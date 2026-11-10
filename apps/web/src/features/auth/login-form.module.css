@@ -1,0 +1,66 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.errorSummary {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-error-border);
+  background-color: var(--color-error-bg);
+  color: var(--color-error-fg);
+}
+
+.errorSummaryTitle {
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin-block-end: var(--space-2);
+}
+
+.errorList {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.passwordRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.passwordInput {
+  flex: 1;
+}
+
+.mockBox {
+  margin-block-start: var(--space-4);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mockHeading {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.mockNote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.mockButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

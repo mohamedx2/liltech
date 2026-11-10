@@ -1,27 +1,40 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
-import { createRealTransport } from './transports/real';
-import { createMockTransport } from './transports/mock';
+import { createAuthApi, type AuthApi } from './modules/auth';
+import { createEventsApi, type EventsApi } from './modules/events';
+import { createHealthApi } from './modules/health';
+import { createRegistrationsApi, type RegistrationsApi } from './modules/registrations';
 import type { ApiRequestConfig, ApiTransport } from './transport';
+import { createMockTransport } from './transports/mock';
+import { createRealTransport } from './transports/real';
 
 /**
  * Typed API client — the single place where the frontend talks to the backend.
  *
- * Adding a new endpoint means adding a typed method here (with its contract
- * from `libs/api-contracts`), not a new `fetch` in a component.
+ * Adding a new endpoint means adding a typed method in `lib/api/modules/`
+ * (backed by a contract from `libs/api-contracts`), not a new `fetch` in a component.
  */
 export interface ApiClient {
-  /** Raw typed request, for endpoints without a dedicated method yet. */
+  /** Raw typed request, for endpoints without a dedicated module method yet. */
   request: <TResponse>(path: string, config?: ApiRequestConfig) => Promise<TResponse>;
 
   /** `GET /health` — application + database status. */
-  getHealth: () => Promise<HealthResponse>;
+  getHealth: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<HealthResponse>;
+
+  events: EventsApi;
+  auth: AuthApi;
+  registrations: RegistrationsApi;
 }
 
-function createApiClient(transport: ApiTransport): ApiClient {
+export function createApiClient(transport: ApiTransport): ApiClient {
+  const health = createHealthApi(transport);
+
   return {
     request: (path, config) => transport.request(path, config),
-    getHealth: () => transport.request<HealthResponse>('/health'),
+    getHealth: (config) => health.getHealth(config),
+    events: createEventsApi(transport),
+    auth: createAuthApi(transport),
+    registrations: createRegistrationsApi(transport),
   };
 }
 
@@ -40,3 +53,4 @@ export { ApiClientError } from './errors';
 export type { ApiRequestConfig, ApiRequestMethod, ApiTransport } from './transport';
 export type { RealTransportOptions } from './transports/real';
 export type { MockTransportOptions } from './transports/mock';
+export { IMPLEMENTED_ENDPOINTS, PLANNED_ENDPOINTS } from './endpoints';

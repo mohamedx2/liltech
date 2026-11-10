@@ -1,0 +1,82 @@
+# LilTech 2026 — Frontend API Integration Guide
+
+> Documents the centralized typed API client in `apps/web/src/lib/api/`, transport switching (`real` vs `mock`), provisional contract isolation, and backend readiness tracking.
+
+---
+
+## 1. Single API Entry Point (`apps/web/src/lib/api/`)
+
+Per [`AGENTS.md`](../../AGENTS.md) §5, UI components **never** call `fetch()` directly and **never** hardcode backend URLs. Every HTTP call goes through `api` exported from [`apps/web/src/lib/api/index.ts`](../../apps/web/src/lib/api/index.ts).
+
+```text
+apps/web/src/lib/api/
+├── index.ts                 # Exports `api` singleton (Real or Mock by env.NEXT_PUBLIC_API_MODE)
+├── endpoints.ts             # Implemented vs planned path registry
+├── transport.ts             # ApiTransport interface (with credentials support)
+├── errors.ts                # ApiClientError & normalizeHttpError (parses { error: { code, message } })
+├── contracts/
+│   └── pending.ts           # Provisional Zod schemas & types reusing `libs/api-contracts` enums
+├── modules/                 # Domain-grouped client methods (validate responses via Zod)
+│   ├── health.ts            # GET /health (canonical `healthResponseSchema` from libs/api-contracts)
+│   ├── events.ts            # GET /event-state
+│   ├── auth.ts              # POST /auth/login, POST /auth/logout, GET /auth/me
+│   └── registrations.ts     # POST /registrations
+└── transports/
+    ├── real.ts              # Fetch transport (`buildRequestUrl` + `credentials: 'include'`)
+    ├── mock.ts              # Routes mock requests cleanly; returns 404 NOT_FOUND for unknown paths
+    └── mocks/               # Modular dev-only mock handlers + in-memory dev state
+```
+
+### URL Resolution (`buildRequestUrl`)
+
+`NEXT_PUBLIC_API_URL` defaults to `http://localhost:4000/api` (`apps/web/src/config/env.ts`). [`createRealTransport`](../../apps/web/src/lib/api/transports/real.ts) joins paths via `buildRequestUrl(baseUrl, path)` so leading slashes like `/health` or `/auth/login` resolve to `http://localhost:4000/api/health` and `http://localhost:4000/api/auth/login` (avoiding the standard `new URL('/health', 'http://host/api')` pitfall that drops `/api`).
+
+Credentials default to `'include'` so cookie/session authentication works cleanly with the Express CORS configuration (`credentials: true` in `apps/api/src/app.ts`).
+
+---
+
+## 2. Backend Implementation Status & Provisional Contracts
+
+Currently in `apps/api`, **only `GET /api/health` is implemented**. All other endpoint groups listed in [`docs/api/README.md`](../api/README.md) are planned.
+
+| Module | Endpoint(s) Used by Frontend | Backend Status | Contract Source | Behavior in `real` Mode Today |
+|---|---|---|---|---|
+| `health` | `GET /api/health` | **Implemented** | `healthResponseSchema` (`libs/api-contracts`) | Calls live Express API & displays DB status |
+| `events` | `GET /api/event-state` | **Planned (missing)** | Provisional `eventStateResponseSchema` (`pending.ts`) | Returns `404`; UI falls back cleanly to `"Event State Pending API"` notice |
+| `auth` | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `Role` & `ChallengeTrack` | `GET /auth/me` `401`/`404` treats visitor as signed out; login surfaces a clear pending-endpoint message |
+| `registrations` | `POST /api/registrations` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `TeamProgressState` | Validates 3–5 members locally; `404` surfaces a clear pending-endpoint message |
+| Team / Check-In / Jury / Admin / Results | Participant, check-in, jury scoring, admin & leaderboard routes | **Planned (missing)** | Owned by Persons 2 & 3 | To be added as modular `lib/api/modules/*.ts` files |
+
+### Migrating Provisional Contracts to `libs/api-contracts`
+
+1. As backend contributors add Zod schemas to `libs/api-contracts/src/lib/`, remove the corresponding provisional schema from [`apps/web/src/lib/api/contracts/pending.ts`](../../apps/web/src/lib/api/contracts/pending.ts).
+2. Update imports in `apps/web/src/lib/api/modules/*.ts` and `apps/web/src/lib/api/transports/mocks/*.ts` to import directly from `'api-contracts'`.
+3. Update path strings in [`endpoints.ts`](../../apps/web/src/lib/api/endpoints.ts) if the finalized REST route naming differs, then verify in `NEXT_PUBLIC_API_MODE=real`.
+
+---
+
+## 3. Error Handling Contract
+
+All API failures throw `ApiClientError` ([`apps/web/src/lib/api/errors.ts`](../../apps/web/src/lib/api/errors.ts)) with:
+- `status`: HTTP status (`0` for network failure)
+- `code`: Backend canonical code (`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `RATE_LIMITED`, `CTF_NOT_SOLVED`, `INTERNAL`, `NETWORK_ERROR`, or fallback)
+- `message`: Human-readable error message from `{ "error": { "code", "message" } }`
+- `isNetworkError`: Boolean flag
+
+Rate-limited requests (`429 RATE_LIMITED`) and HTTP `404`/`501` unimplemented endpoints are handled explicitly across `LoginForm`, `TeamRegistrationForm`, and `EventPhaseBanner` with accessible error alerts.
+
+---
+
+## 4. Server-Synchronized Countdowns
+
+Per [`AGENTS.md`](../../AGENTS.md) §2 and [`docs/api/README.md`](../api/README.md), countdowns must never rely blindly on the client clock:
+- Event responses return authoritative ISO 8601 UTC `serverTime` and `nextPhaseAt` strings.
+- [`ServerCountdown`](../../apps/web/src/components/events/server-countdown.tsx) parses both timestamps via `parseIsoTimestamp` from `libs/shared`, computes `offsetMs = serverMs - Date.now()` once when timestamps change, and ticks `Date.now() + offsetMs` until expiration.
+
+---
+
+## 5. Development Mock Mode (`NEXT_PUBLIC_API_MODE=mock`)
+
+- Mock handlers live inside `apps/web/src/lib/api/transports/mocks/` and run only when `NEXT_PUBLIC_API_MODE=mock`.
+- Mock accounts (`team@liltech.mock`, `jury@liltech.mock`, `admin@liltech.mock`) and mock banner controls are strictly gated behind `env.NEXT_PUBLIC_API_MODE === 'mock'` and contain **zero real credentials or CTF flags**.
+- Keep `NEXT_PUBLIC_API_MODE=real` for staging/production builds.
