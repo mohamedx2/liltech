@@ -13,6 +13,27 @@ jobs:
   verify:
     name: Verify affected projects
     runs-on: ubuntu-latest
+
+    services:
+      # Dedicated integration-test database (isolated from dev DATABASE_URL).
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: liltech_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: liltech_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U liltech_test -d liltech_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Used by apps/api integration tests (see docs/backend/DEVELOPMENT.md).
+      TEST_DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +53,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to the integration test database
+        run: pnpm --filter api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
       - name: Derive affected base
         id: base

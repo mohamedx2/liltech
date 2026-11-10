@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Roles defined by the LilTech API specification.
  * Every authenticated endpoint declares exactly one required role.
@@ -9,6 +11,8 @@ export const Role = {
 } as const;
 
 export type Role = (typeof Role)[keyof typeof Role];
+
+export const roleSchema = z.enum([Role.Team, Role.Jury, Role.Admin]);
 
 /** All valid roles, e.g. for validation schemas and dropdowns. */
 export const ROLES: readonly Role[] = [Role.Team, Role.Jury, Role.Admin];

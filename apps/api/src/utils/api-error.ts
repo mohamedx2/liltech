@@ -13,6 +13,7 @@ export const ApiErrorCode = {
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
   NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
   RATE_LIMITED: 'RATE_LIMITED',
   CTF_NOT_SOLVED: 'CTF_NOT_SOLVED',
 } as const;
@@ -47,6 +48,10 @@ export class ApiError extends Error {
 
   static notFound(message = 'Resource not found.'): ApiError {
     return new ApiError(ApiErrorCode.NOT_FOUND, message, 404);
+  }
+
+  static conflict(message = 'The request conflicts with the current state.'): ApiError {
+    return new ApiError(ApiErrorCode.CONFLICT, message, 409);
   }
 
   static rateLimited(message = 'Too many requests. Please slow down.'): ApiError {

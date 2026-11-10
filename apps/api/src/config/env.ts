@@ -26,6 +26,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().startsWith('postgresql://', {
     message: 'DATABASE_URL must be a valid PostgreSQL connection string',
   }),
+
+  /** Lifetime of authentication session tokens, in hours. */
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
 });
 
 export type Env = z.infer<typeof envSchema>;
