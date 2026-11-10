@@ -1,4 +1,5 @@
 .container {
+  box-sizing: border-box;
   inline-size: 100%;
   max-inline-size: var(--content-width);
   margin-inline: auto;
