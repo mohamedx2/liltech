@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "args=-t lint,typecheck,test,build --base=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+            echo "args=affected -t lint,typecheck,test,build --base=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
           else
             # On main pushes, verify everything to keep the branch always green
             echo "args=run-many -t lint,typecheck,test,build" >> "$GITHUB_OUTPUT"
