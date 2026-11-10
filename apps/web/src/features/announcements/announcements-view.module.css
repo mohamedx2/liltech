@@ -1,0 +1,131 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background-color: var(--color-surface, #121730);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 0.75rem);
+}
+
+@media (min-width: 48rem) {
+  .header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.headerTitles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.subHeading {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  max-width: 36rem;
+  margin: 0;
+  line-height: var(--leading-normal, 1.5);
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: inline-flex;
+  background-color: var(--color-surface-raised, #161c38);
+  padding: var(--space-1);
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid var(--color-border);
+}
+
+.filterButton {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm, 0.25rem);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.filterButton:hover {
+  color: var(--color-text);
+}
+
+.filterButton.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.feedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.announcementArticle {
+  width: 100%;
+}
+
+.announcementCard {
+  width: 100%;
+}
+
+.cardHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.timestamp {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.bodyContent {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: var(--leading-relaxed, 1.6);
+  margin: 0;
+}

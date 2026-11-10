@@ -103,3 +103,138 @@ export const teamRegistrationResponseSchema = z.object({
 });
 
 export type TeamRegistrationResponse = z.infer<typeof teamRegistrationResponseSchema>;
+
+/**
+ * Participant portal contracts (provisional — pending `libs/api-contracts` additions).
+ * Reuse canonical enums (`TeamProgressState`, `ChallengeTrack`) from `api-contracts`.
+ */
+
+export const participantProfileSchema = z.object({
+  id: z.string(),
+  teamId: z.string(),
+  fullName: z.string(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  roleInTeam: z.enum(['leader', 'member']),
+  isCheckedIn: z.boolean(),
+});
+
+export type ParticipantProfile = z.infer<typeof participantProfileSchema>;
+
+export const teamSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  track: challengeTrackSchema.nullable().optional(),
+  progress: teamProgressStateSchema,
+  isCheckedIn: z.boolean(),
+  members: z.array(participantProfileSchema),
+});
+
+export type TeamSummary = z.infer<typeof teamSummarySchema>;
+
+export const badgePassResponseSchema = z.object({
+  participantId: z.string(),
+  participantName: z.string(),
+  teamId: z.string(),
+  teamName: z.string(),
+  track: challengeTrackSchema.nullable().optional(),
+  /** QR badge image (SVG data or data URL) issued to the participant by email. */
+  qrData: z.string(),
+  /** High-entropy, revocable badge token treated as a credential by the backend. */
+  qrToken: z.string(),
+});
+
+export type BadgePassResponse = z.infer<typeof badgePassResponseSchema>;
+
+export const miniCtfStatusResponseSchema = z.object({
+  /** Server-owned decision: gate availability (phase, check-in eligibility). */
+  isOpen: z.boolean(),
+  isSolved: z.boolean(),
+  solvedAt: isoTimestampSchema.optional(),
+  attemptsCount: z.number().int().nonnegative(),
+  /** Server UTC timestamp until which further flag attempts are rejected. */
+  cooldownUntil: isoTimestampSchema.nullable().optional(),
+  hint: z.string().optional(),
+});
+
+export type MiniCtfStatusResponse = z.infer<typeof miniCtfStatusResponseSchema>;
+
+export const miniCtfSubmitRequestSchema = z.object({
+  flag: z.string().min(1, 'Flag cannot be empty').max(100),
+});
+
+export type MiniCtfSubmitRequest = z.infer<typeof miniCtfSubmitRequestSchema>;
+
+export const miniCtfSubmitResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  progress: teamProgressStateSchema,
+  unlockedChallengeTrack: challengeTrackSchema.nullable().optional(),
+});
+
+export type MiniCtfSubmitResponse = z.infer<typeof miniCtfSubmitResponseSchema>;
+
+export const challengeResourceSchema = z.object({
+  name: z.string(),
+  url: z.string(),
+  size: z.string().optional(),
+});
+
+export type ChallengeResource = z.infer<typeof challengeResourceSchema>;
+
+export const challengeDetailResponseSchema = z.object({
+  id: z.string(),
+  track: challengeTrackSchema,
+  title: z.string(),
+  description: z.string(),
+  problemStatement: z.string(),
+  deliverablesRequirements: z.array(z.string()),
+  resources: z.array(challengeResourceSchema),
+});
+
+export type ChallengeDetailResponse = z.infer<typeof challengeDetailResponseSchema>;
+
+export const submissionItemSchema = z.object({
+  id: z.string(),
+  teamId: z.string(),
+  track: challengeTrackSchema,
+  title: z.string(),
+  description: z.string().optional(),
+  repoUrl: z.string().url().optional().or(z.literal('')),
+  fileName: z.string().optional(),
+  fileSizeBytes: z.number().optional(),
+  submittedAt: isoTimestampSchema,
+  version: z.number().int().positive(),
+});
+
+export type SubmissionItem = z.infer<typeof submissionItemSchema>;
+
+export const submissionHistoryResponseSchema = z.object({
+  submissions: z.array(submissionItemSchema),
+  current: submissionItemSchema.nullable().optional(),
+  isLocked: z.boolean(),
+  deadline: isoTimestampSchema.nullable().optional(),
+});
+
+export type SubmissionHistoryResponse = z.infer<typeof submissionHistoryResponseSchema>;
+
+export const announcementPrioritySchema = z.enum(['normal', 'urgent', 'broadcast']);
+
+export type AnnouncementPriority = z.infer<typeof announcementPrioritySchema>;
+
+export const announcementItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(),
+  priority: announcementPrioritySchema,
+  createdAt: isoTimestampSchema,
+});
+
+export type AnnouncementItem = z.infer<typeof announcementItemSchema>;
+
+export const announcementsResponseSchema = z.object({
+  items: z.array(announcementItemSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export type AnnouncementsResponse = z.infer<typeof announcementsResponseSchema>;
