@@ -40,10 +40,10 @@ export type DatabaseHealth = {
  * Runs a trivial query with a hard timeout so health checks stay fast.
  */
 export async function checkDatabaseHealth(timeoutMs = 2000): Promise<DatabaseHealth> {
-  const client = getPrismaClient();
   const start = Date.now();
 
   try {
+    const client = getPrismaClient();
     await Promise.race([
       client.$queryRaw`SELECT 1`,
       new Promise<never>((_, reject) =>
