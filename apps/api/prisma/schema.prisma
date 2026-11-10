@@ -1,12 +1,13 @@
-// LilTech 2026 Platform — initial Prisma schema
+// LilTech 2026 Platform — Prisma schema
 //
-// This schema intentionally models only what is needed to validate the
-// database integration (connection, migrations, health checks, seeds).
+// The foundation domain covers what the specification defines unambiguously:
+// authentication accounts and sessions, team/participant registration, QR
+// badge tokens, check-in, the event phase state (single writer), live
+// announcements, and the audit log.
 //
-// The full event domain (participants, teams, challenges, submissions,
-// scoring, …) is modeled in dedicated migrations once the open business
-// questions are confirmed — see `docs/decisions/OPEN_QUESTIONS.md`.
-// Do not add speculative models or assumptions to this file.
+// Still intentionally absent (blocked on `docs/decisions/OPEN_QUESTIONS.md`):
+// challenge tracks/assignment, Mini-CTF material and attempt log, challenge
+// unlocking, submissions, jury scoping, scores, leaderboards, results.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,7 +19,6 @@ datasource db {
 }
 
 /// Generic key/value store for platform-level metadata.
-/// Deliberately domain-neutral until the event model is finalized.
 model SystemSetting {
   key       String   @id
   value     String
@@ -26,4 +26,170 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+/// Roles from the LilTech specification. Enforcement happens in the API.
+enum Role {
+  team
+  jury
+  admin
+
+  @@map("role")
+}
+
+/// Account for one of the API roles. Created by registration (team) or
+/// administratively (jury/admin — provisioning endpoint pending decision).
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  role           Role
+  email          String          @unique @db.VarChar(254)
+  name           String          @db.VarChar(100)
+  /// bcrypt hash (slow, salted). Never logged, never returned.
+  passwordHash   String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sessions       Session[]
+  team           Team?
+  checkInRecords CheckInRecord[]
+  auditLogs      AuditLog[]
+  announcements  Announcement[]
+
+  @@map("users")
+}
+
+/// Server-side session. Only a SHA-256 digest of the bearer token is stored;
+/// the raw token is a credential shown once at login.
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(64)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  /// Set when the session is logged out; expired sessions are never accepted.
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Team registered by its leader. 3–5 members (leader included).
+model Team {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @unique @db.VarChar(60)
+  leader        User          @relation(fields: [leaderId], references: [id])
+  leaderId      String        @unique @db.Uuid
+  progressState TeamProgress  @default(registered)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  participants  Participant[]
+
+  @@index([progressState])
+  @@map("teams")
+}
+
+/// Team progress through the event (canonical states from the specification).
+enum TeamProgress {
+  registered
+  checked_in
+  ctf_unlocked
+  ctf_solved
+  challenge_unlocked
+  submitted
+
+  @@map("team_progress")
+}
+
+/// Member of a team, including the leader. Each participant gets one QR badge.
+model Participant {
+  id        String         @id @default(uuid()) @db.Uuid
+  team      Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String         @db.Uuid
+  name      String         @db.VarChar(100)
+  isLeader  Boolean
+  /// Optional contact email — delivery transport is pending (open question 8).
+  email     String?        @db.VarChar(254)
+  createdAt DateTime       @default(now())
+  badge     QrToken?
+  checkIn   CheckInRecord?
+
+  @@index([teamId])
+  @@map("participants")
+}
+
+/// One QR badge per participant. The raw token is high-entropy
+/// (32 bytes, base64url) and only its SHA-256 digest is persisted; the badge
+/// is revocable (credential semantics).
+model QrToken {
+  id            String      @id @default(uuid()) @db.Uuid
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId String      @unique @db.Uuid
+  tokenHash     String      @unique @db.VarChar(64)
+  issuedAt      DateTime    @default(now())
+  revokedAt     DateTime?
+
+  @@map("qr_tokens")
+}
+
+/// Record of a successful QR check-in. One per participant — enforced by the
+/// unique participant reference and checked atomically at scan time.
+model CheckInRecord {
+  id              String      @id @default(uuid()) @db.Uuid
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId   String      @unique @db.Uuid
+  checkedInAt     DateTime    @default(now())
+  checkedByUser   User        @relation(fields: [checkedByUserId], references: [id])
+  checkedByUserId String      @db.Uuid
+
+  @@index([checkedInAt])
+  @@map("check_in_records")
+}
+
+/// Single-row table (id = 1). The API is the only writer.
+model EventPhaseState {
+  id              Int        @id @default(1)
+  phase           EventPhase @default(registration)
+  phaseChangedAt  DateTime   @default(now())
+  changedByUserId String?    @db.Uuid
+
+  @@map("event_phase_state")
+}
+
+enum EventPhase {
+  registration
+  checkin
+  live
+  submissions_closed
+  pitching
+  results
+
+  @@map("event_phase")
+}
+
+/// Audit trail for sensitive administrative actions.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId    String?  @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String?  @db.VarChar(50)
+  /// Identifier of the audited target; semantics depend on `targetType`
+  /// (e.g. the fixed `1` of the event phase state row).
+  targetId   String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// Live announcement feed.
+model Announcement {
+  id          String   @id @default(uuid()) @db.Uuid
+  author      User     @relation(fields: [authorId], references: [id])
+  authorId    String   @db.Uuid
+  body        String   @db.VarChar(500)
+  publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
+  @@map("announcements")
 }
