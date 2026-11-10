@@ -33,6 +33,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm nx run api:prisma-generate
+
       - name: Derive affected base
         id: base
         shell: bash
