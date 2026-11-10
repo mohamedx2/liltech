@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+  - 'libs/*'
+
+# pnpm 10+ blocks lifecycle scripts by default; approve the ones we need
+onlyBuiltDependencies:
+  - nx
+  - '@parcel/watcher'
+  - unrs-resolver
+  - '@swc/core'
+  - core-js-pure
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - esbuild

@@ -1,0 +1,31 @@
+# Local development infrastructure.
+#
+# Start only the database:   docker compose up -d postgres
+# Check status:              docker compose ps
+# Follow database logs:      docker compose logs -f postgres
+# Stop everything:           docker compose down
+#
+# The `.env` file (see `.env.example`) provides the database credentials.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: liltech-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-liltech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-liltech}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-liltech} -d ${POSTGRES_DB:-liltech}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:

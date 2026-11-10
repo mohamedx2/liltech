@@ -1,0 +1,29 @@
+// LilTech 2026 Platform — initial Prisma schema
+//
+// This schema intentionally models only what is needed to validate the
+// database integration (connection, migrations, health checks, seeds).
+//
+// The full event domain (participants, teams, challenges, submissions,
+// scoring, …) is modeled in dedicated migrations once the open business
+// questions are confirmed — see `docs/decisions/OPEN_QUESTIONS.md`.
+// Do not add speculative models or assumptions to this file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Generic key/value store for platform-level metadata.
+/// Deliberately domain-neutral until the event model is finalized.
+model SystemSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}

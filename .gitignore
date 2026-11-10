@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds & caches
+dist/
+out-tsc/
+.nx/cache
+.nx/workspace-data
+.turbo
+.next/
+out/
+build/
+coverage/
+.vitest/
+.vitest/
+
+# Prisma
+apps/api/prisma/*.db
+
+# Environment files — commit examples (.env.example), never real env files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# Uploads & runtime data
+uploads/
+data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editors & OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Nx
+www/
+tmp/
+
+# Misc
+*.tsbuildinfo
+.eslintcache
+.qodo
+
+.nx/installation
+.nx/self-healing
+.nx/migrate-runs
+.nx/polygraph
+.claude/worktrees
+.claude/settings.local.json
+
+# Next.js
+.next
+out
+vitest.config.*.timestamp*
+.vitest

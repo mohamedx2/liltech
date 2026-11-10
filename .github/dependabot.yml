@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [ci, dependencies]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    # Batch related updates to reduce review noise for a small team
+    groups:
+      nx:
+        patterns: ['nx', '@nx/*']
+      next:
+        patterns: ['next', '@next/*']

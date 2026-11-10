@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify affected projects
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Needed for `nx affected` to compute the diff against the base branch
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        # Version is read from `packageManager` in package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Derive affected base
+        id: base
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "args=-t lint,typecheck,test,build --base=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+          else
+            # On main pushes, verify everything to keep the branch always green
+            echo "args=run-many -t lint,typecheck,test,build" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check formatting
+        run: pnpm exec nx format:check
+
+      - name: Lint, typecheck, test & build (affected)
+        run: pnpm exec nx ${{ steps.base.outputs.args }}
