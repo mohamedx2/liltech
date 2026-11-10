@@ -9,6 +9,16 @@ export interface RealTransportOptions {
 }
 
 /**
+ * Joins `baseUrl` (which may include a base path like `/api`) and `path`
+ * without dropping the base path when `path` begins with `/`.
+ */
+export function buildRequestUrl(baseUrl: string, path: string): string {
+  const normalizedBase = baseUrl.replace(/\/+$/, '');
+  const normalizedPath = path.replace(/^\/+/, '');
+  return normalizedPath.length > 0 ? `${normalizedBase}/${normalizedPath}` : normalizedBase;
+}
+
+/**
  * Real HTTP transport against the Express API.
  * Normalizes every failure mode (network, timeout, non-JSON, API error body)
  * into `ApiClientError`.
@@ -18,10 +28,12 @@ export function createRealTransport(options: RealTransportOptions): ApiTransport
 
   return {
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
-      const { method = 'GET', body, headers, authToken, signal } = config;
+      const { method = 'GET', body, headers, authToken, credentials = 'include', signal } = config;
+      const url = buildRequestUrl(options.baseUrl, path);
 
-      const response = await doFetch(new URL(path, `${options.baseUrl}/`), {
+      const response = await doFetch(url, {
         method,
+        credentials,
         headers: {
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),

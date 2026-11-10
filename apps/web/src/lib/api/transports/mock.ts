@@ -1,13 +1,15 @@
-import type { HealthResponse } from 'api-contracts';
 import { ApiClientError } from '../errors';
 import type { ApiRequestConfig, ApiTransport } from '../transport';
+import { createAuthMockRoutes } from './mocks/auth.mock';
+import { createEventsMockRoutes } from './mocks/events.mock';
+import { createHealthMockRoutes } from './mocks/health.mock';
+import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
+import type { MockRouteMap } from './mocks/types';
 
 export interface MockTransportOptions {
   /** Simulated network latency in milliseconds. */
   latencyMs?: number;
 }
-
-type MockHandler = (config: ApiRequestConfig) => unknown;
 
 /**
  * In-memory mock transport. Lets UI work proceed without a running backend.
@@ -16,25 +18,34 @@ type MockHandler = (config: ApiRequestConfig) => unknown;
  * never be used as the source of truth for business logic — the API is.
  */
 export function createMockTransport(options: MockTransportOptions = {}): ApiTransport {
-  const latencyMs = options.latencyMs ?? 300;
+  const latencyMs = options.latencyMs ?? 150;
 
-  const routes: Record<string, MockHandler> = {
-    'GET /health': (): HealthResponse => ({
-      status: 'ok',
-      uptimeSeconds: 42,
-      timestamp: new Date().toISOString(),
-      database: { status: 'up', latencyMs: 2 },
-    }),
+  const routes: MockRouteMap = {
+    ...createHealthMockRoutes(),
+    ...createEventsMockRoutes(),
+    ...createAuthMockRoutes(),
+    ...createRegistrationsMockRoutes(),
   };
 
   return {
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
-      await new Promise((resolve) => setTimeout(resolve, latencyMs));
+      if (latencyMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, latencyMs));
+      }
 
-      const handler = routes[`${config.method ?? 'GET'} ${path}`];
+      if (config.signal?.aborted) {
+        throw new ApiClientError({
+          message: 'Request aborted.',
+          status: null,
+          code: 'ABORTED',
+        });
+      }
+
+      const method = config.method ?? 'GET';
+      const handler = routes[`${method} ${path}`];
       if (!handler) {
         throw new ApiClientError({
-          message: `No mock defined for ${config.method ?? 'GET'} ${path}.`,
+          message: `No mock defined for ${method} ${path}.`,
           status: 404,
           code: 'NOT_FOUND',
         });
