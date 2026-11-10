@@ -21,4 +21,12 @@ export const PLANNED_ENDPOINTS = {
   AUTH_LOGOUT: '/auth/logout',
   AUTH_SESSION: '/auth/me',
   REGISTRATIONS: '/registrations',
+  PARTICIPANTS_TEAM: '/participants/team',
+  PARTICIPANTS_BADGE: '/participants/badge',
+  MINI_CTF_STATUS: '/mini-ctf/status',
+  MINI_CTF_SUBMIT: '/mini-ctf/submit',
+  CHALLENGES_CURRENT: '/challenges/current',
+  SUBMISSIONS: '/submissions',
+  SUBMISSIONS_MY_TEAM: '/submissions/my-team',
+  ANNOUNCEMENTS: '/announcements',
 } as const;
