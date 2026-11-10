@@ -1,9 +1,14 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
+import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
+import { createChallengesApi, type ChallengesApi } from './modules/challenges';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
+import { createMiniCtfApi, type MiniCtfApi } from './modules/mini-ctf';
+import { createParticipantsApi, type ParticipantsApi } from './modules/participants';
 import { createRegistrationsApi, type RegistrationsApi } from './modules/registrations';
+import { createSubmissionsApi, type SubmissionsApi } from './modules/submissions';
 import type { ApiRequestConfig, ApiTransport } from './transport';
 import { createMockTransport } from './transports/mock';
 import { createRealTransport } from './transports/real';
@@ -24,6 +29,11 @@ export interface ApiClient {
   events: EventsApi;
   auth: AuthApi;
   registrations: RegistrationsApi;
+  participants: ParticipantsApi;
+  miniCtf: MiniCtfApi;
+  challenges: ChallengesApi;
+  submissions: SubmissionsApi;
+  announcements: AnnouncementsApi;
 }
 
 export function createApiClient(transport: ApiTransport): ApiClient {
@@ -35,6 +45,11 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     events: createEventsApi(transport),
     auth: createAuthApi(transport),
     registrations: createRegistrationsApi(transport),
+    participants: createParticipantsApi(transport),
+    miniCtf: createMiniCtfApi(transport),
+    challenges: createChallengesApi(transport),
+    submissions: createSubmissionsApi(transport),
+    announcements: createAnnouncementsApi(transport),
   };
 }
 

@@ -31,15 +31,19 @@ export function createRealTransport(options: RealTransportOptions): ApiTransport
       const { method = 'GET', body, headers, authToken, credentials = 'include', signal } = config;
       const url = buildRequestUrl(options.baseUrl, path);
 
+      // FormData requests are sent as multipart/form-data (browser sets the
+      // boundary); JSON bodies are sent as application/json.
+      const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+
       const response = await doFetch(url, {
         method,
         credentials,
         headers: {
-          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...(body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
           ...headers,
         },
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
         signal,
       }).catch(
         (cause: unknown) =>
