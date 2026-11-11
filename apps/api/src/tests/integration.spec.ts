@@ -4,6 +4,7 @@ import type { Express } from 'express';
 import { createApp } from '../app';
 import { hashPassword } from '../modules/auth/password.service';
 import { createSessionForUser, login, createUser } from '../modules/auth/auth.service';
+import { registerTeamWithBadges } from '../modules/registration/registration.service';
 import {
   destroyIntegrationDatabase,
   INTEGRATION_DB_AVAILABLE,
@@ -297,6 +298,70 @@ describeDb('api foundation modules', () => {
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
+    it('registers a full 5-member team and issues one badge per participant', async () => {
+      const response = await request(app)
+        .post('/api/registration/teams')
+        .send({
+          teamName: 'Full House',
+          leader: {
+            name: 'Full Leader',
+            email: 'full-house-leader@test.local',
+            password: LEADER_PASSWORD,
+          },
+          members: [
+            { name: 'Member One' },
+            { name: 'Member Two' },
+            { name: 'Member Three' },
+            { name: 'Member Four' },
+          ],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.badges).toHaveLength(5);
+    });
+
+    it('enforces the 3–5 member size at the service layer', async () => {
+      const tooSmall = {
+        teamName: 'Too Small',
+        leader: {
+          name: 'Small Leader',
+          email: 'too-small-leader@test.local',
+          password: LEADER_PASSWORD,
+        },
+        members: [{ name: 'Only Member' }],
+      };
+      await expect(registerTeamWithBadges(tooSmall)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        status: 400,
+      });
+
+      const tooLarge = {
+        teamName: 'Too Large',
+        leader: {
+          name: 'Large Leader',
+          email: 'too-large-leader@test.local',
+          password: LEADER_PASSWORD,
+        },
+        members: [
+          { name: 'One' },
+          { name: 'Two' },
+          { name: 'Three' },
+          { name: 'Four' },
+          { name: 'Five' },
+        ],
+      };
+      await expect(registerTeamWithBadges(tooLarge)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        status: 400,
+      });
+
+      // The rejected registrations must not have created leader accounts.
+      const loginAttempt = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'too-small-leader@test.local', password: LEADER_PASSWORD });
+      expect(loginAttempt.status).toBe(401);
+    });
+
     it('rejects duplicate team names and duplicate leader emails', async () => {
       await registerTeam('Duplicate Probe', 'probe-leader@test.local');
 
@@ -378,6 +443,59 @@ describeDb('api foundation modules', () => {
         .send({ token: created.tokens[0] });
       expect(afterRevoke.status).toBe(403);
       expect(afterRevoke.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('a successful scan moves the team progress state from registered to checked_in', async () => {
+      const created = await registerTeam('Progress Crew', 'progress-leader@test.local');
+      const logged = await login('progress-leader@test.local', LEADER_PASSWORD);
+
+      const before = await request(app)
+        .get('/api/registration/teams/me')
+        .set('Authorization', `Bearer ${logged.token}`);
+      expect(before.status).toBe(200);
+      expect(before.body.progressState).toBe('registered');
+
+      const adminToken = await tokenFor(admin);
+      const scan = await request(app)
+        .post('/api/checkin/scan')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ token: created.tokens[0] });
+      expect(scan.status).toBe(200);
+
+      const after = await request(app)
+        .get('/api/registration/teams/me')
+        .set('Authorization', `Bearer ${logged.token}`);
+      expect(after.status).toBe(200);
+      expect(after.body.progressState).toBe('checked_in');
+    });
+
+    it('rejects invalid revoke payloads', async () => {
+      const created = await registerTeam(
+        'Revoke Validation Crew',
+        'revoke-validation-leader@test.local',
+      );
+      const adminToken = await tokenFor(admin);
+
+      const missing = await request(app)
+        .post('/api/checkin/revoke')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+      expect(missing.status).toBe(400);
+      expect(missing.body.error.code).toBe('VALIDATION_ERROR');
+
+      const malformed = await request(app)
+        .post('/api/checkin/revoke')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ participantId: 'not-a-uuid' });
+      expect(malformed.status).toBe(400);
+      expect(malformed.body.error.code).toBe('VALIDATION_ERROR');
+
+      const unknownField = await request(app)
+        .post('/api/checkin/revoke')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ participantId: created.leaderParticipantId, token: 'A'.repeat(43) });
+      expect(unknownField.status).toBe(400);
+      expect(unknownField.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('logs every scan in the audit trail', async () => {

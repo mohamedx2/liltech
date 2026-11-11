@@ -41,6 +41,27 @@ export async function issueBadgeForParticipant(participantId: string): Promise<I
   };
 }
 
+/** Issue a QR badge within an already-open transaction (atomic with registration). */
+export async function issueBadgeForParticipantInTx(
+  tx: Prisma.TransactionClient,
+  participantId: string,
+  participantName: string,
+): Promise<IssueBadgeResponse> {
+  const { token, tokenHash } = generateQrToken();
+
+  const created = await tx.qrToken.create({
+    data: { participantId, tokenHash },
+    select: { issuedAt: true },
+  });
+
+  return {
+    participantId,
+    participantName,
+    token,
+    issuedAt: created.issuedAt.toISOString(),
+  };
+}
+
 export async function listBadges(): Promise<BadgeSummary[]> {
   const prisma = getPrismaClient();
 
@@ -98,6 +119,11 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
 
       const checkIn = await tx.checkInRecord.create({
         data: { participantId: badge.participantId, checkedByUserId: adminUserId },
+      });
+
+      await tx.team.update({
+        where: { id: badge.participant.team.id },
+        data: { progressState: 'checked_in' },
       });
 
       await tx.auditLog.create({

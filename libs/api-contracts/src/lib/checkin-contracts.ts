@@ -25,6 +25,12 @@ export const scanCheckInRequestSchema = z.strictObject({
 
 export type ScanCheckInRequest = z.infer<typeof scanCheckInRequestSchema>;
 
+export const revokeBadgeRequestSchema = z.strictObject({
+  participantId: z.string().uuid(),
+});
+
+export type RevokeBadgeRequest = z.infer<typeof revokeBadgeRequestSchema>;
+
 export const checkInResponseSchema = z.strictObject({
   participant: z.strictObject({
     id: z.uuid(),
