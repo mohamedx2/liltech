@@ -1,0 +1,294 @@
+/*
+ * Layer 2: Semantic Design Tokens (light/dark adaptive, temporary neutral theme).
+ *
+ * Follows modern-web-guidance `dark-mode` and `dark-mode-toggle`:
+ * - Root `color-scheme: light dark` adapts browser UI automatically.
+ * - `<meta name="color-scheme">` overrides (`light` | `dark`) feed back into CSS.
+ * - Neutral colors maintain >= 4.5:1 text contrast and >= 3:1 UI boundary
+ *   contrast in both light and dark modes.
+ * - Forced Colors Mode tokens remain safe via system colors.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Light/dark pair definitions */
+  --_bg-light: var(--palette-neutral-0);
+  --_bg-dark: var(--palette-neutral-950);
+
+  --_surface-light: var(--palette-neutral-50);
+  --_surface-dark: var(--palette-neutral-900);
+
+  --_surface-raised-light: var(--palette-neutral-100);
+  --_surface-raised-dark: var(--palette-neutral-800);
+
+  --_text-light: var(--palette-neutral-900);
+  --_text-dark: var(--palette-neutral-50);
+
+  --_text-muted-light: var(--palette-neutral-600);
+  --_text-muted-dark: var(--palette-neutral-300);
+
+  --_primary-light: var(--palette-neutral-800);
+  --_primary-dark: var(--palette-neutral-50);
+
+  --_primary-strong-light: var(--palette-neutral-900);
+  --_primary-strong-dark: var(--palette-neutral-200);
+
+  --_primary-fg-light: var(--palette-neutral-0);
+  --_primary-fg-dark: var(--palette-neutral-900);
+
+  --_secondary-light: var(--palette-neutral-200);
+  --_secondary-dark: var(--palette-neutral-800);
+
+  --_secondary-hover-light: var(--palette-neutral-300);
+  --_secondary-hover-dark: var(--palette-neutral-700);
+
+  --_secondary-fg-light: var(--palette-neutral-900);
+  --_secondary-fg-dark: var(--palette-neutral-50);
+
+  --_accent-light: var(--palette-neutral-700);
+  --_accent-dark: var(--palette-neutral-300);
+
+  --_border-light: var(--palette-neutral-300);
+  --_border-dark: var(--palette-neutral-700);
+
+  --_border-strong-light: var(--palette-neutral-500);
+  --_border-strong-dark: var(--palette-neutral-400);
+
+  --_focus-ring-light: var(--palette-neutral-900);
+  --_focus-ring-dark: var(--palette-neutral-100);
+
+  /* Status pairs */
+  --_success-light: var(--palette-green-700);
+  --_success-dark: var(--palette-green-400);
+  --_success-bg-light: var(--palette-green-50);
+  --_success-bg-dark: var(--palette-green-950);
+  --_success-fg-light: var(--palette-green-900);
+  --_success-fg-dark: var(--palette-green-200);
+  --_success-border-light: var(--palette-green-600);
+  --_success-border-dark: var(--palette-green-400);
+
+  --_warning-light: var(--palette-amber-700);
+  --_warning-dark: var(--palette-amber-400);
+  --_warning-bg-light: var(--palette-amber-50);
+  --_warning-bg-dark: var(--palette-amber-950);
+  --_warning-fg-light: var(--palette-amber-900);
+  --_warning-fg-dark: var(--palette-amber-200);
+  --_warning-border-light: var(--palette-amber-700);
+  --_warning-border-dark: var(--palette-amber-500);
+
+  --_error-light: var(--palette-red-700);
+  --_error-dark: var(--palette-red-400);
+  --_error-bg-light: var(--palette-red-50);
+  --_error-bg-dark: var(--palette-red-950);
+  --_error-fg-light: var(--palette-red-900);
+  --_error-fg-dark: var(--palette-red-200);
+  --_error-border-light: var(--palette-red-600);
+  --_error-border-dark: var(--palette-red-500);
+
+  --_info-light: var(--palette-blue-700);
+  --_info-dark: var(--palette-blue-400);
+  --_info-bg-light: var(--palette-blue-50);
+  --_info-bg-dark: var(--palette-blue-950);
+  --_info-fg-light: var(--palette-blue-900);
+  --_info-fg-dark: var(--palette-blue-200);
+  --_info-border-light: var(--palette-blue-600);
+  --_info-border-dark: var(--palette-blue-500);
+
+  /* Default semantic mapping (light fallback before dark overrides) */
+  --color-bg: var(--_bg-light);
+  --color-surface: var(--_surface-light);
+  --color-surface-raised: var(--_surface-raised-light);
+  --color-text: var(--_text-light);
+  --color-text-muted: var(--_text-muted-light);
+  --color-primary: var(--_primary-light);
+  --color-primary-strong: var(--_primary-strong-light);
+  --color-primary-fg: var(--_primary-fg-light);
+  --color-secondary: var(--_secondary-light);
+  --color-secondary-hover: var(--_secondary-hover-light);
+  --color-secondary-fg: var(--_secondary-fg-light);
+  --color-accent: var(--_accent-light);
+  --color-border: var(--_border-light);
+  --color-border-strong: var(--_border-strong-light);
+  --color-focus-ring: var(--_focus-ring-light);
+
+  --color-success: var(--_success-light);
+  --color-success-bg: var(--_success-bg-light);
+  --color-success-fg: var(--_success-fg-light);
+  --color-success-border: var(--_success-border-light);
+
+  --color-warning: var(--_warning-light);
+  --color-warning-bg: var(--_warning-bg-light);
+  --color-warning-fg: var(--_warning-fg-light);
+  --color-warning-border: var(--_warning-border-light);
+
+  --color-error: var(--_error-light);
+  --color-error-bg: var(--_error-bg-light);
+  --color-error-fg: var(--_error-fg-light);
+  --color-error-border: var(--_error-border-light);
+
+  --color-info: var(--_info-light);
+  --color-info-bg: var(--_info-bg-light);
+  --color-info-fg: var(--_info-fg-light);
+  --color-info-border: var(--_info-border-light);
+
+  /* Compatibility aliases for existing tokens */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-bg-raised: var(--color-surface);
+  --color-bg-card: var(--color-surface-raised);
+  --color-danger: var(--color-error);
+  --color-danger-bg: var(--color-error-bg);
+  --color-danger-fg: var(--color-error-fg);
+  --color-danger-border: var(--color-error-border);
+
+  /* Native form accent */
+  accent-color: var(--color-primary);
+}
+
+/* Fallback for browsers without CSS light-dark() */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: var(--_bg-dark);
+    --color-surface: var(--_surface-dark);
+    --color-surface-raised: var(--_surface-raised-dark);
+    --color-text: var(--_text-dark);
+    --color-text-muted: var(--_text-muted-dark);
+    --color-primary: var(--_primary-dark);
+    --color-primary-strong: var(--_primary-strong-dark);
+    --color-primary-fg: var(--_primary-fg-dark);
+    --color-secondary: var(--_secondary-dark);
+    --color-secondary-hover: var(--_secondary-hover-dark);
+    --color-secondary-fg: var(--_secondary-fg-dark);
+    --color-accent: var(--_accent-dark);
+    --color-border: var(--_border-dark);
+    --color-border-strong: var(--_border-strong-dark);
+    --color-focus-ring: var(--_focus-ring-dark);
+
+    --color-success: var(--_success-dark);
+    --color-success-bg: var(--_success-bg-dark);
+    --color-success-fg: var(--_success-fg-dark);
+    --color-success-border: var(--_success-border-dark);
+
+    --color-warning: var(--_warning-dark);
+    --color-warning-bg: var(--_warning-bg-dark);
+    --color-warning-fg: var(--_warning-fg-dark);
+    --color-warning-border: var(--_warning-border-dark);
+
+    --color-error: var(--_error-dark);
+    --color-error-bg: var(--_error-bg-dark);
+    --color-error-fg: var(--_error-fg-dark);
+    --color-error-border: var(--_error-border-dark);
+
+    --color-info: var(--_info-dark);
+    --color-info-bg: var(--_info-bg-dark);
+    --color-info-fg: var(--_info-fg-dark);
+    --color-info-border: var(--_info-border-dark);
+  }
+}
+
+/* Modern light-dark() dynamically follows :root `color-scheme` (including overrides) */
+@supports (color: light-dark(white, black)) {
+  :root {
+    --color-bg: light-dark(var(--_bg-light), var(--_bg-dark));
+    --color-surface: light-dark(var(--_surface-light), var(--_surface-dark));
+    --color-surface-raised: light-dark(var(--_surface-raised-light), var(--_surface-raised-dark));
+    --color-text: light-dark(var(--_text-light), var(--_text-dark));
+    --color-text-muted: light-dark(var(--_text-muted-light), var(--_text-muted-dark));
+    --color-primary: light-dark(var(--_primary-light), var(--_primary-dark));
+    --color-primary-strong: light-dark(var(--_primary-strong-light), var(--_primary-strong-dark));
+    --color-primary-fg: light-dark(var(--_primary-fg-light), var(--_primary-fg-dark));
+    --color-secondary: light-dark(var(--_secondary-light), var(--_secondary-dark));
+    --color-secondary-hover: light-dark(
+      var(--_secondary-hover-light),
+      var(--_secondary-hover-dark)
+    );
+    --color-secondary-fg: light-dark(var(--_secondary-fg-light), var(--_secondary-fg-dark));
+    --color-accent: light-dark(var(--_accent-light), var(--_accent-dark));
+    --color-border: light-dark(var(--_border-light), var(--_border-dark));
+    --color-border-strong: light-dark(var(--_border-strong-light), var(--_border-strong-dark));
+    --color-focus-ring: light-dark(var(--_focus-ring-light), var(--_focus-ring-dark));
+
+    --color-success: light-dark(var(--_success-light), var(--_success-dark));
+    --color-success-bg: light-dark(var(--_success-bg-light), var(--_success-bg-dark));
+    --color-success-fg: light-dark(var(--_success-fg-light), var(--_success-fg-dark));
+    --color-success-border: light-dark(var(--_success-border-light), var(--_success-border-dark));
+
+    --color-warning: light-dark(var(--_warning-light), var(--_warning-dark));
+    --color-warning-bg: light-dark(var(--_warning-bg-light), var(--_warning-bg-dark));
+    --color-warning-fg: light-dark(var(--_warning-fg-light), var(--_warning-fg-dark));
+    --color-warning-border: light-dark(var(--_warning-border-light), var(--_warning-border-dark));
+
+    --color-error: light-dark(var(--_error-light), var(--_error-dark));
+    --color-error-bg: light-dark(var(--_error-bg-light), var(--_error-bg-dark));
+    --color-error-fg: light-dark(var(--_error-fg-light), var(--_error-fg-dark));
+    --color-error-border: light-dark(var(--_error-border-light), var(--_error-border-dark));
+
+    --color-info: light-dark(var(--_info-light), var(--_info-dark));
+    --color-info-bg: light-dark(var(--_info-bg-light), var(--_info-bg-dark));
+    --color-info-fg: light-dark(var(--_info-fg-light), var(--_info-fg-dark));
+    --color-info-border: light-dark(var(--_info-border-light), var(--_info-border-dark));
+  }
+}
+
+/* Sync <meta name="color-scheme"> override back into CSS `color-scheme` */
+:root:has(> head > meta[name='color-scheme'][content='dark']) {
+  color-scheme: dark;
+}
+
+:root:has(> head > meta[name='color-scheme'][content='light']) {
+  color-scheme: light;
+}
+
+/* Explicit fallback when JS sets meta override on browsers without light-dark() */
+@supports not (color: light-dark(white, black)) {
+  :root:has(> head > meta[name='color-scheme'][content='dark']) {
+    --color-bg: var(--_bg-dark);
+    --color-surface: var(--_surface-dark);
+    --color-surface-raised: var(--_surface-raised-dark);
+    --color-text: var(--_text-dark);
+    --color-text-muted: var(--_text-muted-dark);
+    --color-primary: var(--_primary-dark);
+    --color-primary-strong: var(--_primary-strong-dark);
+    --color-primary-fg: var(--_primary-fg-dark);
+    --color-secondary: var(--_secondary-dark);
+    --color-secondary-hover: var(--_secondary-hover-dark);
+    --color-secondary-fg: var(--_secondary-fg-dark);
+    --color-accent: var(--_accent-dark);
+    --color-border: var(--_border-dark);
+    --color-border-strong: var(--_border-strong-dark);
+    --color-focus-ring: var(--_focus-ring-dark);
+  }
+
+  :root:has(> head > meta[name='color-scheme'][content='light']) {
+    --color-bg: var(--_bg-light);
+    --color-surface: var(--_surface-light);
+    --color-surface-raised: var(--_surface-raised-light);
+    --color-text: var(--_text-light);
+    --color-text-muted: var(--_text-muted-light);
+    --color-primary: var(--_primary-light);
+    --color-primary-strong: var(--_primary-strong-light);
+    --color-primary-fg: var(--_primary-fg-light);
+    --color-secondary: var(--_secondary-light);
+    --color-secondary-hover: var(--_secondary-hover-light);
+    --color-secondary-fg: var(--_secondary-fg-light);
+    --color-accent: var(--_accent-light);
+    --color-border: var(--_border-light);
+    --color-border-strong: var(--_border-strong-light);
+    --color-focus-ring: var(--_focus-ring-light);
+  }
+}
+
+/* High contrast / Forced Colors Mode support */
+@media (forced-colors: active) {
+  :root {
+    --color-bg: Canvas;
+    --color-surface: Canvas;
+    --color-surface-raised: Canvas;
+    --color-text: CanvasText;
+    --color-text-muted: GrayText;
+    --color-border: ButtonBorder;
+    --color-border-strong: ButtonBorder;
+    --color-focus-ring: Highlight;
+  }
+}

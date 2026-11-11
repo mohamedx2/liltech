@@ -1,0 +1,99 @@
+.card {
+  width: 100%;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.badgePreviewWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+@media (min-width: 40rem) {
+  .badgePreviewWrapper {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.qrContainer {
+  background-color: #ffffff;
+  padding: var(--space-3);
+  border-radius: var(--radius-md, 0.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.qrImage {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.tokenBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background-color: var(--color-surface, #121730);
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.tokenLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.tokenCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+}
+
+.metaInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.metaLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.metaValue {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.footer {
+  justify-content: flex-start;
+}

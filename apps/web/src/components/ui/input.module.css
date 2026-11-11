@@ -1,0 +1,86 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  padding-block: var(--space-1);
+}
+
+.requiredMark {
+  color: var(--color-error);
+  margin-inline-start: var(--space-1);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-block-end: var(--space-1);
+}
+
+.control {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 3rem;
+  padding-inline: var(--space-3);
+  padding-block: var(--space-2);
+  font-size: max(1rem, 1em);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.control::placeholder {
+  color: var(--color-text-muted);
+}
+
+.control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--color-surface);
+}
+
+.control[aria-invalid='true'],
+.control:user-invalid {
+  border-color: var(--color-error-border);
+  background-color: var(--color-error-bg);
+}
+
+.textarea {
+  min-block-size: 6rem;
+  resize: vertical;
+}
+
+.errorMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-error-fg);
+}
+
+.errorIcon {
+  flex-shrink: 0;
+  margin-block-start: 0.125rem;
+}
+
+.inputGroup {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.inputGroup .control {
+  flex: 1;
+}

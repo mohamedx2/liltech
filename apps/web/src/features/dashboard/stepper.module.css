@@ -1,0 +1,117 @@
+.stepperContainer {
+  width: 100%;
+  overflow-x: auto;
+  padding-block: var(--space-4);
+}
+
+.stepperList {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 48rem;
+  gap: var(--space-2);
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  position: relative;
+}
+
+.indicatorWrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  margin-bottom: var(--space-2);
+}
+
+.indicator {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  background-color: var(--color-surface, #121730);
+  border: 2px solid var(--color-border);
+  color: var(--color-text-muted);
+  margin-inline: auto;
+  z-index: 1;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.connector {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background-color: var(--color-border);
+  z-index: 0;
+  transform: translateY(-50%);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.description {
+  font-size: 0.6875rem;
+  color: var(--color-text-dim, #6d78a3);
+  max-width: 8rem;
+  line-height: 1.25;
+}
+
+/* Completed Step */
+.completed .indicator {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+  color: #0b0e1a;
+}
+
+.completed .connector {
+  background-color: var(--color-success);
+}
+
+.completed .label {
+  color: var(--color-text);
+}
+
+/* Current Step */
+.current .indicator {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px var(--color-primary-subtle, rgba(79, 124, 255, 0.25));
+}
+
+.current .label {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+/* Upcoming Step */
+.upcoming .indicator {
+  opacity: 0.6;
+}
+
+.upcoming .label {
+  opacity: 0.6;
+}
