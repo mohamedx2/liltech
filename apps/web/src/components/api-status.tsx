@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiClientError } from '@/lib/api';
 import type { HealthResponse } from 'api-contracts';
+import styles from './api-status.module.css';
 
 type Status = 'loading' | 'ok' | 'degraded' | 'unreachable';
 
@@ -19,7 +20,7 @@ export function ApiStatus() {
     const controller = new AbortController();
 
     api
-      .getHealth()
+      .getHealth({ signal: controller.signal })
       .then((result) => {
         setHealth(result);
         setStatus(result.database.status === 'up' ? 'ok' : 'degraded');
@@ -43,41 +44,13 @@ export function ApiStatus() {
     unreachable: 'Platform API unreachable',
   };
 
-  const colors: Record<Status, string> = {
-    loading: 'var(--color-text-muted)',
-    ok: 'var(--color-accent)',
-    degraded: 'var(--color-warning)',
-    unreachable: 'var(--color-danger)',
-  };
-
   return (
-    <p
-      role="status"
-      aria-live="polite"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--space-2)',
-        color: 'var(--color-text-muted)',
-        fontSize: 'var(--text-sm)',
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{
-          width: '0.625rem',
-          height: '0.625rem',
-          borderRadius: '50%',
-          backgroundColor: colors[status],
-          flexShrink: 0,
-        }}
-      />
-      {labels[status]}
-      {health?.status === 'ok' && (
-        <span style={{ color: 'var(--color-text-muted)' }}>
-          (server time {new Date(health.timestamp).toLocaleString()})
-        </span>
-      )}
+    <p role="status" aria-live="polite" className={styles.status}>
+      <span aria-hidden="true" className={`${styles.dot} ${styles[status]}`} />
+      <span>{labels[status]}</span>
+      {health?.status === 'ok' ? (
+        <span>(server time {new Date(health.timestamp).toLocaleString()})</span>
+      ) : null}
     </p>
   );
 }

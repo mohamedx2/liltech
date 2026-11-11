@@ -7,6 +7,8 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       '@': join(import.meta.dirname, './src'),
+      'api-contracts': join(import.meta.dirname, '../../libs/api-contracts/src/index.ts'),
+      shared: join(import.meta.dirname, '../../libs/shared/src/index.ts'),
     },
     conditions: ['liltech-platform'],
   },

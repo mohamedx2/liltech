@@ -14,6 +14,8 @@ export interface ApiRequestConfig {
   headers?: Record<string, string>;
   /** Bearer token attached as `Authorization: Bearer <token>` when present. */
   authToken?: string;
+  /** Credentials mode for cookie-based sessions. Defaults to `include` on real transport. */
+  credentials?: RequestCredentials;
   signal?: AbortSignal;
 }
 

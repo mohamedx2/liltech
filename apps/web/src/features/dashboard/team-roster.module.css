@@ -1,0 +1,14 @@
+.card {
+  width: 100%;
+}
+
+.nameCell {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.emailCell {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
