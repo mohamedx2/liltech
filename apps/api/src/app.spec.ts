@@ -26,12 +26,24 @@ describe('api app', () => {
     expect(response.headers['x-request-id']).toBeDefined();
   });
 
-  it('degrades gracefully when the database is unreachable', async () => {
+  // When a test database is configured (TEST_DATABASE_URL) the health check
+  // reaches it, so the degraded path only holds in the database-free default run.
+  const dbReachable = Boolean(process.env.TEST_DATABASE_URL);
+
+  it.skipIf(dbReachable)('degrades gracefully when the database is unreachable', async () => {
     const response = await request(createApp()).get('/api/health');
 
     expect(response.status).toBe(503);
     expect(response.body.status).toBe('degraded');
     expect(response.body.database.status).toBe('down');
     expect(response.body.timestamp).toBeDefined();
+  });
+
+  it.skipIf(!dbReachable)('reports ok when a test database is reachable', async () => {
+    const response = await request(createApp()).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('ok');
+    expect(response.body.database.status).toBe('up');
   });
 });

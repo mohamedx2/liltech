@@ -24,6 +24,7 @@ export const apiErrorCodeSchema = z.enum([
   'UNAUTHORIZED',
   'FORBIDDEN',
   'NOT_FOUND',
+  'CONFLICT',
   'RATE_LIMITED',
   'CTF_NOT_SOLVED',
 ]);
