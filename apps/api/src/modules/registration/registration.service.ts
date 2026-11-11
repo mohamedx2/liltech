@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
 import type { CreateTeamRequest, TeamResponse } from 'api-contracts';
-import { issueBadgeForParticipant } from '../checkin/checkin.service';
+import { issueBadgeForParticipantInTx } from '../checkin/checkin.service';
 import { hashPassword } from '../auth/password.service';
 
 /**
@@ -35,7 +35,12 @@ export async function registerTeamWithBadges(
   const prisma = getPrismaClient();
   const leaderEmail = request.leader.email.toLowerCase();
 
-  const team = await prisma
+  const totalSize = 1 + request.members.length;
+  if (totalSize < 3 || totalSize > 5) {
+    throw ApiError.badRequest('A team must have 3 to 5 members total, including the leader.');
+  }
+
+  const { team: created, badges } = await prisma
     .$transaction(async (tx) => {
       const emailTaken = await tx.user.findUnique({
         where: { email: leaderEmail },
@@ -90,7 +95,13 @@ export async function registerTeamWithBadges(
         },
       });
 
-      return created;
+      const issuedBadges = await Promise.all(
+        created.participants.map((participant) =>
+          issueBadgeForParticipantInTx(tx, participant.id, participant.name),
+        ),
+      );
+
+      return { team: created, badges: issuedBadges };
     })
     .catch((error: unknown) => {
       // The unique constraints are the final defense against two concurrent
@@ -102,28 +113,17 @@ export async function registerTeamWithBadges(
     });
 
   const registered: TeamResponse = {
-    id: team.id,
-    name: team.name,
-    progressState: team.progressState,
-    createdAt: team.createdAt.toISOString(),
-    leader: { id: team.leaderId, name: request.leader.name },
-    participants: team.participants.map((participant) => ({
+    id: created.id,
+    name: created.name,
+    progressState: created.progressState,
+    createdAt: created.createdAt.toISOString(),
+    leader: { id: created.leaderId, name: request.leader.name },
+    participants: created.participants.map((participant) => ({
       id: participant.id,
       name: participant.name,
       isLeader: participant.isLeader,
     })),
   };
-
-  const badges = await Promise.all(
-    registered.participants.map(async (participant) => {
-      const badge = await issueBadgeForParticipant(participant.id);
-      return {
-        participantId: badge.participantId,
-        participantName: badge.participantName,
-        token: badge.token,
-      };
-    }),
-  );
 
   return { ...registered, badges };
 }

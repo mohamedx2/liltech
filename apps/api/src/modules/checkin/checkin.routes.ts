@@ -1,5 +1,9 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { scanCheckInRequestSchema, type CheckInResponse } from 'api-contracts';
+import {
+  revokeBadgeRequestSchema,
+  scanCheckInRequestSchema,
+  type CheckInResponse,
+} from 'api-contracts';
 import { ApiError } from '../../utils/api-error';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { listBadges, revokeBadge, scanCheckIn } from './checkin.service';
@@ -63,12 +67,22 @@ checkinRouter.post(
 );
 
 checkinRouter.post('/checkin/revoke', ...adminOnly, (req, res, next) => {
-  const participantId = (req.body as { participantId?: unknown }).participantId;
+  const input = revokeBadgeRequestSchema.safeParse(req.body);
 
-  if (typeof participantId !== 'string' || !participantId) {
-    next(ApiError.badRequest('A participantId is required.'));
+  if (!input.success) {
+    next(
+      ApiError.badRequest(
+        'The request payload is invalid.',
+        input.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        })),
+      ),
+    );
     return;
   }
+
+  const participantId = input.data.participantId;
 
   const adminUserId = requireAdminUserId(req, next);
   if (!adminUserId) {
