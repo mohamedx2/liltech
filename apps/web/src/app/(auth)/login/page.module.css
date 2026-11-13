@@ -1,0 +1,13 @@
+.stage {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  min-block-size: calc(100dvh - 540px);
+}
+
+@media (max-width: 860px) {
+  .stage {
+    min-block-size: calc(100dvh - 620px);
+  }
+}
