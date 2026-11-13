@@ -44,7 +44,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ['npx', 'prisma', 'migrate', 'deploy']
+    command: ['prisma', 'migrate', 'deploy']
 
   api:
     image: ${API_IMAGE:?API_IMAGE is required}
