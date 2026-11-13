@@ -19,8 +19,13 @@ COPY nx.json tsconfig.base.json tsconfig.json ./
 COPY apps/api apps/api
 COPY libs libs
 
-RUN pnpm exec prisma generate --schema=apps/api/prisma/schema.prisma \
-  && pnpm nx run api:build --skip-nx-cache
+# `pnpm exec prisma` is not resolvable from the workspace root (the binary
+# lives in apps/api); use the same --filter pattern as the repo's Nx targets.
+# The resolved CLI version is exported so the runtime stage can install the
+# matching global `prisma` for the one-shot migrate service.
+RUN pnpm --filter api exec prisma generate --schema=prisma/schema.prisma \
+  && pnpm nx run api:build --skip-nx-cache \
+  && node -p "require('./apps/api/node_modules/prisma/package.json').version" > /tmp/prisma-version.txt
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:22-alpine
@@ -33,7 +38,13 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY --from=build --chown=appuser:appgroup /repo/apps/api/dist ./dist
 COPY --from=build --chown=appuser:appgroup /repo/apps/api/prisma ./prisma
-COPY --from=build --chown=appuser:appgroup /repo/node_modules/.pnpm/prisma*/node_modules/prisma ./node_modules/prisma
+COPY --from=build /tmp/prisma-version.txt /tmp/prisma-version.txt
+
+# The one-shot `migrate` service (docker-compose.prod.yml) needs the Prisma CLI
+# with its full dependency tree — a pnpm store fragment is not runnable, so
+# install the exact version pinned by the lockfile.
+RUN npm install --global "prisma@$(cat /tmp/prisma-version.txt)" \
+  && rm /tmp/prisma-version.txt
 
 USER appuser
 
