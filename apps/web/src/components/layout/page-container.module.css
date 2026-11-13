@@ -9,3 +9,9 @@
 .narrow {
   max-inline-size: var(--content-width-narrow);
 }
+
+/* Pages that opt into the wide layout (e.g. the two-column register flow) escape
+ * the narrow reading measure without leaving the shared container. */
+.narrow:has([data-full-bleed]) {
+  max-inline-size: var(--content-width);
+}
