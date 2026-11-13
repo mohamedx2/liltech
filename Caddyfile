@@ -1,4 +1,4 @@
-# Public entrypoint for liltechsousse.com.
+# Public entrypoint for liltechsousse.com (apex and www).
 #
 # Copied to /opt/liltech by the GitHub Actions deploy job, mounted read-only
 # into the caddy service (docker-compose.prod.yml). Caddy obtains and renews
@@ -9,7 +9,7 @@
 # domain hits the same route inside the API). Everything else goes to the
 # Next.js web app.
 
-liltechsousse.com {
+liltechsousse.com, www.liltechsousse.com {
 	encode gzip
 
 	handle /api/* {
