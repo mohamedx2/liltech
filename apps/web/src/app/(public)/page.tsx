@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ApiStatus } from '@/components/api-status';
 import { EventPhaseBanner } from '@/components/events/event-phase-banner';
+import { HomeMotion } from '@/components/home/home-motion';
 import { LockIcon } from '@/components/icons/lock-icon';
 import { PageContainer } from '@/components/layout/page-container';
 import { buttonClassName } from '@/components/ui/button';
@@ -98,22 +99,23 @@ export default function HomePage() {
 
   return (
     <PageContainer>
-      <div className={styles.stack}>
-        <header className={styles.hero} id="top">
-          <div className={styles.heroCopy}>
+      <div className={styles.stack} data-home-root>
+        <HomeMotion />
+        <header className={styles.hero} id="top" data-motion="hero">
+          <div className={styles.heroCopy} data-motion="hero-copy">
             <p className={styles.phase}>
               <span className={styles.phaseDot} aria-hidden="true" />
               Registration is open
             </p>
-            <h1 className={styles.heroTitle}>
+            <h1 className={styles.heroTitle} data-motion="hero-title">
               <span>One night.</span> <span className={styles.heroTitleGold}>Two challenges.</span>{' '}
               <span className={styles.heroTitleMuted}>One platform to run it all.</span>
             </h1>
-            <p className={styles.lede}>
+            <p className={styles.lede} data-motion="hero-lede">
               A night-long tech competition at <b>Campus EPI, Sousse</b>, November 21–22. Register
               your team, check in with a QR badge, solve the Mini-CTF, and submit before 08:00.
             </p>
-            <div className={styles.ctaRow}>
+            <div className={styles.ctaRow} data-motion="hero-cta">
               <Link
                 href="/register"
                 className={buttonClassName({ variant: 'primary', size: 'md' })}
@@ -126,7 +128,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <figure className={styles.heroLogo}>
+          <figure className={styles.heroLogo} data-motion="hero-logo">
             {logos.default ? (
               <img
                 src={logos.default}
@@ -139,7 +141,9 @@ export default function HomePage() {
           </figure>
         </header>
 
-        <EventPhaseBanner />
+        <div data-motion="clock">
+          <EventPhaseBanner />
+        </div>
 
         <div className={styles.apiLine}>
           <ApiStatus />
@@ -151,7 +155,7 @@ export default function HomePage() {
             Every unlock and every deadline follows the server clock, so no team gets a head start.
           </p>
 
-          <div className={styles.curve} aria-hidden="true">
+          <div className={styles.curve} aria-hidden="true" data-motion="night-curve">
             <svg viewBox="0 0 1000 100" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="night-swoosh" x1="0" x2="1">
@@ -182,7 +186,7 @@ export default function HomePage() {
 
           <ul className={styles.stops}>
             {nightStops.map((stop) => (
-              <li key={stop.time}>
+              <li key={stop.time} data-motion="night-stop">
                 <b className={styles.stopTime}>{stop.time}</b>
                 <h3 className={styles.stopTitle}>{stop.title}</h3>
                 <p className={styles.stopText}>{stop.description}</p>
@@ -195,8 +199,11 @@ export default function HomePage() {
           <h2 className={styles.sectionTitle}>Two challenges, two juries, two podiums</h2>
           <p className={styles.sub}>The two run in parallel. A jury sees only its own challenge.</p>
 
-          <div className={styles.duo}>
-            <article className={`${styles.challenge} ${styles.challengeFeatured}`}>
+          <div className={styles.duo} data-motion-group="challenges">
+            <article
+              className={`${styles.challenge} ${styles.challengeFeatured}`}
+              data-motion="challenge"
+            >
               <div>
                 <p className={styles.challengeLabel}>Challenge Track A</p>
                 <h3 className={styles.challengeTitle}>Challenge 01</h3>
@@ -211,7 +218,10 @@ export default function HomePage() {
               </p>
             </article>
 
-            <article className={`${styles.challenge} ${styles.challengeAsymmetric}`}>
+            <article
+              className={`${styles.challenge} ${styles.challengeAsymmetric}`}
+              data-motion="challenge"
+            >
               <div>
                 <p className={styles.challengeLabel}>Challenge Track B</p>
                 <h3 className={styles.challengeTitle}>Challenge 02</h3>
@@ -232,9 +242,9 @@ export default function HomePage() {
             <h2 className={styles.sectionTitle}>Your team’s path through the night</h2>
             <p className={styles.sub}>Eight steps, from sign-up to the live pitch.</p>
           </div>
-          <ol className={styles.pathList}>
+          <ol className={styles.pathList} data-motion="path-line">
             {teamPath.map((step) => (
-              <li key={step.title}>
+              <li key={step.title} data-motion="path-step">
                 <b>{step.title}</b> <span>{step.text}</span>
               </li>
             ))}
@@ -247,7 +257,7 @@ export default function HomePage() {
 
           <div className={styles.roles}>
             {roles.map((role) => (
-              <div key={role.title} className={styles.role}>
+              <div key={role.title} className={styles.role} data-motion="role">
                 <h3 className={styles.roleTitle}>{role.title}</h3>
                 <p className={styles.roleText}>{role.description}</p>
               </div>
@@ -255,7 +265,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className={styles.final} id="login">
+        <section className={styles.final} id="login" data-motion="final">
           <h2 className={styles.sectionTitle}>Teams of 3 to 5. One form to enter.</h2>
           <p className={styles.sub}>
             Registration takes a few minutes. Your badges arrive by email.
