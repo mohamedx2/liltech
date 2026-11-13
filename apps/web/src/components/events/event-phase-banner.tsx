@@ -138,7 +138,10 @@ export function EventPhaseBanner() {
   const nextLabel = state.nextPhase ? `Next: ${getPhaseMeta(state.nextPhase).label}` : 'Countdown';
 
   return (
-    <section className={styles.banner} aria-label="Event phase">
+    <section
+      className={`${styles.banner} ${state.phase === EventPhase.Live ? styles.live : ''}`}
+      aria-label="Event phase"
+    >
       <div className={styles.summary}>
         <div className={styles.headingRow}>
           <Badge tone={meta.tone} showDot>

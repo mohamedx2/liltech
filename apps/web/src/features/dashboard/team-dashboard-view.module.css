@@ -10,7 +10,7 @@
   flex-direction: column;
   gap: var(--space-6);
   padding: var(--space-6);
-  background-color: var(--color-surface, #121730);
+  background-color: rgb(8 7 6 / 0.86);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg, 0.75rem);
 }
@@ -83,6 +83,22 @@
 
 .actionCardContent {
   margin-top: auto;
+}
+
+.lockedAction {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-block-size: 3rem;
+  margin: 0;
+  color: var(--palette-gold);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.lockedAction svg {
+  flex: 0 0 auto;
+  margin-block-start: 0.1rem;
 }
 
 .bottomGrid {

@@ -32,7 +32,9 @@ export function SiteHeader() {
     <header className={styles.header}>
       <PageContainer>
         <div className={styles.inner}>
-          <BrandMark />
+          <div className={styles.brandCluster}>
+            <BrandMark variant="logo" />
+          </div>
 
           <nav aria-label="Primary" className={styles.desktopNav}>
             <ul className={styles.navList}>
@@ -75,7 +77,11 @@ export function SiteHeader() {
               </>
             ) : (
               <>
-                <Link href="/login" className={buttonClassName({ variant: 'outline', size: 'sm' })}>
+                <Link
+                  href="/login"
+                  className={buttonClassName({ variant: 'outline', size: 'sm' })}
+                  aria-current={pathname === '/login' ? 'page' : undefined}
+                >
                   Sign in
                 </Link>
                 <Link

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button';
 import { Alert } from '@/components/feedback/alert';
+import { LockIcon } from '@/components/icons/lock-icon';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import styles from './challenge-view.module.css';
 
@@ -59,10 +60,13 @@ export function ChallengeView() {
                 Challenge Locked
               </Badge>
             </div>
-            <CardTitle as="h1">Mini-CTF Clearance Required</CardTitle>
+            <div className={styles.lockedTitle}>
+              <LockIcon size={24} />
+              <CardTitle as="h1">Mini-CTF clearance required</CardTitle>
+            </div>
             <CardDescription>
-              Your challenge brief and dataset resources remain encrypted until your team submits a
-              valid flag.
+              Unlock condition: submit a valid Mini-CTF flag. Your challenge brief and resources
+              stay locked until the server confirms the solve.
             </CardDescription>
           </CardHeader>
           <CardContent className={styles.lockedContent}>
@@ -165,9 +169,19 @@ export function ChallengeView() {
             {challenge.resources.map((res, idx) => (
               <div key={idx} className={styles.resourceCard}>
                 <div className={styles.resourceInfo}>
-                  <span className={styles.resourceIcon} aria-hidden="true">
-                    📦
-                  </span>
+                  <svg
+                    className={styles.resourceIcon}
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
+                    <path d="M5 19h14" />
+                  </svg>
                   <div>
                     <h3 className={styles.resourceName}>{res.name}</h3>
                     {res.size && <span className={styles.resourceSize}>{res.size}</span>}

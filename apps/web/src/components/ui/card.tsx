@@ -3,13 +3,26 @@ import styles from './card.module.css';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   surface?: 'default' | 'raised';
+  /** `panel` for page containers, `row` for hairline-divided list items. */
+  variant?: 'panel' | 'row';
   children: ReactNode;
 }
 
-export function Card({ surface = 'default', className, children, ...rest }: CardProps) {
+export function Card({
+  surface = 'default',
+  variant = 'panel',
+  className,
+  children,
+  ...rest
+}: CardProps) {
   return (
     <div
-      className={[styles.card, surface === 'raised' ? styles.raised : '', className]
+      className={[
+        styles.card,
+        styles[variant],
+        surface === 'raised' ? styles.raised : '',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       {...rest}

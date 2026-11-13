@@ -1,0 +1,102 @@
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  min-inline-size: 0;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.logoList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.logoItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-inline-size: 0;
+}
+
+/* Height-only sizing: width follows the intrinsic aspect ratio (no distortion). */
+.logo {
+  display: block;
+  block-size: 112px;
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+
+.logoText {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.compact {
+  display: none;
+  flex-wrap: nowrap;
+}
+
+.compact .label,
+.compact .logoText {
+  display: none;
+}
+
+.compact .logoList {
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+
+.compact .logo {
+  block-size: 40px;
+}
+
+.auth {
+  justify-content: center;
+}
+
+.auth .logo {
+  block-size: 96px;
+}
+
+.footer .logo {
+  block-size: 112px;
+}
+
+@media (min-width: 64rem) {
+  .compact {
+    display: flex;
+  }
+}
+
+@media (max-width: 32rem) {
+  .auth .label,
+  .footer .label {
+    display: none;
+  }
+
+  .logoList {
+    gap: 24px;
+  }
+
+  .footer .logo,
+  .logo {
+    block-size: 88px;
+  }
+}

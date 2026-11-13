@@ -56,6 +56,8 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm nx run api:prisma-generate
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
       - name: Apply migrations to the integration test database
         run: pnpm --filter api exec prisma migrate deploy

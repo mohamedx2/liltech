@@ -1,66 +1,229 @@
+.card {
+  --ink: #f5ede0;
+  --muted: rgba(245, 237, 224, 0.72);
+  --gold: #ebc27a;
+  --red: #d81b1b;
+  --neon: #ff2a1f;
+  --danger: #ff6b6b;
+  --line: rgba(245, 237, 224, 0.18);
+
+  position: relative;
+  box-sizing: border-box;
+  inline-size: min(100%, 460px);
+  max-inline-size: 100%;
+  padding: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 36px;
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.13),
+    rgba(255, 255, 255, 0.04) 45%,
+    rgba(255, 255, 255, 0.08)
+  );
+  -webkit-backdrop-filter: blur(26px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(26px) saturate(1.9) brightness(1.05);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1.5px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 40px rgba(255, 255, 255, 0.04),
+    0 40px 90px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  color: var(--ink);
+  animation: enter 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    420px circle at var(--mx, 20%) var(--my, 0%),
+    rgba(255, 255, 255, 0.2),
+    transparent 60%
+  );
+}
+
+.card > * {
+  position: relative;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card {
+    background: rgba(20, 20, 20, 0.92);
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+}
+
+.title {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 3.4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  color: var(--ink);
+  outline: none;
+}
+
+.lede {
+  margin: 0 0 28px;
+  max-inline-size: 46ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: 20px;
+}
+
+.passwordRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.passwordInput {
+  min-inline-size: 0;
+}
+
+/* Scoped with .card so these win over the shared button styles. */
+.card .toggle {
+  min-block-size: 50px;
+  padding: 0 22px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.card .toggle:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.card .submit {
+  min-block-size: 52px;
+  border-radius: 999px;
+  border-color: var(--red);
+  background-color: var(--red);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card .submit:hover:not(:disabled) {
+  color: var(--ink);
+  box-shadow: 0 0 34px rgba(255, 42, 31, 0.6);
+}
+
+.card .submit:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .errorSummary {
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-error-border);
-  background-color: var(--color-error-bg);
-  color: var(--color-error-fg);
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger);
+  font-size: 15px;
 }
 
 .errorSummaryTitle {
-  font-size: var(--text-base);
+  margin: 0 0 6px;
+  font-size: 15px;
   font-weight: 700;
-  margin-block-end: var(--space-2);
 }
 
 .errorList {
   margin: 0;
-  padding-inline-start: var(--space-5);
+  padding-inline-start: 20px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
+  gap: 4px;
+  font-size: 15px;
 }
 
-.passwordRow {
+.errorList a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.prompt {
+  margin-block-start: 24px;
+  padding-block-start: 20px;
+  border-block-start: 1px solid var(--line);
   display: flex;
-  gap: var(--space-2);
-  align-items: stretch;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.passwordInput {
-  flex: 1;
+.promptText {
+  margin: 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.promptLink {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.promptLink:hover {
+  color: var(--ink);
 }
 
 .mockBox {
-  margin-block-start: var(--space-4);
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
+  margin-block-start: 20px;
+  padding: 16px;
+  border: 1px dashed rgba(245, 237, 224, 0.28);
+  border-radius: 18px;
+  background: rgba(245, 237, 224, 0.03);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 12px;
 }
 
 .mockHeading {
-  font-size: var(--text-sm);
+  font-size: 14px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--ink);
 }
 
 .mockNote {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .mockButtons {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .card {
+    padding: 28px 22px;
+    border-radius: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
 }

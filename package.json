@@ -10,9 +10,9 @@
   },
   "scripts": {
     "nx": "nx",
-    "dev": "nx run-many -t serve -p web api",
-    "dev:web": "nx serve web",
-    "dev:api": "nx serve api",
+    "dev": "nx run-many --targets=dev,serve --projects=web,api",
+    "dev:web": "nx run web:dev",
+    "dev:api": "nx run api:serve",
     "db:up": "docker compose up -d postgres",
     "db:migrate": "nx run api:db-migrate",
     "db:seed": "nx run api:db-seed",

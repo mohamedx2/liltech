@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FormField, TextInput } from '@/components/ui/input';
 import { Button, buttonClassName } from '@/components/ui/button';
 import { Alert } from '@/components/feedback/alert';
+import { LockIcon } from '@/components/icons/lock-icon';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import styles from './mini-ctf-view.module.css';
@@ -180,7 +181,7 @@ export function MiniCtfView() {
       {isSolved && (
         <Card surface="raised" className={styles.solvedCard}>
           <CardHeader>
-            <CardTitle as="h2">🎉 Mini-CTF Solved!</CardTitle>
+            <CardTitle as="h2">Mini-CTF Solved!</CardTitle>
             <CardDescription>
               Your flag submission was verified. Your main challenge track is ready for review.
             </CardDescription>
@@ -206,10 +207,13 @@ export function MiniCtfView() {
       {!isGateOpen && !isSolved && (
         <Card surface="default" className={styles.lockedCard}>
           <CardHeader>
-            <CardTitle as="h2">🔒 The Mini-CTF is Locked</CardTitle>
+            <div className={styles.lockedTitle}>
+              <LockIcon size={22} />
+              <CardTitle as="h2">The Mini-CTF is locked</CardTitle>
+            </div>
             <CardDescription>
-              The challenge gate opens automatically at 20:00 UTC when the hackathon transitions to
-              the LIVE phase.
+              Unlock condition: your team must be checked in and the event must enter the live phase
+              at 20:00 UTC.
             </CardDescription>
           </CardHeader>
           <CardContent>

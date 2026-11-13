@@ -1,29 +1,46 @@
+/* Navbar: solid black, hairline bottom border, no glass blur. */
+
 .header {
   position: sticky;
   inset-block-start: 0;
   z-index: var(--z-sticky);
-  background-color: var(--color-bg);
-  border-block-end: 1px solid var(--color-border);
+  background-color: var(--black);
+  border-block-end: 1px solid var(--line);
 }
 
 .inner {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: 24px;
   min-block-size: var(--header-height);
+  padding-block: 20px;
+}
+
+.brandCluster {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* Navbar uses the artwork itself — height-driven so it cannot overflow. */
+.brandCluster img {
+  block-size: 48px;
+  inline-size: auto;
+  max-inline-size: 100%;
 }
 
 .desktopNav {
   display: none;
   align-items: center;
-  gap: var(--space-1);
+  gap: 4px;
 }
 
 .navList {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -32,56 +49,68 @@
 .navLink {
   display: inline-flex;
   align-items: center;
-  min-block-size: 2.75rem;
-  padding-inline: var(--space-3);
-  border-radius: var(--radius-md);
+  min-block-size: 44px;
+  padding-inline: 12px;
+  border-radius: 999px;
   text-decoration: none;
-  font-size: var(--text-sm);
+  font-size: 15px;
   font-weight: 500;
-  color: var(--color-text-muted);
+  color: var(--muted);
   transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast);
+    color 0.2s,
+    background-color 0.2s;
 }
 
 .navLink:hover {
-  color: var(--color-text);
-  background-color: var(--color-surface);
+  color: var(--ink);
 }
 
 .navLink[aria-current='page'] {
-  color: var(--color-text);
-  background-color: var(--color-surface-raised);
+  color: var(--gold);
   font-weight: 600;
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .actions {
   display: none;
   align-items: center;
-  gap: var(--space-2);
+  gap: 14px;
 }
 
 .mobileMenuButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-inline-size: 2.75rem;
-  min-block-size: 2.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   background-color: transparent;
-  color: var(--color-text);
+  color: var(--ink);
   cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .mobileMenuButton:hover {
-  background-color: var(--color-surface);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.mobileMenuButton:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .mobileNavList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -90,28 +119,34 @@
 .mobileNavLink {
   display: flex;
   align-items: center;
-  min-block-size: 2.75rem;
-  padding-inline: var(--space-3);
-  border-radius: var(--radius-md);
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border-radius: 999px;
   text-decoration: none;
+  font-size: 17px;
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--ink);
 }
 
 .mobileNavLink[aria-current='page'] {
-  background-color: var(--color-surface-raised);
+  color: var(--gold);
   font-weight: 600;
+}
+
+.mobileNavLink:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .mobileActions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--color-border);
+  gap: 14px;
+  padding-block-start: 24px;
+  border-block-start: 1px solid var(--line);
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 860px) {
   .desktopNav {
     display: flex;
   }

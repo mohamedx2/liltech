@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { TeamProgressState } from 'api-contracts';
 import { api, ApiClientError } from '@/lib/api';
 import type {
   BadgePassResponse,
@@ -14,6 +15,7 @@ import { QrPassCard } from './qr-pass-card';
 import { TeamRoster } from './team-roster';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import { ServerCountdown } from '@/components/events/server-countdown';
+import { LockIcon } from '@/components/icons/lock-icon';
 import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,6 +72,19 @@ export function TeamDashboardView() {
     );
   }
 
+  const progressOrder = [
+    TeamProgressState.Registered,
+    TeamProgressState.CheckedIn,
+    TeamProgressState.CtfUnlocked,
+    TeamProgressState.CtfSolved,
+    TeamProgressState.ChallengeUnlocked,
+    TeamProgressState.Submitted,
+  ] as const;
+  const progressIndex = progressOrder.indexOf(team.progress);
+  const canEnterCtf = progressIndex >= progressOrder.indexOf(TeamProgressState.CtfUnlocked);
+  const canOpenChallenge = progressIndex >= progressOrder.indexOf(TeamProgressState.CtfSolved);
+  const canSubmit = progressIndex >= progressOrder.indexOf(TeamProgressState.ChallengeUnlocked);
+
   return (
     <div className={styles.container}>
       {/* Overview & Live Countdown Bar */}
@@ -123,43 +138,79 @@ export function TeamDashboardView() {
       <div className={styles.quickActionsGrid}>
         <Card surface="raised" className={styles.actionCard}>
           <CardHeader>
-            <CardTitle as="h3">🚩 Mini-CTF Gate</CardTitle>
+            <CardTitle as="h3">Mini-CTF Gate</CardTitle>
             <CardDescription>
               Submit your challenge flag to unlock your track workspace.
             </CardDescription>
           </CardHeader>
           <CardContent className={styles.actionCardContent}>
-            <Link href="/team/ctf" className={buttonClassName({ variant: 'primary' })}>
-              Enter CTF Gate
-            </Link>
+            {canEnterCtf ? (
+              <Link
+                href="/team/ctf"
+                className={buttonClassName({
+                  variant: canOpenChallenge ? 'outline' : 'primary',
+                  size: 'lg',
+                })}
+              >
+                Enter CTF Gate
+              </Link>
+            ) : (
+              <p className={styles.lockedAction}>
+                <LockIcon />
+                Unlocks after team check-in and the 20:00 event launch.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card surface="raised" className={styles.actionCard}>
           <CardHeader>
-            <CardTitle as="h3">🧩 Main Challenge</CardTitle>
+            <CardTitle as="h3">Main Challenge</CardTitle>
             <CardDescription>
               Review challenge brief, problem statement, and downloadable resources.
             </CardDescription>
           </CardHeader>
           <CardContent className={styles.actionCardContent}>
-            <Link href="/team/challenge" className={buttonClassName({ variant: 'secondary' })}>
-              View Challenge
-            </Link>
+            {canOpenChallenge ? (
+              <Link
+                href="/team/challenge"
+                className={buttonClassName({
+                  variant: canSubmit ? 'secondary' : 'primary',
+                  size: 'lg',
+                })}
+              >
+                View Challenge
+              </Link>
+            ) : (
+              <p className={styles.lockedAction}>
+                <LockIcon />
+                Unlocks when the server validates your Mini-CTF flag.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card surface="raised" className={styles.actionCard}>
           <CardHeader>
-            <CardTitle as="h3">📤 Deliverables</CardTitle>
+            <CardTitle as="h3">Deliverables</CardTitle>
             <CardDescription>
               Submit your project repository and archives before 08:00 UTC.
             </CardDescription>
           </CardHeader>
           <CardContent className={styles.actionCardContent}>
-            <Link href="/team/submissions" className={buttonClassName({ variant: 'outline' })}>
-              Manage Submissions
-            </Link>
+            {canSubmit ? (
+              <Link
+                href="/team/submissions"
+                className={buttonClassName({ variant: 'primary', size: 'lg' })}
+              >
+                Manage Submissions
+              </Link>
+            ) : (
+              <p className={styles.lockedAction}>
+                <LockIcon />
+                Unlocks with your main challenge workspace.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

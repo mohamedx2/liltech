@@ -152,7 +152,7 @@ export function AnnouncementsView() {
         <div className={styles.feedList} role="feed" aria-label="Announcements Stream">
           {filteredItems.map((item) => (
             <article key={item.id} className={styles.announcementArticle}>
-              <Card surface="default" className={styles.announcementCard}>
+              <Card surface="default" variant="row" className={styles.announcementCard}>
                 <CardHeader>
                   <div className={styles.cardHeaderRow}>
                     <div className={styles.titleBlock}>

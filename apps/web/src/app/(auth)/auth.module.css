@@ -6,13 +6,15 @@
 
 .main {
   flex: 1;
-  padding-block: var(--space-10) var(--space-16);
+  padding-block: 72px 96px;
 }
 
+/* The card inside already provides the single frame — no nested panel here. */
 .content {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  padding: 0;
 }
 
 .footerPrompt {
@@ -22,7 +24,7 @@
 }
 
 .inlineLink {
-  color: var(--color-text);
+  color: var(--palette-gold);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 0.2em;

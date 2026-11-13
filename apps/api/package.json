@@ -20,13 +20,15 @@
       "db-migrate": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "pnpm --filter api exec prisma migrate dev --schema=prisma/schema.prisma --env-file=../../.env"
+          "command": "pnpm --filter api exec prisma migrate dev --schema=prisma/schema.prisma",
+          "envFile": ".env"
         }
       },
       "db-deploy": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "pnpm --filter api exec prisma migrate deploy --schema=prisma/schema.prisma --env-file=../../.env"
+          "command": "pnpm --filter api exec prisma migrate deploy --schema=prisma/schema.prisma",
+          "envFile": ".env"
         }
       },
       "db-seed": {
@@ -35,19 +37,22 @@
           "prisma-generate"
         ],
         "options": {
-          "command": "pnpm --filter api exec tsx apps/api/prisma/seed.ts"
+          "command": "pnpm --filter api exec tsx prisma/seed.ts",
+          "envFile": ".env"
         }
       },
       "db-reset": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "pnpm --filter api exec prisma migrate reset --schema=prisma/schema.prisma --env-file=../../.env --force"
+          "command": "pnpm --filter api exec prisma migrate reset --schema=prisma/schema.prisma --force",
+          "envFile": ".env"
         }
       },
       "db-studio": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "pnpm --filter api exec prisma studio --schema=prisma/schema.prisma --env-file=../../.env"
+          "command": "pnpm --filter api exec prisma studio --schema=prisma/schema.prisma",
+          "envFile": ".env"
         }
       },
       "prune-lockfile": {

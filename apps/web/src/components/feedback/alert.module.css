@@ -1,11 +1,12 @@
 .alert {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  font-size: var(--text-sm);
+  gap: 16px;
+  padding: 20px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  font-size: 17px;
+  line-height: 1.6;
 }
 
 .icon {
@@ -16,33 +17,40 @@
 .body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 4px;
+  max-inline-size: 65ch;
 }
 
 .title {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .info {
-  background-color: var(--color-info-bg);
-  color: var(--color-info-fg);
-  border-color: var(--color-info-border);
+  background-color: rgb(235 194 122 / 0.08);
+  color: var(--gold);
+  border-color: rgb(235 194 122 / 0.5);
 }
 
 .success {
-  background-color: var(--color-success-bg);
-  color: var(--color-success-fg);
-  border-color: var(--color-success-border);
+  background-color: rgb(63 185 80 / 0.1);
+  color: var(--success);
+  border-color: rgb(63 185 80 / 0.5);
 }
 
 .warning {
-  background-color: var(--color-warning-bg);
-  color: var(--color-warning-fg);
-  border-color: var(--color-warning-border);
+  background-color: rgb(232 162 90 / 0.1);
+  color: var(--warning);
+  border-color: rgb(232 162 90 / 0.5);
 }
 
 .error {
-  background-color: var(--color-error-bg);
-  color: var(--color-error-fg);
-  border-color: var(--color-error-border);
+  background-color: rgb(255 77 77 / 0.1);
+  color: var(--danger);
+  border-color: rgb(255 77 77 / 0.5);
+}
+
+.alert a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }

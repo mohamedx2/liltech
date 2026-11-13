@@ -4,35 +4,20 @@ import styles from './brand-mark.module.css';
 
 export interface BrandMarkProps {
   href?: string;
+  /** `wordmark` = text brand for the nav, `logo` = official artwork on black. */
+  readonly variant?: 'wordmark' | 'logo';
 }
 
 /**
  * Reusable brand identity component.
- * Renders official logo assets from `brandConfig.logos` once available,
- * and falls back to a clean text wordmark in the meantime.
+ * The dark artwork carries its own black background, so it is blended and
+ * soft-masked instead of being placed inside a container.
  */
-export function BrandMark({ href = '/' }: BrandMarkProps) {
+export function BrandMark({ href = '/', variant = 'wordmark' }: BrandMarkProps) {
   const { logos, shortName, productName } = brandConfig;
 
   const content =
-    logos.light && logos.dark ? (
-      <>
-        <img
-          src={logos.light}
-          alt={logos.alt}
-          width={logos.width}
-          height={logos.height}
-          className={`${styles.logoImage} ${styles.logoLight}`}
-        />
-        <img
-          src={logos.dark}
-          alt={logos.alt}
-          width={logos.width}
-          height={logos.height}
-          className={`${styles.logoImage} ${styles.logoDark}`}
-        />
-      </>
-    ) : logos.default ? (
+    variant === 'logo' && logos.default ? (
       <img
         src={logos.default}
         alt={logos.alt}
@@ -42,7 +27,10 @@ export function BrandMark({ href = '/' }: BrandMarkProps) {
       />
     ) : (
       <span className={styles.wordmark} aria-label={productName}>
-        <span>{shortName}</span>
+        <span className={styles.wordmarkText}>{shortName}</span>
+        <span className={styles.wordmarkArabic} lang="ar" dir="rtl">
+          ليل
+        </span>
         <span className={styles.yearTag}>2026</span>
       </span>
     );

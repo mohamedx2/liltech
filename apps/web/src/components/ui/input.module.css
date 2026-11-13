@@ -1,72 +1,99 @@
+/* Shared form controls: label above field, 48px controls, 14px radius, gold focus. */
+
 .field {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-1);
+  gap: 8px;
 }
 
 .label {
-  font-size: var(--text-sm);
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
-  padding-block: var(--space-1);
+  color: var(--ink);
+  padding-block: 0;
 }
 
 .requiredMark {
-  color: var(--color-error);
-  margin-inline-start: var(--space-1);
+  color: var(--danger);
+  margin-inline-start: 4px;
 }
 
 .hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin-block-end: var(--space-1);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .control {
   box-sizing: border-box;
   inline-size: 100%;
-  min-block-size: 3rem;
-  padding-inline: var(--space-3);
-  padding-block: var(--space-2);
-  font-size: max(1rem, 1em);
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  border: 1.5px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  min-block-size: 50px;
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-size: 17px;
+  color: var(--ink);
+  background-color: rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
   transition:
-    border-color var(--transition-fast),
-    background-color var(--transition-fast);
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .control::placeholder {
-  color: var(--color-text-muted);
+  color: rgb(245 237 224 / 0.38);
+}
+
+.control:hover {
+  border-color: var(--color-border-strong);
+}
+
+.control:focus-visible {
+  border-color: var(--gold);
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 3px rgb(235 194 122 / 0.25),
+    0 0 28px rgb(255 42 31 / 0.18);
+}
+
+/* Browser autofill must keep the dark field, not a bluish-grey plate. */
+.control:-webkit-autofill,
+.control:-webkit-autofill:hover,
+.control:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px #0b0b0b inset;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  transition: background-color 9999s;
 }
 
 .control:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: not-allowed;
-  background-color: var(--color-surface);
 }
 
 .control[aria-invalid='true'],
 .control:user-invalid {
-  border-color: var(--color-error-border);
-  background-color: var(--color-error-bg);
+  border-color: var(--danger);
 }
 
 .textarea {
-  min-block-size: 6rem;
+  min-block-size: 7rem;
   resize: vertical;
+  line-height: 1.6;
 }
 
 .errorMessage {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  margin-block-start: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--color-error-fg);
+  gap: 8px;
+  margin-block-start: 4px;
+  font-size: 15px;
+  color: var(--danger);
 }
 
 .errorIcon {
@@ -78,9 +105,26 @@
   position: relative;
   display: flex;
   align-items: stretch;
-  gap: var(--space-2);
+  gap: 8px;
 }
 
 .inputGroup .control {
   flex: 1;
+}
+
+/* Native file inputs follow the same border/radius language. */
+.control[type='file'] {
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.control[type='file']::file-selector-button {
+  margin-inline-end: 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--ink);
+  font: 600 15px/1 var(--font-body);
+  cursor: pointer;
 }

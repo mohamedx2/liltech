@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/table';
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import { ServerCountdown } from '@/components/events/server-countdown';
+import { LockIcon } from '@/components/icons/lock-icon';
 import styles from './submissions-view.module.css';
 
 /** Matches the documented server-side upload limit (see docs/api). */
@@ -148,8 +149,11 @@ export function SubmissionsView() {
       {/* Lock Notice if Closed */}
       {isLocked && (
         <Alert tone="warning" title="Submissions Closed">
-          The 08:00 UTC submission deadline has passed. Deliverables are locked for jury review and
-          scoring.
+          <span className={styles.lockedNotice}>
+            <LockIcon />
+            Unlock condition: only an administrator can reopen submissions after the 08:00 UTC
+            deadline. Deliverables are now locked for jury review and scoring.
+          </span>
         </Alert>
       )}
 

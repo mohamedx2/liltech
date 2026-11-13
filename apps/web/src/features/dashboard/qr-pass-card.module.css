@@ -33,7 +33,7 @@
 .qrContainer {
   background-color: #ffffff;
   padding: var(--space-3);
-  border-radius: var(--radius-md, 0.5rem);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,8 +52,9 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-4);
-  background-color: var(--color-surface, #121730);
-  border-radius: var(--radius-sm, 0.25rem);
+  background-color: rgb(235 194 122 / 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
 .tokenLabel {
@@ -64,7 +65,7 @@
 .tokenCode {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--color-primary);
+  color: var(--palette-gold);
 }
 
 .metaInfo {

@@ -1,16 +1,17 @@
 .container {
+  box-sizing: border-box;
   inline-size: 100%;
   max-inline-size: var(--content-width);
   margin-inline: auto;
-  padding-inline: var(--space-4);
+  padding-inline: max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-right));
 }
 
 .narrow {
   max-inline-size: var(--content-width-narrow);
 }
 
-@media (min-width: 48rem) {
-  .container {
-    padding-inline: var(--space-6);
-  }
+/* Pages that opt into the wide layout (e.g. the two-column register flow) escape
+ * the narrow reading measure without leaving the shared container. */
+.narrow:has([data-full-bleed]) {
+  max-inline-size: var(--content-width);
 }

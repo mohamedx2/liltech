@@ -1,64 +1,179 @@
+/*
+ * Footer is plain document flow on black. Nothing in here may be positioned
+ * absolutely or given blend/mask effects, otherwise the fixed page backdrops
+ * (hero, register) paint over the text.
+ */
+
 .footer {
-  border-block-start: 1px solid var(--color-border);
-  padding-block: var(--space-8);
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
   margin-block-start: auto;
-  background-color: var(--color-surface);
+  background-color: #000;
+  border-block-start: 1px solid rgba(245, 237, 224, 0.16);
+  color: #f5ede0;
+}
+
+/* Neutralise every inherited image treatment before the sizes below.
+ * :where() keeps this at class specificity so the logo classes win. */
+.footer :where(img) {
+  position: static;
+  max-inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+  mix-blend-mode: normal;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .inner {
+  box-sizing: border-box;
+  max-inline-size: 1180px;
+  margin-inline: auto;
+  padding: 56px 24px 32px;
+}
+
+.top {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 28px;
 }
 
-.meta {
+.brand {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  align-items: flex-start;
+  gap: 10px;
+  min-inline-size: 0;
 }
 
-.title {
-  font-weight: 600;
-  font-size: var(--text-sm);
-  color: var(--color-text);
+.brandLogo {
+  display: block;
+  block-size: 44px;
+  inline-size: auto;
+  max-inline-size: 160px;
 }
 
-.subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+.brandName {
+  margin: 0;
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.2;
+  color: #f5ede0;
 }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-4);
+.brandMeta {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(245, 237, 224, 0.7);
+}
+
+.nav {
+  min-inline-size: 0;
 }
 
 .links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: 16px 28px;
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-size: 15px;
 }
 
 .links a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  color: rgba(245, 237, 224, 0.7);
   text-decoration: none;
+  transition: color 0.2s;
 }
 
 .links a:hover {
-  text-decoration: underline;
-  color: var(--color-text);
+  color: #ebc27a;
 }
 
-@media (min-width: 48rem) {
-  .inner {
+.links a:focus-visible {
+  outline: 2px solid #ebc27a;
+  outline-offset: 3px;
+}
+
+.organizers {
+  margin-block-start: 28px;
+  padding-block-start: 32px;
+  border-block-start: 1px solid rgba(245, 237, 224, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.organizersLabel {
+  margin: 0;
+  font-size: 15px;
+  color: rgba(245, 237, 224, 0.7);
+}
+
+.logoRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 32px;
+}
+
+.logoItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.organizerLogo {
+  block-size: 72px;
+  inline-size: auto;
+  display: block;
+}
+
+.organizerName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5ede0;
+}
+
+.bottomLine {
+  margin: 20px 0 0;
+  padding-block-start: 24px;
+  border-block-start: 1px solid rgba(245, 237, 224, 0.16);
+  font-size: 14px;
+  color: rgba(245, 237, 224, 0.7);
+}
+
+@media (min-width: 861px) {
+  .top {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 860px) {
+  .inner {
+    padding: 44px 24px 32px;
+  }
+
+  .links {
+    gap: 8px 16px;
+  }
+
+  .logoRow {
+    gap: 24px;
   }
 }

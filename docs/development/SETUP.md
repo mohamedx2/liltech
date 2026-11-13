@@ -26,8 +26,8 @@ pnpm nx run api:db-seed           # optional demo metadata
 
 ```bash
 pnpm dev                          # web (3000) + api (4000) concurrently
-pnpm nx serve web                 # frontend only
-pnpm nx serve api                 # backend only
+pnpm nx run web:dev               # frontend only
+pnpm nx run api:serve             # backend only
 pnpm nx run api:db-studio         # browse the database
 ```
 
