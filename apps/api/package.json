@@ -14,8 +14,7 @@
           "{workspaceRoot}/node_modules/.prisma/client"
         ],
         "options": {
-          "command": "pnpm --filter api exec prisma generate --schema=prisma/schema.prisma",
-          "envFile": ".env"
+          "command": "pnpm --filter api exec prisma generate --schema=prisma/schema.prisma"
         }
       },
       "db-migrate": {
