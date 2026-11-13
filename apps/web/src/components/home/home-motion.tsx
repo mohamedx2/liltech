@@ -132,8 +132,10 @@ export function HomeMotion() {
             const draw = gsap.timeline({
               scrollTrigger: {
                 trigger: '[data-motion="night-curve"]',
-                start: 'top 82%',
-                end: 'bottom 45%',
+                start: 'top 88%',
+                // Finish the draw while the band is still mid-screen, so the line
+                // always reaches the 11:00 stop before the section leaves the view.
+                end: 'center 62%',
                 scrub: 0.5,
               },
             });
