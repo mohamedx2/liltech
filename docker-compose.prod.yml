@@ -13,8 +13,10 @@
 #   API_IMAGE / WEB_IMAGE — ghcr.io image references
 #   POSTGRES_PASSWORD     — random 32-char secret, never committed
 #
-# Only the web (3000) and API (4000) ports are published. The database is
-# reachable only inside the compose network.
+# Ports: caddy publishes 80/443 (public entrypoint, TLS for
+# liltechsousse.com). The web (3000) and API (4000) ports stay published as
+# a direct fallback; the database is reachable only inside the compose
+# network.
 
 services:
   postgres:
@@ -70,5 +72,24 @@ services:
     depends_on:
       - api
 
+  # Public entrypoint: terminates TLS for liltechsousse.com (certificates are
+  # obtained and renewed automatically) and routes /api/* to the API.
+  caddy:
+    image: caddy:2-alpine
+    container_name: liltech-caddy-prod
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - api
+
 volumes:
   postgres-data:
+  caddy-data:
+  caddy-config:
