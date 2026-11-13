@@ -24,12 +24,21 @@ COPY libs libs
 # `nx sync` regenerates the TypeScript project references for the subset of
 # projects present in this build context (apps/web and apps/api-e2e are
 # deliberately not copied here, so the committed root tsconfig.json is stale).
-# The resolved CLI version is exported so the runtime stage can install the
-# matching global `prisma` for the one-shot migrate service.
+#
+# The bundle keeps `pino` and `@prisma/client` external (they cannot be
+# bundled), so the runtime needs a real node_modules tree next to the bundle:
+# `api:prune` produces an installable dist (bundle + package.json + pruned
+# lockfile); we copy the Prisma schema in, install prod deps and generate the
+# client there. The CLI version is exported for the runtime stage's global
+# install (used by the one-shot migrate service).
 RUN pnpm nx sync \
   && pnpm --filter api exec prisma generate --schema=prisma/schema.prisma \
-  && pnpm nx run api:build --skip-nx-cache \
-  && node -p "require('./apps/api/node_modules/prisma/package.json').version" > /tmp/prisma-version.txt
+  && pnpm nx run api:prune --skip-nx-cache \
+  && node -p "require('./apps/api/node_modules/prisma/package.json').version" > /tmp/prisma-version.txt \
+  && cp -r apps/api/prisma apps/api/dist/prisma \
+  && cd apps/api/dist \
+  && pnpm install --frozen-lockfile --prod \
+  && node "$(ls -d /repo/node_modules/.pnpm/prisma@*/node_modules/prisma | head -1)/build/index.js" generate --schema=prisma/schema.prisma
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:22-alpine
