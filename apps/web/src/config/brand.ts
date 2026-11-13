@@ -52,10 +52,10 @@ export const brandConfig: BrandConfig = {
   organizers: ['GDG on Campus EPI', 'ISITCom Google Club'],
   organizerLogos: [
     {
-      src: '/brand/gdg-on-campus-epi.svg',
+      src: '/brand/gdg-on-campus-epi.png',
       alt: 'GDG on Campus EPI',
-      width: 960,
-      height: 1330,
+      width: 1920,
+      height: 390,
     },
     {
       src: '/brand/isitcom-google-club.svg',
