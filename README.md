@@ -180,6 +180,24 @@ docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://…/
 
 > ⚠️ The production Dockerfiles are provided as infrastructure groundwork and have not been battle-tested against a real deployment yet — treat them as a starting point.
 
+## Deployment
+
+Every push to `main` (and every manual **Run workflow** on the CI workflow) runs the `verify` job and then, automatically, the `deploy` job:
+
+1. Builds and pushes the two images to GHCR (`ghcr.io/mohamedx2/liltech-api`, `ghcr.io/mohamedx2/liltech-web` — `latest` + `sha-<commit>` tags).
+2. SSHes to the VPS and, against `docker-compose.prod.yml` copied to `/opt/liltech`:
+   - writes `/opt/liltech/.env` from repository secrets (never stored in the repo),
+   - logs the VPS in to GHCR with an ephemeral job token,
+   - pulls images, applies Prisma migrations (one-shot `migrate` service), starts the stack (web `:3000`, API `:4000`, Postgres internal-only),
+   - smoke-tests `GET /api/health` from the runner.
+
+Required GitHub configuration:
+
+- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`.
+- **Variables**: `DEPLOY_ENABLED` — deploy runs **only** when this is `true`, so the VPS is never touched before it is ready. Optional overrides: `NEXT_PUBLIC_API_URL`, `CORS_ORIGIN` (defaults use `http://<DEPLOY_SSH_HOST>:3000` / `:4000`).
+
+On the VPS the workflow assumes only Docker + the compose plugin (`docker compose version`) — nothing else is provisioned by hand. To harden host-key verification later, replace the workflow's runtime `ssh-keyscan` step with a pinned `known_hosts` entry (a `SSH_KNOWN_HOSTS` secret) — see the comment in `.github/workflows/ci.yml`.
+
 ## Git Workflow
 
 - Branch from `main`: `feat/<description>`, `fix/<description>`, `docs/<description>`, `chore/<description>`, `ci/<description>`, …
