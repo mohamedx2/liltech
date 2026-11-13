@@ -19,6 +19,10 @@ COPY nx.json tsconfig.base.json tsconfig.json ./
 COPY apps/web apps/web
 COPY libs libs
 
+# Regenerate the TypeScript project references for the subset of projects in
+# this build context (apps/api and apps/api-e2e are not copied here).
+RUN pnpm nx sync
+
 # NEXT_PUBLIC_* variables are baked in at build time; pass them as build args.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_API_MODE=real

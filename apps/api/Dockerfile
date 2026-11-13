@@ -21,9 +21,13 @@ COPY libs libs
 
 # `pnpm exec prisma` is not resolvable from the workspace root (the binary
 # lives in apps/api); use the same --filter pattern as the repo's Nx targets.
+# `nx sync` regenerates the TypeScript project references for the subset of
+# projects present in this build context (apps/web and apps/api-e2e are
+# deliberately not copied here, so the committed root tsconfig.json is stale).
 # The resolved CLI version is exported so the runtime stage can install the
 # matching global `prisma` for the one-shot migrate service.
-RUN pnpm --filter api exec prisma generate --schema=prisma/schema.prisma \
+RUN pnpm nx sync \
+  && pnpm --filter api exec prisma generate --schema=prisma/schema.prisma \
   && pnpm nx run api:build --skip-nx-cache \
   && node -p "require('./apps/api/node_modules/prisma/package.json').version" > /tmp/prisma-version.txt
 
