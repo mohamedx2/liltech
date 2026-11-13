@@ -44,6 +44,9 @@ temp copy is deleted after each use.
   on the VPS by hand; only the workflow writes there (`/opt/liltech`).
 - `/opt/liltech/` contains `docker-compose.prod.yml` + `.env` (600).
 - Postgres migrations were applied by the `migrate` service (Prisma 6.19.3).
+- **First fully green deploy run: `43518594774` (2026-11-13).** All three
+  containers healthy; API and web reachable from the internet on ports 3000
+  and 4000 (health endpoint returns `{"status":"ok","database":{"status":"up"}}`).
 
 ## Issues found and fixed while getting the first green deploy
 
@@ -55,14 +58,22 @@ temp copy is deleted after each use.
    references projects absent from the partial build context — both Dockerfiles
    run `pnpm nx sync` before building.
 4. The API bundle is `dist/main.js`, not `dist/server.js` — the image `CMD` now
-   points at the real file (this was the API crash-loop).
-5. The first smoke test could hang ~1 h on a silently-dropped port (no
+   points at the real file (this was the first API crash-loop).
+5. The webpack bundle keeps `pino`, `pino-pretty` (pino transport worker) and
+   `@prisma/client` external, but the runtime image shipped no `node_modules`
+   (`Cannot find module 'pino'` on boot). The API Dockerfile build stage now
+   runs `pnpm nx run api:prune` to turn `apps/api/dist` into an installable
+   package (bundle + `package.json` + pruned lockfile), copies the Prisma
+   schema in, runs `pnpm install --frozen-lockfile --prod` and generates the
+   Prisma client there before it ships to the runtime stage.
+6. The first smoke test could hang ~1 h on a silently-dropped port (no
    `--max-time` on curl). Health is now gated on the VPS itself (hard fail);
    external reachability is a fast advisory warning only.
 
 Commits: `ci(deploy): ship main to the VPS with Docker Compose` (#16),
 `fix(api): resolve prisma CLI…` (#17), `fix(ci): run nx sync…` (#18),
-`fix(ci): make the smoke test hang-proof…` (#19), `fix(api): point the image CMD…` (#20).
+`fix(ci): make the smoke test hang-proof…` (#19), `fix(api): point the image CMD…` (#20),
+`fix(api): install prod deps next to the bundle via api:prune` (#22).
 
 ## Still open / recommended follow-ups
 
