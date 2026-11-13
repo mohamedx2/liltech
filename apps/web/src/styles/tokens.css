@@ -1,116 +1,106 @@
 /*
- * Layer 1: Primitive Design Tokens (brand-independent).
- *
- * Raw neutral scales, spacing, typography, radii, shadows, transitions,
- * and layout breakpoints. Replace or extend here when official brand
- * tokens arrive — never scatter raw values inside components.
+ * Layer 1: Design tokens (single source of truth).
+ * Dark-only. Depth comes from borders and the red glow — never tinted blacks.
  */
 
 :root {
-  /* Neutral primitive palette */
-  --palette-neutral-0: #ffffff;
-  --palette-neutral-50: #f8fafc;
-  --palette-neutral-100: #f1f5f9;
-  --palette-neutral-200: #e2e8f0;
-  --palette-neutral-300: #cbd5e1;
-  --palette-neutral-400: #94a3b8;
-  --palette-neutral-500: #64748b;
-  --palette-neutral-600: #475569;
-  --palette-neutral-700: #334155;
-  --palette-neutral-800: #1e293b;
-  --palette-neutral-900: #0f172a;
-  --palette-neutral-950: #090d16;
+  color-scheme: dark;
 
-  /* Status primitives — light */
-  --palette-green-50: #f0fdf4;
-  --palette-green-600: #16a34a;
-  --palette-green-700: #15803d;
-  --palette-green-900: #14532d;
-  --palette-green-950: #052e16;
-  --palette-green-200: #bbf7d0;
-  --palette-green-400: #4ade80;
+  /* Brand palette */
+  --black: #000000;
+  --ink: #f5ede0;
+  --muted: rgb(245 237 224 / 0.7);
+  --gold: #ebc27a;
+  --red: #d81b1b;
+  --neon: #ff2a1f;
+  --maroon: #7a0c0c;
+  --line: rgb(245 237 224 / 0.16);
 
-  --palette-amber-50: #fefce8;
-  --palette-amber-500: #f59e0b;
-  --palette-amber-700: #b45309;
-  --palette-amber-900: #713f12;
-  --palette-amber-950: #422006;
-  --palette-amber-200: #fde68a;
-  --palette-amber-400: #fbbf24;
+  /* Status */
+  --success: #3fb950;
+  --warning: #e8a25a;
+  --danger: #ff4d4d;
 
-  --palette-red-50: #fef2f2;
-  --palette-red-500: #ef4444;
-  --palette-red-600: #dc2626;
-  --palette-red-700: #b91c1c;
-  --palette-red-900: #7f1d1d;
-  --palette-red-950: #450a0a;
-  --palette-red-200: #fecaca;
-  --palette-red-400: #f87171;
+  /* Legacy aliases kept so existing stylesheets keep resolving */
+  --palette-black: var(--black);
+  --palette-cream: var(--ink);
+  --palette-gold: var(--gold);
+  --palette-crimson: var(--red);
+  --palette-neon: var(--neon);
+  --palette-maroon: var(--maroon);
 
-  --palette-blue-50: #eff6ff;
-  --palette-blue-500: #3b82f6;
-  --palette-blue-600: #2563eb;
-  --palette-blue-700: #1d4ed8;
-  --palette-blue-900: #1e3a8a;
-  --palette-blue-950: #172554;
-  --palette-blue-200: #bfdbfe;
-  --palette-blue-400: #60a5fa;
+  /* Spacing scale: 8 / 16 / 24 / 36 / 56 / 96 */
+  --gap-xs: 8px;
+  --gap-sm: 16px;
+  --gap-md: 24px;
+  --gap-lg: 36px;
+  --gap-xl: 56px;
+  --gap-2xl: 96px;
+  --section-gap: 96px;
+  --section-gap-sm: 72px;
 
-  /* Spacing scale (4px base unit) */
+  /* 4px base steps (used by existing layouts) */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-5: 1.25rem;
   --space-6: 1.5rem;
+  --space-7: 2.25rem;
   --space-8: 2rem;
   --space-10: 2.5rem;
   --space-12: 3rem;
+  --space-14: 3.5rem;
   --space-16: 4rem;
   --space-20: 5rem;
+  --space-24: 6rem;
 
   /* Typography */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    'Bricolage Grotesque', 'Segoe UI Variable Display', 'Segoe UI', ui-sans-serif, system-ui,
+    sans-serif;
+  --font-arabic: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   --font-heading: var(--font-sans);
   --font-body: var(--font-sans);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: clamp(1.875rem, 1.35rem + 2vw, 2.75rem);
+  --text-xs: 14px;
+  --text-sm: 15px;
+  --text-base: 17px;
+  --text-lg: 19px;
+  --text-xl: 26px;
+  --text-2xl: 30px;
+  --text-3xl: clamp(40px, 6.2vw, 84px);
 
-  --leading-tight: 1.15;
+  --leading-tight: 1.04;
   --leading-snug: 1.35;
   --leading-normal: 1.6;
 
   /* Shape */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 1rem;
-  --radius-full: 9999px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 28px;
+  --radius-card: 28px;
+  --radius-full: 999px;
 
-  /* Elevation & shadows */
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
-  --shadow-md: 0 4px 12px rgb(15 23 42 / 0.1);
-  --shadow-lg: 0 12px 28px rgb(15 23 42 / 0.18);
+  /* Elevation — borders and glow only, no drop shadows */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --glow-red: 0 0 32px rgb(255 42 31 / 0.55);
 
   /* Motion */
-  --transition-fast: 150ms ease;
-  --transition-base: 220ms ease;
+  --transition-fast: 200ms ease;
+  --transition-base: 200ms ease;
 
-  /* Layout & z-index */
-  --content-width: 72rem;
+  /* Layout */
+  --content-width: 1180px;
   --content-width-narrow: 44rem;
-  --header-height: 4rem;
+  --header-height: 4.75rem;
   --z-sticky: 20;
   --z-overlay: 40;
   --z-skip-link: 100;
 
-  /* Reference breakpoints (used in documentation/media queries):
-     sm: 40rem (640px), md: 48rem (768px), lg: 64rem (1024px), xl: 80rem (1280px) */
+  /* Reference breakpoints: stack columns below 860px */
+  --bp-md: 860px;
 }

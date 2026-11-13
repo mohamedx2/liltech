@@ -57,14 +57,11 @@ export function Button({
       className={buttonClassName({ variant, size, fullWidth, className })}
       {...rest}
     >
-      {loading ? (
-        <>
-          <span className={styles.spinner} aria-hidden="true" />
-          <span>{loadingLabel ?? children}</span>
-        </>
-      ) : (
-        children
-      )}
+      <span
+        className={loading ? styles.spinner : `${styles.spinner} ${styles.spinnerIdle}`}
+        aria-hidden="true"
+      />
+      {loading ? <span>{loadingLabel ?? children}</span> : children}
     </button>
   );
 }

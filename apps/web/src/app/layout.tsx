@@ -15,9 +15,6 @@ export const metadata: Metadata = {
   },
 };
 
-const COLOR_SCHEME_INIT_SCRIPT =
-  "try{var s=localStorage.getItem('color-scheme');if(s==='light'||s==='dark'){var m=document.querySelector('meta[name=\"color-scheme\"]');if(m)m.content=s;}}catch(e){}";
-
 export default function RootLayout({ children }: { children: ReactNode }) {
   const defaultMetaContent =
     brandConfig.theme.defaultMode === 'system' ? 'light dark' : brandConfig.theme.defaultMode;
@@ -26,7 +23,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <meta name="color-scheme" content={defaultMetaContent} suppressHydrationWarning />
-        <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_INIT_SCRIPT }} />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Cairo:wght@600;800&display=swap"
+        />
       </head>
       <body>
         <a href="#main-content" className="skip-link visually-hidden">

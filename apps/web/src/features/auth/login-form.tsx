@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Alert } from '@/components/feedback/alert';
+import { BrandMark } from '@/components/layout/brand-mark';
 import { Button, buttonClassName } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField, TextInput } from '@/components/ui/input';
@@ -108,6 +109,7 @@ export function LoginForm() {
   return (
     <Card>
       <CardHeader>
+        <BrandMark variant="logo" />
         <CardTitle as="h1">Sign in to LilTech 2026</CardTitle>
         <CardDescription>
           Access your team, jury, or organizer workspace using the credentials issued for your role.

@@ -22,16 +22,32 @@
 
 html {
   font-family: var(--font-body);
-  line-height: var(--leading-normal);
+  font-size: 17px;
+  line-height: 1.6;
   scroll-behavior: smooth;
   text-size-adjust: 100%;
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  /* Pure black everywhere: no gradients, no tinted blacks, no glass. */
+  background-color: var(--black);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.6;
+  font-weight: 400;
   min-height: 100dvh;
+}
+
+[lang='ar'],
+[dir='rtl'] {
+  font-family: var(--font-arabic);
+}
+
+::selection {
+  background: var(--palette-maroon);
+  color: var(--palette-cream);
 }
 
 h1,
@@ -48,10 +64,41 @@ h3,
 h4 {
   font-family: var(--font-heading);
   line-height: var(--leading-tight);
+  letter-spacing: -0.03em;
+}
+
+h1 {
+  font-size: clamp(40px, 6.2vw, 84px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+
+h2 {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 1.04;
+  font-weight: 800;
+}
+
+h3 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+html[lang='ar'],
+[lang='ar'] h1,
+[lang='ar'] h2,
+[lang='ar'] h3 {
+  font-family: var(--font-arabic);
 }
 
 a {
   color: inherit;
+}
+
+p {
+  max-inline-size: 65ch;
 }
 
 button,
@@ -64,8 +111,7 @@ textarea {
 /* Visible focus indicator for keyboard navigation */
 :focus-visible {
   outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  outline-offset: 3px;
 }
 
 /* Canonical visually hidden utility (remains accessible; focus-within reveals skip links) */
@@ -88,8 +134,8 @@ textarea {
   z-index: var(--z-skip-link);
   padding: var(--space-3) var(--space-4);
   background-color: var(--color-primary);
-  color: var(--color-primary-fg);
-  border-radius: var(--radius-md);
+  color: var(--palette-cream);
+  border-radius: 999px;
   text-decoration: none;
   font-weight: 600;
 }
@@ -102,5 +148,5 @@ dialog:modal {
 dialog::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
-  background-color: rgb(9 13 22 / 0.6);
+  background-color: rgb(0 0 0 / 0.78);
 }

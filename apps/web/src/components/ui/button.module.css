@@ -1,106 +1,135 @@
+/* Shared button system — one geometry for the whole app. */
+
 .button {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  font-weight: 600;
-  line-height: 1.25;
-  text-decoration: none;
+  gap: 8px;
+  padding: 14px 26px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background-color: transparent;
+  color: var(--ink);
+  font: 600 16px/1 var(--font-body);
+  min-height: 48px;
   cursor: pointer;
+  text-decoration: none;
+  text-align: center;
   transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast),
-    opacity var(--transition-fast);
-  min-block-size: 2.75rem;
-  padding-inline: var(--space-4);
-  padding-block: var(--space-2);
+    background 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 
+.button:active:not(:disabled, [aria-disabled='true']) {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  opacity: 0.45;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Sizes */
 .sm {
-  min-block-size: 2.25rem;
-  padding-inline: var(--space-3);
-  font-size: var(--text-sm);
+  min-height: 44px;
+  padding: 10px 20px;
+  font-size: 15px;
 }
 
 .md {
-  min-block-size: 2.75rem;
-  padding-inline: var(--space-5);
-  font-size: var(--text-base);
+  min-height: 48px;
 }
 
 .lg {
-  min-block-size: 3rem;
-  padding-inline: var(--space-6);
-  font-size: var(--text-lg);
+  min-height: 54px;
+  padding: 16px 32px;
+  font-size: 17px;
 }
 
 .fullWidth {
   inline-size: 100%;
 }
 
+/* Variants */
 .primary {
-  background-color: var(--color-primary);
-  color: var(--color-primary-fg);
+  background-color: var(--red);
+  border-color: var(--red);
+  color: var(--ink);
 }
 
 .primary:hover:not(:disabled, [aria-disabled='true']) {
-  background-color: var(--color-primary-strong);
+  border-color: var(--red);
+  box-shadow: 0 0 32px rgb(255 42 31 / 0.55);
 }
 
 .secondary {
-  background-color: var(--color-secondary);
-  color: var(--color-secondary-fg);
-  border-color: var(--color-border);
+  background-color: transparent;
+  border-color: var(--line);
+  color: var(--ink);
 }
 
 .secondary:hover:not(:disabled, [aria-disabled='true']) {
-  background-color: var(--color-secondary-hover);
+  background-color: rgb(235 194 122 / 0.08);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .outline {
   background-color: transparent;
-  color: var(--color-text);
-  border-color: var(--color-border-strong);
+  border-color: var(--line);
+  color: var(--ink);
 }
 
 .outline:hover:not(:disabled, [aria-disabled='true']) {
-  background-color: var(--color-surface);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .ghost {
   background-color: transparent;
-  color: var(--color-text);
+  border-color: transparent;
+  color: var(--ink);
+  padding-inline: 16px;
 }
 
 .ghost:hover:not(:disabled, [aria-disabled='true']) {
-  background-color: var(--color-surface-raised);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .danger {
-  background-color: var(--color-error);
-  color: var(--color-primary-fg);
+  background-color: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .danger:hover:not(:disabled, [aria-disabled='true']) {
-  opacity: 0.92;
-}
-
-.button:disabled,
-.button[aria-disabled='true'] {
-  opacity: 0.55;
-  cursor: not-allowed;
+  background-color: rgb(255 77 77 / 0.1);
 }
 
 .spinner {
   inline-size: 1em;
   block-size: 1em;
+  flex: 0 0 auto;
   border: 2px solid currentColor;
   border-inline-end-color: transparent;
-  border-radius: var(--radius-full);
+  border-radius: 999px;
   animation: liltech-spin 0.7s linear infinite;
+}
+
+/* Reserves the spinner slot while idle so the row does not shift on submit. */
+.spinnerIdle {
+  visibility: hidden;
 }
 
 @keyframes liltech-spin {

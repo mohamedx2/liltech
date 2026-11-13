@@ -1,9 +1,8 @@
 /**
  * Centralized brand configuration for LilTech 2026.
  *
- * Official logos, colors, and typography are not finalized yet.
- * Replace the asset paths here once official files are placed in
- * `apps/web/public/brand/` and update token values in `src/styles/`.
+ * Event partner artwork lives in `apps/web/public/brand/`. LilTech keeps
+ * its text wordmark until a dedicated event logo is supplied.
  */
 
 export interface BrandConfig {
@@ -13,6 +12,14 @@ export interface BrandConfig {
   readonly eventDates: string;
   readonly eventLocation: string;
   readonly organizers: readonly string[];
+  readonly organizerLogos: readonly {
+    readonly src: string;
+    readonly alt: string;
+    /** Live text rendered beside the mark when the artwork itself has no lettering. */
+    readonly label?: string;
+    readonly width: number;
+    readonly height: number;
+  }[];
   readonly logos: {
     /** Set to `'/brand/logo-light.svg'` when official light-mode logo is added. */
     readonly light: string | null;
@@ -43,18 +50,33 @@ export const brandConfig: BrandConfig = {
   eventDates: 'November 21–22, 2026',
   eventLocation: 'Campus EPI, Sousse, Tunisia',
   organizers: ['GDG on Campus EPI', 'ISITCom Google Club'],
+  organizerLogos: [
+    {
+      src: '/brand/gdg-on-campus-epi.svg',
+      alt: 'GDG on Campus EPI',
+      width: 960,
+      height: 1330,
+    },
+    {
+      src: '/brand/isitcom-google-club.svg',
+      alt: 'ISITCom Google Club',
+      label: 'ISITCom Google Club',
+      width: 1099,
+      height: 1431,
+    },
+  ],
   logos: {
     light: null,
     dark: null,
-    default: null,
+    default: '/brand/liltech-logo.jpg',
     alt: 'LilTech 2026 logo',
-    width: 132,
-    height: 32,
+    width: 1254,
+    height: 1104,
   },
-  favicon: '/favicon.ico',
+  favicon: '/brand/liltech-logo.jpg',
   theme: {
-    defaultMode: 'system',
-    supportsColorSchemeSwitch: true,
+    defaultMode: 'dark',
+    supportsColorSchemeSwitch: false,
   },
   typography: {
     headingFontVar: 'var(--font-heading)',

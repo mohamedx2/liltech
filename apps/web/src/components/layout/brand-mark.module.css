@@ -1,63 +1,54 @@
 .brandLink {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 12px;
   text-decoration: none;
   color: var(--color-text);
   font-weight: 700;
   letter-spacing: -0.02em;
-  font-size: var(--text-lg);
-  min-block-size: 2.75rem;
+  font-size: 1.35rem;
+  min-block-size: 44px;
 }
 
 .wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-1);
+  gap: 8px;
+  letter-spacing: -0.03em;
+}
+
+.wordmarkText {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.wordmarkArabic {
+  font-family: var(--font-arabic);
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--palette-gold);
+  line-height: 1;
 }
 
 .yearTag {
-  font-size: var(--text-xs);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding-inline: var(--space-2);
-  padding-block: 0.125rem;
+  color: var(--palette-gold);
+  border: 1px solid rgb(235 194 122 / 0.42);
+  border-radius: 999px;
+  padding-inline: 8px;
+  padding-block: 2px;
 }
 
+/*
+ * The official artwork ships with a black background: blend it into the black
+ * page and soften the square edge. No wrapper, border, padding, radius or filter.
+ */
 .logoImage {
   display: block;
   block-size: auto;
-  max-block-size: 2rem;
-}
-
-.logoDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  .logoLight {
-    display: none;
-  }
-
-  .logoDark {
-    display: block;
-  }
-}
-
-:root:has(> head > meta[name='color-scheme'][content='dark']) .logoLight {
-  display: none;
-}
-
-:root:has(> head > meta[name='color-scheme'][content='dark']) .logoDark {
-  display: block;
-}
-
-:root:has(> head > meta[name='color-scheme'][content='light']) .logoLight {
-  display: block;
-}
-
-:root:has(> head > meta[name='color-scheme'][content='light']) .logoDark {
-  display: none;
+  inline-size: min(220px, 100%);
+  mix-blend-mode: lighten;
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 52%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 52%, #000 62%, transparent 100%);
 }
