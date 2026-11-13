@@ -1,10 +1,17 @@
 # LilTech 2026 — Official Brand Assets Directory
 
-This folder is the single injection point for the official LilTech visual assets once finalized by the organizers (**GDG on Campus EPI** and **ISITCom Google Club**).
+This folder is the single injection point for official event and organizer artwork.
 
-## Expected Asset Slots
+## Current Assets
 
-Drop official files here and wire their paths in [`apps/web/src/config/brand.ts`](../../src/config/brand.ts):
+| File | Purpose |
+|---|---|
+| `gdg-on-campus-epi.svg` | GDG on Campus EPI organizer mark and current favicon |
+| `isitcom-google-club.svg` | ISITCom Google Club organizer mark |
+
+## Reserved LilTech Asset Slots
+
+Add a dedicated event logo only when the organizers provide one, then wire it in [`apps/web/src/config/brand.ts`](../../src/config/brand.ts):
 
 | File | Purpose |
 |---|---|
@@ -16,5 +23,5 @@ Drop official files here and wire their paths in [`apps/web/src/config/brand.ts`
 ## Rules
 
 - **Do not** invent or draw an unofficial logo here.
-- Until official files are added, `BrandMark` automatically renders the neutral text wordmark configured in `apps/web/src/config/brand.ts`.
+- Until a dedicated LilTech event logo is added, `BrandMark` renders the configured LilTech text wordmark while `OrganizerMarks` renders the supplied partner artwork.
 - Update visual colors and typography centrally in `apps/web/src/styles/tokens.css` and `apps/web/src/styles/theme.css` — never inside individual components.

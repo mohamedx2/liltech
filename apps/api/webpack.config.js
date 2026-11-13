@@ -16,6 +16,10 @@ module.exports = {
       main: './src/server.ts',
       tsConfig: './tsconfig.app.json',
       assets: ['./src/assets'],
+      // Prisma Client loads a platform-specific query engine at runtime.
+      // Keep it out of the bundle so Node resolves the generated client and
+      // native engine from node_modules.
+      externalDependencies: ['@prisma/client', 'pino'],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: false,

@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Keep `next dev` from generating a nested AGENTS.md in the worktree.
+  agentRules: false,
   // Produces a self-contained server bundle for Docker deployments
   // (see apps/web/Dockerfile).
   output: 'standalone',

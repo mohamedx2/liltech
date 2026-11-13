@@ -41,7 +41,7 @@
   justify-content: center;
   font-size: var(--text-xs);
   font-weight: 700;
-  background-color: var(--color-surface, #121730);
+  background-color: var(--color-surface);
   border: 2px solid var(--color-border);
   color: var(--color-text-muted);
   margin-inline: auto;
@@ -73,8 +73,8 @@
 }
 
 .description {
-  font-size: 0.6875rem;
-  color: var(--color-text-dim, #6d78a3);
+  font-size: 14px;
+  color: var(--color-text-muted);
   max-width: 8rem;
   line-height: 1.25;
 }
@@ -83,7 +83,7 @@
 .completed .indicator {
   background-color: var(--color-success);
   border-color: var(--color-success);
-  color: #0b0e1a;
+  color: var(--palette-black);
 }
 
 .completed .connector {
@@ -98,12 +98,14 @@
 .current .indicator {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px var(--color-primary-subtle, rgba(79, 124, 255, 0.25));
+  color: var(--palette-cream);
+  box-shadow:
+    0 0 0 4px var(--color-primary-subtle),
+    0 0 22px rgb(255 42 31 / 0.3);
 }
 
 .current .label {
-  color: var(--color-primary);
+  color: var(--palette-gold);
   font-weight: 800;
 }
 

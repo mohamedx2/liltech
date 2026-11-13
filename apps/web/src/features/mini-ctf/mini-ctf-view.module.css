@@ -63,6 +63,13 @@
   width: 100%;
 }
 
+.lockedTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--palette-gold);
+}
+
 .solvedContent {
   display: flex;
   flex-direction: column;

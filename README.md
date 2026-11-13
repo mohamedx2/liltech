@@ -129,10 +129,10 @@ pnpm nx run api:db-reset             # nuke & recreate your local database
 
 ```bash
 # Start frontend (http://localhost:3000) — API proxy configured
-pnpm nx serve web
+pnpm nx run web:dev
 
 # Start backend (http://localhost:4000/api) — requires .env and PostgreSQL
-pnpm nx serve api
+pnpm nx run api:serve
 
 # Start both
 pnpm dev
