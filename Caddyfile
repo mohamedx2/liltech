@@ -1,0 +1,22 @@
+# Public entrypoint for liltechsousse.com (apex and www).
+#
+# Copied to /opt/liltech by the GitHub Actions deploy job, mounted read-only
+# into the caddy service (docker-compose.prod.yml). Caddy obtains and renews
+# the Let's Encrypt certificate automatically — port 80 must stay reachable
+# for the HTTP-01 challenge.
+#
+# /api/* goes to the API container (paths are preserved: /api/health on the
+# domain hits the same route inside the API). Everything else goes to the
+# Next.js web app.
+
+liltechsousse.com, www.liltechsousse.com {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
