@@ -73,7 +73,7 @@ export const brandConfig: BrandConfig = {
     width: 1254,
     height: 1104,
   },
-  favicon: '/brand/liltech-logo.jpg',
+  favicon: '/brand/liltech-icon.png',
   theme: {
     defaultMode: 'dark',
     supportsColorSchemeSwitch: false,
