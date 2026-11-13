@@ -6,7 +6,7 @@ This folder is the single injection point for official event and organizer artwo
 
 | File | Purpose |
 |---|---|
-| `gdg-on-campus-epi.svg` | GDG on Campus EPI organizer mark and current favicon |
+| `gdg-on-campus-epi.png` | GDG on Campus EPI organizer mark with a black background |
 | `isitcom-google-club.svg` | ISITCom Google Club organizer mark |
 
 ## Reserved LilTech Asset Slots
