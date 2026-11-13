@@ -82,8 +82,22 @@ Commits: `ci(deploy): ship main to the VPS with Docker Compose` (#16),
 - Pin SSH host keys in the workflow (currently runtime `ssh-keyscan`) — see the
   comment in `ci.yml`.
 - Consider a dedicated non-root deploy user instead of root.
-- No domain yet: the platform is served on raw-IP ports 3000/4000. A reverse
-  proxy (nginx/Caddy, 80/443, TLS) is the natural next step; `NEXT_PUBLIC_API_URL`
-  and `CORS_ORIGIN` variables are already in place for it.
 - `nx.json` `"analytics": true` and `next.config.ts` `agentRules: false` remain
   unreviewed side effects of PR #15 (flagged in that PR's review).
+
+## Domain and TLS (liltechsousse.com, 2026-11-13)
+
+The domain resolves to the VPS. A **Caddy** reverse proxy service
+(`liltech-caddy-prod`) was added to `docker-compose.prod.yml` (PR #24):
+
+- Listens on 80/443, terminates TLS; the Let's Encrypt certificate is
+  obtained and renewed automatically (port 80 must stay reachable for the
+  HTTP-01 challenge).
+- `/api/*` → API container (paths preserved), everything else → web app.
+- The deploy workflow copies the `Caddyfile` (repo root) to `/opt/liltech`
+  alongside the compose file; it is mounted read-only into Caddy.
+- Repo variables switched to domain URLs:
+  `NEXT_PUBLIC_API_URL=https://liltechsousse.com/api`,
+  `CORS_ORIGIN=https://liltechsousse.com`.
+- Ports 3000/4000 remain published as a direct fallback; raw-IP links
+  (`http://72.61.20.23:3000`) still work.
