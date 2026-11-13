@@ -1,64 +1,70 @@
 .footer {
-  border-block-start: 1px solid var(--color-border);
-  padding-block: var(--space-8);
+  border-block-start: 1px solid var(--line);
+  padding-block: 56px;
   margin-block-start: auto;
-  background-color: var(--color-surface);
+  background-color: var(--black);
 }
 
 .inner {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 24px;
 }
 
 .meta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 16px;
 }
 
 .title {
   font-weight: 600;
-  font-size: var(--text-sm);
-  color: var(--color-text);
+  font-size: 17px;
+  color: var(--ink);
 }
 
 .subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-size: 15px;
+  color: var(--muted);
+  max-inline-size: 60ch;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
+  gap: 24px;
 }
 
 .links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: 24px;
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-size: 15px;
+  color: var(--muted);
 }
 
 .links a {
   text-decoration: none;
+  transition: color 0.2s;
 }
 
 .links a:hover {
-  text-decoration: underline;
-  color: var(--color-text);
+  color: var(--gold);
 }
 
-@media (min-width: 48rem) {
+.links a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+@media (min-width: 860px) {
   .inner {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
   }
 }

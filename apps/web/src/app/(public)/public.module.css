@@ -6,7 +6,7 @@
 
 .main {
   flex: 1;
-  padding-block: var(--space-16) var(--space-20);
+  padding-block: 56px 96px;
 }
 
 .stack {

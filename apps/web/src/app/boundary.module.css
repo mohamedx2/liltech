@@ -1,16 +1,18 @@
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  min-block-size: 100dvh;
+  background-color: var(--black);
 }
 
 .main {
   flex: 1;
-  padding-block: var(--space-12);
+  padding-block: 96px;
 }
 
 .heading {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  margin-block-end: var(--space-4);
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-block-end: 24px;
 }
