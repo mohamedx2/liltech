@@ -1,7 +1,10 @@
+/* Public shell + home page (ported from design-reference/liltech-home.html). */
+
 .shell {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  background-color: var(--black);
 }
 
 .main {
@@ -15,26 +18,340 @@
   gap: var(--section-gap);
 }
 
-@media (max-width: 39.99rem) {
-  .stack {
-    gap: var(--section-gap-sm);
+/* ---------- Hero ---------- */
+.hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 24px;
+  padding-block: 36px 56px;
+}
+
+.heroCopy {
+  min-inline-size: 0;
+}
+
+.phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--gold);
+  margin: 0 0 22px;
+}
+
+.phaseDot {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background-color: var(--neon);
+  box-shadow: 0 0 12px var(--neon);
+  animation: phasePulse 2s infinite;
+}
+
+@keyframes phasePulse {
+  50% {
+    opacity: 0.35;
   }
 }
 
-.hero {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding-block: clamp(2rem, 6vw, 6rem);
-  position: relative;
+.heroTitle {
+  margin: 0 0 26px;
+  max-inline-size: 16ch;
 }
 
-.hero::after {
+.heroTitle > span {
+  display: block;
+}
+
+.heroTitleGold {
+  color: var(--gold);
+}
+
+.heroTitleMuted {
+  color: var(--muted);
+}
+
+.lede {
+  max-inline-size: 46ch;
+  color: var(--muted);
+  font-size: 19px;
+  margin: 0 0 32px;
+}
+
+.lede b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.heroLogo {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.heroLogoImg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  mix-blend-mode: lighten;
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 52%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 52%, #000 62%, transparent 100%);
+}
+
+/* Pulls the status line up to sit just under the clock band. */
+.apiLine {
+  margin-block-start: calc(-1 * var(--section-gap) + 16px);
+}
+
+/* ---------- Sections ---------- */
+.band {
+  display: block;
+}
+
+.sectionTitle {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  margin: 0 0 14px;
+  max-inline-size: 18ch;
+}
+
+.sub {
+  color: var(--muted);
+  max-inline-size: 52ch;
+  margin: 0 0 48px;
+  font-size: 17px;
+}
+
+/* ---------- Night curve ---------- */
+.curve {
+  position: relative;
+  block-size: 100px;
+  margin-block-end: 10px;
+}
+
+.curve svg {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+.curveDot {
+  position: absolute;
+  inline-size: 16px;
+  block-size: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background-color: var(--black);
+  border: 3px solid var(--gold);
+}
+
+.curveDotHot {
+  border-color: var(--neon);
+  box-shadow: 0 0 16px var(--neon);
+}
+
+.stops {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stopTime {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.stopTitle {
+  margin: 2px 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0;
+}
+
+.stopText {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ---------- Challenges ---------- */
+.duo {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.challenge {
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 36px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 340px;
+}
+
+.challengeFeatured {
+  background: linear-gradient(160deg, rgb(216 27 27 / 0.28), rgb(122 12 12 / 0.1) 55%, transparent);
+  border-color: rgb(216 27 27 / 0.5);
+}
+
+.challengeAsymmetric {
+  border-radius: 28px 28px 120px 28px;
+  margin-block-start: 48px;
+}
+
+.challengeLabel {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.challengeTitle {
+  font-size: clamp(28px, 3.4vw, 46px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 0 0 12px;
+  font-weight: 800;
+}
+
+.challengeText {
+  margin: 0;
+  color: var(--muted);
+  max-inline-size: 38ch;
+}
+
+.lock {
+  margin: 36px 0 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 15px;
+  color: var(--gold);
+}
+
+.lock svg {
+  flex: none;
+}
+
+/* ---------- Team path ---------- */
+.path {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 56px;
+}
+
+.pathList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-inline-start: 2px solid var(--line);
+}
+
+.pathList li {
+  position: relative;
+  padding: 0 0 26px 34px;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.pathList li::before {
   content: '';
-  inline-size: min(32rem, 80%);
-  block-size: 3px;
-  margin-block-start: var(--space-6);
-  background: linear-gradient(90deg, var(--palette-crimson), var(--palette-gold), transparent);
+  position: absolute;
+  left: -7px;
+  top: 9px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background-color: var(--black);
+  border: 2px solid var(--red);
+}
+
+.pathList li b {
+  font-weight: 600;
+}
+
+.pathList li span {
+  color: var(--muted);
+}
+
+.pathList li:last-child {
+  padding-block-end: 0;
+}
+
+.pathList li:last-child::before {
+  background-color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* ---------- Roles ---------- */
+.roles {
+  border-block-start: 1px solid var(--line);
+}
+
+.role {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 24px;
+  padding: 28px 0;
+  border-block-end: 1px solid var(--line);
+}
+
+.roleTitle {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+.roleText {
+  margin: 0;
+  color: var(--muted);
+  max-inline-size: 56ch;
+}
+
+/* ---------- Final CTA ---------- */
+.final {
+  padding-block: 72px 0;
+  border-block-start: 1px solid var(--line);
+}
+
+.final .sectionTitle {
+  max-inline-size: 20ch;
+}
+
+/* ---------- Shared page classes (schedule, challenges) ---------- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionLead {
+  color: var(--muted);
+  max-inline-size: 52ch;
 }
 
 .eyebrow {
@@ -45,139 +362,55 @@
   text-transform: none;
 }
 
-.heroTitle {
-  font-size: var(--text-3xl);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  max-width: 52rem;
-  text-wrap: balance;
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-block: 36px;
+  border-block-end: 1px solid var(--line);
 }
 
-.lead {
-  color: var(--color-text-muted);
-  font-size: var(--text-lg);
-  max-width: 48rem;
+.pageTitle {
+  font-size: clamp(40px, 6.2vw, 84px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
 }
 
 .ctaRow {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-block-start: var(--space-2);
-}
-
-/* CTA groups go full width only on narrow phones. */
-@media (max-width: 480px) {
-  .ctaRow > * {
-    inline-size: 100%;
-  }
-}
-
-.statusCluster {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: rgb(8 7 6 / 0.78);
-}
-
-.factsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0;
-  border-block: 1px solid var(--color-border);
-  margin: 0;
-  padding: 0;
-}
-
-.factCard {
-  background-color: transparent;
-  border-inline-end: 1px solid var(--color-border);
-  padding: var(--space-5);
-}
-
-.factCard:last-child {
-  border-inline-end: 0;
-}
-
-.factLabel {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.factValue {
-  margin-block-start: var(--space-1);
-  margin-inline-start: 0;
-  font-weight: 600;
-  font-size: var(--text-base);
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.sectionHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.sectionTitle {
-  font-size: clamp(1.5rem, 1.2rem + 1vw, 2.25rem);
-  font-weight: 600;
-}
-
-.sectionLead {
-  color: var(--color-text-muted);
-  max-width: 46rem;
+  margin-block-start: 8px;
 }
 
 .cardGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: var(--space-6);
+  gap: 24px;
 }
 
 .twoColGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: var(--space-8);
-}
-
-.pageHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-block: var(--space-8);
-  border-block-end: 1px solid var(--color-border);
-}
-
-.pageTitle {
-  font-size: clamp(2rem, 1.5rem + 2vw, 3.75rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  gap: 24px;
 }
 
 .bulletList {
   margin: 0;
-  padding-inline-start: var(--space-5);
+  padding-inline-start: 20px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  gap: 8px;
+  color: var(--muted);
+  font-size: 17px;
 }
 
 .badgeRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
 }
 
 .timelineList {
@@ -186,66 +419,104 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
 }
 
 .timelineItem {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-2);
-  padding: var(--space-5) 0;
-  background-color: transparent;
-  border-block-start: 1px solid var(--color-border);
-  border-radius: 0;
+  gap: 8px;
+  padding: 28px 0;
+  border-block-start: 1px solid var(--line);
 }
 
 .timelineTime {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--ink);
 }
 
 .timelineBody {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 4px;
 }
 
 .timelineHeading {
-  font-size: var(--text-base);
+  font-size: 17px;
   font-weight: 600;
 }
 
 .timelineDescription {
   font-size: 17px;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .codeTag {
   font-family: var(--font-mono);
   font-size: 14px;
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface-raised);
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-color: transparent;
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 860px) {
   .timelineItem {
     grid-template-columns: 11rem 1fr;
-    gap: var(--space-6);
+    gap: 24px;
     align-items: start;
   }
 }
 
-@media (max-width: 47.99rem) {
-  .factCard {
-    border-inline-end: 0;
-    border-block-end: 1px solid var(--color-border);
+@media (max-width: 859px) {
+  .stack {
+    gap: var(--section-gap-sm);
   }
 
-  .factCard:last-child {
-    border-block-end: 0;
+  .hero,
+  .duo,
+  .path,
+  .role {
+    grid-template-columns: 1fr;
+  }
+
+  .heroLogo {
+    order: -1;
+  }
+
+  .stops {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .curve {
+    display: none;
+  }
+
+  .stops li {
+    border-inline-start: 2px solid var(--gold);
+    padding-inline-start: 18px;
+  }
+
+  .challengeAsymmetric {
+    margin-block-start: 0;
+    border-radius: 28px;
+  }
+
+  .apiLine {
+    margin-block-start: calc(-1 * var(--section-gap-sm) + 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  .ctaRow > * {
+    inline-size: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phaseDot {
+    animation: none;
   }
 }

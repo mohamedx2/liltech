@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ChallengeTrack } from 'api-contracts';
 import { ApiStatus } from '@/components/api-status';
 import { EventPhaseBanner } from '@/components/events/event-phase-banner';
+import { LockIcon } from '@/components/icons/lock-icon';
 import { PageContainer } from '@/components/layout/page-container';
-import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { brandConfig } from '@/config/brand';
 import styles from './public.module.css';
 
@@ -14,167 +12,260 @@ export const metadata: Metadata = {
   title: `${brandConfig.productName} — Hackathon Platform`,
 };
 
-const eventFacts = [
-  { label: 'Dates', value: brandConfig.eventDates },
-  { label: 'Location', value: brandConfig.eventLocation },
-  { label: 'Team size', value: '3–5 participants' },
-  { label: 'Structure', value: '2 parallel tracks · 2 juries · 2 podiums' },
-] as const;
-
-const workflowSteps = [
+const nightStops = [
   {
-    step: '01 · Pre-event',
-    title: 'Team registration & QR badges',
-    description:
-      'Team leaders register teams of 3–5 members. Every participant receives a personal QR check-in badge by email.',
+    time: 'Arrival',
+    title: 'Check-in',
+    description: 'Staff scan your QR badge. Green means you’re in.',
   },
   {
-    step: '02 · Doors open',
-    title: 'On-site QR check-in',
-    description:
-      'Staff scan participant QR badges at Campus EPI entrance. Checked-in teams become eligible when the event launches.',
+    time: '20:00',
+    title: 'Launch',
+    description: 'Organizers start the night. Teams solve the Mini-CTF.',
   },
   {
-    step: '03 · 20:00 launch',
-    title: 'Mini-CTF unlock gate',
-    description:
-      'Administrators launch the event at 20:00. Solving a valid Mini-CTF flag server-side unlocks the team main challenge.',
+    time: '08:00',
+    title: 'Submissions close',
+    description: 'Late deliveries are flagged for the juries.',
   },
   {
-    step: '04 · 08:00–11:00',
-    title: 'Deliverables, pitches & podiums',
-    description:
-      'Teams submit before 08:00, pitch at 09:00 to challenge-scoped juries, and view final track podiums at 11:00.',
+    time: '09:00',
+    title: 'Pitches',
+    description: 'Each jury scores its teams live on the platform.',
+  },
+  {
+    time: '11:00',
+    title: 'Awards',
+    description: 'Scoring closes and both podiums are published.',
   },
 ] as const;
 
-const trackSummaries = [
+const teamPath = [
+  { title: 'Register.', text: 'The team leader signs up 3 to 5 members in one form.' },
+  { title: 'Get your badge.', text: 'Every member receives a personal QR code by email.' },
+  { title: 'Check in.', text: 'Staff scan the code at the entrance.' },
   {
-    id: ChallengeTrack.TrackA,
-    title: 'Challenge Track A',
-    subtitle: 'Parallel Track 1 · Dedicated Jury A · Podium A',
-    description:
-      'Full challenge brief unlocks on the server only after the event launches and your checked-in team passes the Mini-CTF gate.',
+    title: 'Launch at 20:00.',
+    text: 'The Mini-CTF opens for teams with a checked-in member.',
   },
   {
-    id: ChallengeTrack.TrackB,
-    title: 'Challenge Track B',
-    subtitle: 'Parallel Track 2 · Dedicated Jury B · Podium B',
-    description:
-      'Evaluated independently by Track B jury members using challenge-scoped permissions and server-validated score bounds.',
+    title: 'Solve the Mini-CTF.',
+    text: 'Submit a flag formatted like LILTECH{…}. A correct flag unlocks your challenge.',
   },
+  {
+    title: 'Start the challenge.',
+    text: 'Read the brief, rules, resources and criteria.',
+  },
+  {
+    title: 'Submit until 08:00.',
+    text: 'Send links or files and update them freely. Each one is timestamped.',
+  },
+  {
+    title: 'Pitch at 09:00.',
+    text: 'Present to your jury and watch the scores land live.',
+  },
+] as const;
+
+const roles = [
+  {
+    title: 'Participants',
+    description:
+      'Team dashboard, offline QR badge, Mini-CTF, challenge brief, submissions and live announcements.',
+  },
+  {
+    title: 'Juries',
+    description:
+      'Challenge criteria, team deliverables, pitch order, and real-time scoring for one challenge only.',
+  },
+  {
+    title: 'Organizers',
+    description:
+      'QR check-in, team management, launch control, live submissions, jury accounts and results.',
+  },
+] as const;
+
+/** Dot positions sampled from the swoosh path, as percentages of its box. */
+const curveDots = [
+  { left: '0%', top: '78%' },
+  { left: '19.8%', top: '81.8%' },
+  { left: '41.8%', top: '59%' },
+  { left: '75.1%', top: '35.8%' },
+  { left: '100%', top: '34%' },
 ] as const;
 
 export default function HomePage() {
+  const { logos } = brandConfig;
+
   return (
     <PageContainer>
       <div className={styles.stack}>
-        <section className={styles.hero} aria-labelledby="hero-heading">
-          <p className={styles.eyebrow}>
-            {brandConfig.eventDates} · {brandConfig.eventLocation}
-          </p>
-          <h1 id="hero-heading" className={styles.heroTitle}>
-            {brandConfig.tagline}
-          </h1>
-          <p className={styles.lead}>
-            The {brandConfig.productName} platform connects participant registration, entrance QR
-            check-in, the overnight Mini-CTF gate, team deliverable submissions, jury scoring, and
-            results publication for {brandConfig.organizers.join(' and ')}.
-          </p>
-          <div className={styles.ctaRow}>
-            <Link href="/register" className={buttonClassName({ variant: 'primary', size: 'lg' })}>
-              Register a team
-            </Link>
-            <Link
-              href="/schedule"
-              className={buttonClassName({ variant: 'secondary', size: 'lg' })}
-            >
-              View event schedule
-            </Link>
-            <Link href="/login" className={buttonClassName({ variant: 'outline', size: 'lg' })}>
-              Sign in
-            </Link>
+        <header className={styles.hero} id="top">
+          <div className={styles.heroCopy}>
+            <p className={styles.phase}>
+              <span className={styles.phaseDot} aria-hidden="true" />
+              Registration is open
+            </p>
+            <h1 className={styles.heroTitle}>
+              <span>One night.</span> <span className={styles.heroTitleGold}>Two challenges.</span>{' '}
+              <span className={styles.heroTitleMuted}>One platform to run it all.</span>
+            </h1>
+            <p className={styles.lede}>
+              A night-long tech competition at <b>Campus EPI, Sousse</b>, November 21–22. Register
+              your team, check in with a QR badge, solve the Mini-CTF, and submit before 08:00.
+            </p>
+            <div className={styles.ctaRow}>
+              <Link
+                href="/register"
+                className={buttonClassName({ variant: 'primary', size: 'md' })}
+              >
+                Register a team
+              </Link>
+              <Link href="/schedule" className={buttonClassName({ variant: 'ghost', size: 'md' })}>
+                View event schedule
+              </Link>
+            </div>
           </div>
-        </section>
 
-        <div className={styles.statusCluster}>
-          <EventPhaseBanner />
+          <figure className={styles.heroLogo}>
+            {logos.default ? (
+              <img
+                src={logos.default}
+                alt={logos.alt}
+                width={logos.width}
+                height={logos.height}
+                className={styles.heroLogoImg}
+              />
+            ) : null}
+          </figure>
+        </header>
+
+        <EventPhaseBanner />
+
+        <div className={styles.apiLine}>
           <ApiStatus />
         </div>
 
-        <section aria-labelledby="facts-heading" className={styles.section}>
-          <h2 id="facts-heading" className="visually-hidden">
-            Key event facts
-          </h2>
-          <dl className={styles.factsGrid}>
-            {eventFacts.map((fact) => (
-              <div key={fact.label} className={styles.factCard}>
-                <dt className={styles.factLabel}>{fact.label}</dt>
-                <dd className={styles.factValue}>{fact.value}</dd>
+        <section id="night" className={styles.band}>
+          <h2 className={styles.sectionTitle}>The night runs on one clock</h2>
+          <p className={styles.sub}>
+            Every unlock and every deadline follows the server clock, so no team gets a head start.
+          </p>
+
+          <div className={styles.curve} aria-hidden="true">
+            <svg viewBox="0 0 1000 100" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="night-swoosh" x1="0" x2="1">
+                  <stop offset="0" stopColor="#7A0C0C" />
+                  <stop offset=".45" stopColor="#FF2A1F" />
+                  <stop offset="1" stopColor="#EBC27A" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M0,78 C260,112 520,8 1000,34"
+                fill="none"
+                stroke="url(#night-swoosh)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            {curveDots.map((dot, index) => (
+              <span
+                key={dot.left}
+                className={
+                  index === 1 ? `${styles.curveDot} ${styles.curveDotHot}` : styles.curveDot
+                }
+                style={{ left: dot.left, top: dot.top }}
+              />
+            ))}
+          </div>
+
+          <ul className={styles.stops}>
+            {nightStops.map((stop) => (
+              <li key={stop.time}>
+                <b className={styles.stopTime}>{stop.time}</b>
+                <h3 className={styles.stopTitle}>{stop.title}</h3>
+                <p className={styles.stopText}>{stop.description}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section id="challenges" className={styles.band}>
+          <h2 className={styles.sectionTitle}>Two challenges, two juries, two podiums</h2>
+          <p className={styles.sub}>The two run in parallel. A jury sees only its own challenge.</p>
+
+          <div className={styles.duo}>
+            <article className={`${styles.challenge} ${styles.challengeFeatured}`}>
+              <div>
+                <p className={styles.challengeLabel}>Challenge Track A</p>
+                <h3 className={styles.challengeTitle}>Challenge 01</h3>
+                <p className={styles.challengeText}>
+                  Presented by a partner to be announced. Brief, rules, resources and criteria
+                  appear once your team opens it.
+                </p>
+              </div>
+              <p className={styles.lock}>
+                <LockIcon size={20} />
+                Locked until your team solves the Mini-CTF
+              </p>
+            </article>
+
+            <article className={`${styles.challenge} ${styles.challengeAsymmetric}`}>
+              <div>
+                <p className={styles.challengeLabel}>Challenge Track B</p>
+                <h3 className={styles.challengeTitle}>Challenge 02</h3>
+                <p className={styles.challengeText}>
+                  Its own brief, its own jury, its own podium. Same night, same clock.
+                </p>
+              </div>
+              <p className={styles.lock}>
+                <LockIcon size={20} />
+                Locked until your team solves the Mini-CTF
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section id="path" className={styles.path}>
+          <div>
+            <h2 className={styles.sectionTitle}>Your team’s path through the night</h2>
+            <p className={styles.sub}>Eight steps, from sign-up to the live pitch.</p>
+          </div>
+          <ol className={styles.pathList}>
+            {teamPath.map((step) => (
+              <li key={step.title}>
+                <b>{step.title}</b> <span>{step.text}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className={styles.band}>
+          <h2 className={styles.sectionTitle}>One platform for everyone in the room</h2>
+          <p className={styles.sub}>Each role signs in once and lands on its own screens.</p>
+
+          <div className={styles.roles}>
+            {roles.map((role) => (
+              <div key={role.title} className={styles.role}>
+                <h3 className={styles.roleTitle}>{role.title}</h3>
+                <p className={styles.roleText}>{role.description}</p>
               </div>
             ))}
-          </dl>
-        </section>
-
-        <section aria-labelledby="workflow-heading" className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 id="workflow-heading" className={styles.sectionTitle}>
-              How the overnight flow works
-            </h2>
-            <p className={styles.sectionLead}>
-              Server-authoritative phase transitions coordinate teams, entrance check-in staff,
-              juries, and administrators across the competition night.
-            </p>
-          </div>
-
-          <div className={styles.cardGrid}>
-            {workflowSteps.map((item) => (
-              <Card key={item.step} surface="raised">
-                <CardHeader>
-                  <div className={styles.badgeRow}>
-                    <Badge tone="neutral">{item.step}</Badge>
-                  </div>
-                  <CardTitle as="h3">{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>{item.description}</CardDescription>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         </section>
 
-        <section aria-labelledby="tracks-heading" className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 id="tracks-heading" className={styles.sectionTitle}>
-              Two parallel challenge tracks
-            </h2>
-            <p className={styles.sectionLead}>
-              Each track has its own challenge statement, isolated jury evaluation workspace, and
-              dedicated podium.
-            </p>
-          </div>
-
-          <div className={styles.twoColGrid}>
-            {trackSummaries.map((track) => (
-              <Card key={track.id}>
-                <CardHeader>
-                  <CardTitle as="h3">{track.title}</CardTitle>
-                  <CardDescription>{track.subtitle}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>{track.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
+        <section className={styles.final} id="login">
+          <h2 className={styles.sectionTitle}>Teams of 3 to 5. One form to enter.</h2>
+          <p className={styles.sub}>
+            Registration takes a few minutes. Your badges arrive by email.
+          </p>
           <div className={styles.ctaRow}>
-            <Link
-              href="/challenges"
-              className={buttonClassName({ variant: 'outline', size: 'md' })}
-            >
-              Read track rules &amp; unlock flow
+            <Link href="/register" className={buttonClassName({ variant: 'primary', size: 'md' })}>
+              Register your team
+            </Link>
+            <Link href="/login" className={buttonClassName({ variant: 'ghost', size: 'md' })}>
+              Sign in
             </Link>
           </div>
         </section>
