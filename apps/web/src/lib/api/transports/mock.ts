@@ -7,7 +7,12 @@ import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
-import { handleGetAuditLog, handlePublishAdminAnnouncement } from './mocks/admin.mock';
+import {
+  handleGetAdminJury,
+  handleGetAdminTeams,
+  handleGetAuditLog,
+  handlePublishAdminAnnouncement,
+} from './mocks/admin.mock';
 import {
   handleGetJuryEvaluation,
   handleGetJuryOverview,
@@ -87,6 +92,9 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
       const offset = params?.offset ? parseInt(params.offset, 10) : 0;
       return handleGetAuditLog(limit, offset);
     },
+
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_TEAMS}`]: () => handleGetAdminTeams(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
   };
 
   return {

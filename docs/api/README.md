@@ -162,7 +162,7 @@ Revokes a badge token (treated as a credential). Audit entry `checkin.badge_revo
 
 #### `GET /api/checkin/badges`
 
-Returns all badges (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
+Admin only. Returns all badges (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
 
 Schema: `badgeSummarySchema[]`.
 
@@ -191,6 +191,26 @@ Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest f
 **Response `200`:** `{ entries: [{ id, action, actorName?, createdAt }], limit, offset }`.
 
 Schema: `auditLogListRequestSchema` / `auditLogEntrySchema` list.
+
+### Admin team roster
+
+#### `GET /api/admin/teams`
+
+Admin only. Full team roster, newest first: every team with its progress state, leader, and per-participant check-in state.
+
+**Response `200`:** `{ items: TeamResponse[], total }`.
+
+Schema: `adminTeamListResponseSchema` (reuses `teamResponseSchema`).
+
+### Admin jury roster
+
+#### `GET /api/admin/jury`
+
+Admin only, read-only. Lists jury accounts (id, name, email, createdAt), newest first. Credentials are never exposed. Jury account creation and challenge-track assignment are pending OPEN_QUESTIONS #1/#8.
+
+**Response `200`:** `{ items: [{ id, name, email, createdAt }], total }`.
+
+Schema: `adminJuryListResponseSchema`.
 
 ## Planned Endpoint Groups
 

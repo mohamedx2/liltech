@@ -65,12 +65,17 @@ export async function issueBadgeForParticipantInTx(
 export async function listBadges(): Promise<BadgeSummary[]> {
   const prisma = getPrismaClient();
 
+  // Prisma forbids `select` and `include` at the same query level — nested
+  // relations must be expressed with `select` all the way down.
   const badges = await prisma.qrToken.findMany({
     orderBy: { issuedAt: 'desc' },
     include: {
       participant: {
-        select: { name: true, checkIn: true },
-        include: { team: { select: { name: true } } },
+        select: {
+          name: true,
+          team: { select: { name: true } },
+          checkIn: { select: { checkedInAt: true } },
+        },
       },
     },
   });
