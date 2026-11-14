@@ -1,10 +1,13 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
+import { createAdminApi, type AdminApi } from './modules/admin';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
+import { createCheckinApi, type CheckinApi } from './modules/checkin';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
+import { createJuryApi, type JuryApi } from './modules/jury';
 import { createMiniCtfApi, type MiniCtfApi } from './modules/mini-ctf';
 import { createParticipantsApi, type ParticipantsApi } from './modules/participants';
 import { createRegistrationsApi, type RegistrationsApi } from './modules/registrations';
@@ -34,6 +37,9 @@ export interface ApiClient {
   challenges: ChallengesApi;
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
+  jury: JuryApi;
+  checkin: CheckinApi;
+  admin: AdminApi;
 }
 
 export function createApiClient(transport: ApiTransport): ApiClient {
@@ -50,6 +56,9 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     challenges: createChallengesApi(transport),
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),
+    jury: createJuryApi(transport),
+    checkin: createCheckinApi(transport),
+    admin: createAdminApi(transport),
   };
 }
 

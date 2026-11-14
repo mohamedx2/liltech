@@ -93,7 +93,7 @@ describe('API Client, RealTransport, and MockTransport', () => {
 
     const registered = await client.registrations.registerTeam({
       teamName: 'Mock Pioneers',
-      password: 'password123',
+      password: 'password123456',
       leader: { fullName: 'Leader Mock', email: 'leader.mock@liltech.mock' },
       teammates: [
         { fullName: 'Mate One', email: 'mate1@liltech.mock' },
@@ -105,7 +105,7 @@ describe('API Client, RealTransport, and MockTransport', () => {
 
     const loginRes = await client.auth.login({
       email: 'leader.mock@liltech.mock',
-      password: 'password123',
+      password: 'password123456',
     });
     expect(loginRes.user.role).toBe(Role.Team);
 

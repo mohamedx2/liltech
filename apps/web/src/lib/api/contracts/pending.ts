@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import {
+  EventPhase,
   Role,
   challengeTrackSchema,
   eventPhaseSchema,
+  eventStateResponseSchema as canonicalEventStateResponseSchema,
   isoTimestampSchema,
   teamProgressStateSchema,
+  teamResponseSchema as canonicalTeamResponseSchema,
 } from 'api-contracts';
 
 /**
@@ -20,16 +23,27 @@ import {
 
 export const roleSchema = z.enum([Role.Team, Role.Jury, Role.Admin]);
 
-export const eventStateResponseSchema = z.object({
-  phase: eventPhaseSchema,
-  /** Authoritative server UTC timestamp for countdown synchronization. */
-  serverTime: isoTimestampSchema,
-  nextPhase: eventPhaseSchema.nullable(),
-  /** Server UTC timestamp when `nextPhase` begins, if scheduled. */
-  nextPhaseAt: isoTimestampSchema.nullable(),
-  /** Optional schedule window metadata from the event state service. */
-  phaseLabel: z.string().optional(),
-});
+/**
+ * Web view of the canonical event-state contract (`libs/api-contracts`).
+ * The backend stays the single source of truth for the wire shape; the derived
+ * fields below exist only for rendering (phase stepper labels) and never gate
+ * business rules.
+ */
+const EVENT_PHASE_ORDER: EventPhase[] = [
+  EventPhase.Registration,
+  EventPhase.Checkin,
+  EventPhase.Live,
+  EventPhase.SubmissionsClosed,
+  EventPhase.Pitching,
+  EventPhase.Results,
+];
+
+export const eventStateResponseSchema = canonicalEventStateResponseSchema.transform((state) => ({
+  ...state,
+  nextPhase: EVENT_PHASE_ORDER[EVENT_PHASE_ORDER.indexOf(state.phase) + 1] ?? null,
+  nextPhaseAt: null,
+  phaseLabel: undefined,
+}));
 
 export type EventStateResponse = z.infer<typeof eventStateResponseSchema>;
 
@@ -52,17 +66,59 @@ export const loginRequestSchema = z.object({
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
-export const loginResponseSchema = z.object({
-  user: authUserSchema,
-  expiresAt: isoTimestampSchema.optional(),
-});
+export const loginResponseSchema = z.union([
+  z.object({
+    user: authUserSchema,
+    token: z.string().optional(),
+    expiresAt: isoTimestampSchema.optional(),
+  }),
+  z
+    .object({
+      account: z.object({
+        id: z.string(),
+        role: roleSchema,
+        name: z.string(),
+        email: z.string(),
+      }),
+      token: z.string(),
+      expiresAt: isoTimestampSchema,
+    })
+    .transform((data) => ({
+      user: {
+        id: data.account.id,
+        name: data.account.name,
+        email: data.account.email,
+        role: data.account.role,
+      },
+      token: data.token,
+      expiresAt: data.expiresAt,
+    })),
+]);
 
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
-export const sessionResponseSchema = z.object({
-  user: authUserSchema.nullable(),
-  serverTime: isoTimestampSchema,
-});
+export const sessionResponseSchema = z.union([
+  z.object({
+    user: authUserSchema.nullable(),
+    /** Authoritative server time when the backend provides it; never fabricated client-side. */
+    serverTime: isoTimestampSchema.optional(),
+  }),
+  z
+    .object({
+      id: z.string(),
+      role: roleSchema,
+      name: z.string(),
+      email: z.string(),
+    })
+    .transform((data): { user: AuthUser; serverTime?: string } => ({
+      user: {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      },
+    })),
+]);
 
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
@@ -75,32 +131,45 @@ export type TeamMemberInput = z.infer<typeof teamMemberInputSchema>;
 
 /**
  * Team leader registers a team of 3–5 participants (1 leader + 2–4 teammates).
- * Matches the team size rule in `README.md` and `AGENTS.md`.
+ * Mirrors the canonical `createTeamRequestSchema` constraints in
+ * `libs/api-contracts` (team name 3–60 chars, password ≥ 12 chars) so client
+ * validation matches what the server enforces.
  */
 export const teamRegistrationRequestSchema = z.object({
   teamName: z
     .string()
     .trim()
-    .min(2, 'Team name must be at least 2 characters.')
-    .max(80, 'Team name must be 80 characters or fewer.'),
+    .min(3, 'Team name must be at least 3 characters.')
+    .max(60, 'Team name must be 60 characters or fewer.'),
   leader: teamMemberInputSchema,
   teammates: z
     .array(teamMemberInputSchema)
     .min(2, 'Add at least 2 teammates (3–5 total participants including the leader).')
     .max(4, 'A team can have at most 4 teammates (5 total participants including the leader).'),
-  password: z.string().min(8, 'Password must be at least 8 characters.'),
+  password: z.string().min(12, 'Password must be at least 12 characters.'),
 });
 
 export type TeamRegistrationRequest = z.infer<typeof teamRegistrationRequestSchema>;
 
-export const teamRegistrationResponseSchema = z.object({
-  teamId: z.string(),
-  teamName: z.string(),
-  status: teamProgressStateSchema,
-  participantCount: z.number().int().min(3).max(5),
-  createdAt: isoTimestampSchema,
-  message: z.string(),
-});
+export const teamRegistrationResponseSchema = z.union([
+  z.object({
+    teamId: z.string(),
+    teamName: z.string(),
+    status: teamProgressStateSchema,
+    participantCount: z.number().int().min(3).max(5),
+    createdAt: isoTimestampSchema,
+    message: z.string().optional().default('Team registered successfully.'),
+  }),
+  /** The real backend returns the canonical `TeamResponse` — map it explicitly. */
+  canonicalTeamResponseSchema.transform((team) => ({
+    teamId: team.id,
+    teamName: team.name,
+    status: team.progressState,
+    participantCount: team.participants.length,
+    createdAt: team.createdAt,
+    message: 'Team registered successfully.',
+  })),
+]);
 
 export type TeamRegistrationResponse = z.infer<typeof teamRegistrationResponseSchema>;
 
@@ -222,13 +291,24 @@ export const announcementPrioritySchema = z.enum(['normal', 'urgent', 'broadcast
 
 export type AnnouncementPriority = z.infer<typeof announcementPrioritySchema>;
 
-export const announcementItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  content: z.string(),
-  priority: announcementPrioritySchema,
-  createdAt: isoTimestampSchema,
-});
+export const announcementItemSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().optional(),
+    content: z.string().optional(),
+    body: z.string().optional(),
+    priority: announcementPrioritySchema.optional().default('normal'),
+    createdAt: isoTimestampSchema.optional(),
+    publishedAt: isoTimestampSchema.optional(),
+    authorName: z.string().optional(),
+  })
+  .transform((item) => ({
+    id: item.id,
+    title: item.title ?? (item.authorName ? `Update by ${item.authorName}` : 'Announcement'),
+    content: item.content ?? item.body ?? '',
+    priority: item.priority ?? 'normal',
+    createdAt: item.createdAt ?? item.publishedAt ?? new Date().toISOString(),
+  }));
 
 export type AnnouncementItem = z.infer<typeof announcementItemSchema>;
 
@@ -238,3 +318,120 @@ export const announcementsResponseSchema = z.object({
 });
 
 export type AnnouncementsResponse = z.infer<typeof announcementsResponseSchema>;
+
+/**
+ * Jury & Scoring portal contracts (provisional — pending `libs/api-contracts` additions).
+ * Respects track scoping and jury evaluation rules from `AGENTS.md`.
+ */
+
+export const JURY_EVALUATION_CRITERIA = [
+  {
+    key: 'technical_execution',
+    title: 'Technical Execution & Architecture',
+    maxPoints: 25,
+    description: 'Code quality, solution stability, architecture soundness, and working prototype.',
+  },
+  {
+    key: 'innovation_originality',
+    title: 'Innovation & Problem Solving',
+    maxPoints: 25,
+    description:
+      'Creativity, uniqueness of the approach, and cleverness in tackling the challenge.',
+  },
+  {
+    key: 'ui_ux_design',
+    title: 'UI/UX & Usability',
+    maxPoints: 25,
+    description: 'Interface polish, ease of use, responsiveness, and clear presentation.',
+  },
+  {
+    key: 'pitch_presentation',
+    title: 'Pitch, Defense & Q&A',
+    maxPoints: 25,
+    description: 'Clarity of the pitch, ability to answer technical questions, and team cohesion.',
+  },
+] as const;
+
+export type JuryCriterionKey = (typeof JURY_EVALUATION_CRITERIA)[number]['key'];
+
+export const juryTeamItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  track: challengeTrackSchema,
+  progress: teamProgressStateSchema,
+  membersCount: z.number().int().positive(),
+  submitted: z.boolean(),
+  submittedAt: isoTimestampSchema.nullable().optional(),
+  submissionTitle: z.string().nullable().optional(),
+  submissionRepoUrl: z.string().nullable().optional(),
+  submissionFileName: z.string().nullable().optional(),
+  evaluationStatus: z.enum(['graded', 'pending']),
+  myScore: z.number().nullable().optional(),
+  evaluatedAt: isoTimestampSchema.nullable().optional(),
+});
+
+export type JuryTeamItem = z.infer<typeof juryTeamItemSchema>;
+
+export const juryOverviewResponseSchema = z.object({
+  track: challengeTrackSchema,
+  trackTitle: z.string(),
+  trackDescription: z.string(),
+  assignedJury: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().email(),
+  }),
+  eventPhase: eventPhaseSchema,
+  totalTeams: z.number().int().nonnegative(),
+  evaluatedTeams: z.number().int().nonnegative(),
+  pendingTeams: z.number().int().nonnegative(),
+  averageScore: z.number().nullable(),
+  scoringOpen: z.boolean(),
+});
+
+export type JuryOverviewResponse = z.infer<typeof juryOverviewResponseSchema>;
+
+export const submitEvaluationRequestSchema = z.object({
+  criteriaScores: z.object({
+    technical_execution: z.number().min(0).max(25),
+    innovation_originality: z.number().min(0).max(25),
+    ui_ux_design: z.number().min(0).max(25),
+    pitch_presentation: z.number().min(0).max(25),
+  }),
+  notes: z.string().max(2000).optional(),
+});
+
+export type SubmitEvaluationRequest = z.infer<typeof submitEvaluationRequestSchema>;
+
+export const submitEvaluationResponseSchema = z.object({
+  success: z.boolean(),
+  teamId: z.string(),
+  totalScore: z.number(),
+  evaluatedAt: isoTimestampSchema,
+  message: z.string(),
+});
+
+export type SubmitEvaluationResponse = z.infer<typeof submitEvaluationResponseSchema>;
+
+export const juryTeamEvaluationResponseSchema = z.object({
+  team: juryTeamItemSchema,
+  members: z.array(
+    z.object({
+      id: z.string(),
+      fullName: z.string(),
+      roleInTeam: z.string(),
+    }),
+  ),
+  submission: submissionItemSchema.nullable().optional(),
+  evaluation: z
+    .object({
+      criteriaScores: z.record(z.string(), z.number()),
+      notes: z.string(),
+      totalScore: z.number(),
+      evaluatedAt: isoTimestampSchema.optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+export type JuryTeamEvaluationResponse = z.infer<typeof juryTeamEvaluationResponseSchema>;

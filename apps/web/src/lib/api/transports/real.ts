@@ -1,4 +1,5 @@
 import type { ApiErrorBody } from 'api-contracts';
+import { clearAuthToken, getAuthToken } from '../../auth/token-storage';
 import { apiClientErrorFromBody, ApiClientError } from '../errors';
 import type { ApiRequestConfig, ApiTransport } from '../transport';
 
@@ -30,6 +31,7 @@ export function createRealTransport(options: RealTransportOptions): ApiTransport
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
       const { method = 'GET', body, headers, authToken, credentials = 'include', signal } = config;
       const url = buildRequestUrl(options.baseUrl, path);
+      const effectiveToken = authToken ?? getAuthToken();
 
       // FormData requests are sent as multipart/form-data (browser sets the
       // boundary); JSON bodies are sent as application/json.
@@ -40,7 +42,7 @@ export function createRealTransport(options: RealTransportOptions): ApiTransport
         credentials,
         headers: {
           ...(body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}),
           ...headers,
         },
         ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
@@ -74,6 +76,9 @@ export function createRealTransport(options: RealTransportOptions): ApiTransport
       }
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthToken();
+        }
         const errorBody = parsedBody as ApiErrorBody | null;
         if (errorBody?.error?.code && errorBody?.error?.message) {
           throw apiClientErrorFromBody(response.status, errorBody);
