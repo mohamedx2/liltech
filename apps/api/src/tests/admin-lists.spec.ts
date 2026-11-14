@@ -91,7 +91,11 @@ describeDb('admin listings and badge roster', () => {
           email: 'roster-leader@test.local',
           password: LEADER_PASSWORD,
         },
-        members: [{ name: 'Roster Member' }, { name: 'Roster Member Two' }],
+        members: [
+          { name: 'Roster Member' },
+          { name: 'Roster Member Two' },
+          { name: 'Roster Member Three' },
+        ],
       });
 
       const response = await request(app)
@@ -99,8 +103,8 @@ describeDb('admin listings and badge roster', () => {
         .set('Authorization', `Bearer ${await tokenFor(admin)}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.items).toHaveLength(3);
-      expect(response.body.total).toBe(3);
+      expect(response.body.items).toHaveLength(4);
+      expect(response.body.total).toBe(4);
 
       const leaderEntry = response.body.items.find(
         (badge: { participantName: string }) => badge.participantName === 'Roster Leader',
@@ -136,7 +140,11 @@ describeDb('admin listings and badge roster', () => {
           email: 'admin-leader@test.local',
           password: LEADER_PASSWORD,
         },
-        members: [{ name: 'Admin Member' }, { name: 'Admin Member Two' }],
+        members: [
+          { name: 'Admin Member' },
+          { name: 'Admin Member Two' },
+          { name: 'Admin Member Three' },
+        ],
       });
 
       const response = await request(app)
@@ -154,7 +162,7 @@ describeDb('admin listings and badge roster', () => {
         progressState: 'registered',
         leader: { id: registered.leader.id, name: 'Admin Leader' },
       });
-      expect(team.participants).toHaveLength(3);
+      expect(team.participants).toHaveLength(4);
       expect(team.participants[0]).toMatchObject({ name: 'Admin Leader', isLeader: true });
       expect(team.participants[0].checkedInAt).toBeUndefined();
     });
@@ -199,7 +207,11 @@ describeDb('admin listings and badge roster', () => {
           email: 'team-role@test.local',
           password: LEADER_PASSWORD,
         },
-        members: [{ name: 'Team Role Member' }, { name: 'Team Role Member Two' }],
+        members: [
+          { name: 'Team Role Member' },
+          { name: 'Team Role Member Two' },
+          { name: 'Team Role Member Three' },
+        ],
       });
 
       const asTeam = await request(app)

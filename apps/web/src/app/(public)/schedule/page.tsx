@@ -30,7 +30,7 @@ const timelineEntries: readonly TimelineEntry[] = [
     phaseTone: 'info',
     title: 'Team registration & badge issuance',
     description:
-      'Team leaders submit 3–5 participant rosters. Every participant receives a unique personal QR badge by email.',
+      'Team leaders submit 4–7 participant rosters. Every participant receives a unique personal QR badge by email.',
   },
   {
     id: 'checkin',
@@ -90,7 +90,7 @@ const teamProgressionRows: readonly ProgressStageRow[] = [
   {
     state: TeamProgressState.Registered,
     step: '1. Registered',
-    trigger: 'Team leader completes team registration (3–5 members)',
+    trigger: 'Team leader completes team registration (4–7 members)',
     unlocks: 'Team account access & personal QR check-in badges',
   },
   {

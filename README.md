@@ -16,7 +16,7 @@ Organized by **GDG on Campus EPI** and the **ISITCom Google Club**.
 
 LilTech is a one-night hackathon with **two parallel challenge tracks, two separate juries, and two podiums**:
 
-1. Team leaders register teams of 3–5 participants.
+1. Team leaders register teams of 4–7 participants.
 2. Every participant receives a personal QR badge by email.
 3. Staff scan QR codes at the entrance (check-in).
 4. At 20:00 the event goes live and the **Mini-CTF** opens for eligible teams.

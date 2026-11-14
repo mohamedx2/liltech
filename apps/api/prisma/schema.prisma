@@ -73,7 +73,7 @@ model Session {
   @@map("sessions")
 }
 
-/// Team registered by its leader. 3–5 members (leader included).
+/// Team registered by its leader. 4–7 members (leader included).
 model Team {
   id            String        @id @default(uuid()) @db.Uuid
   name          String        @unique @db.VarChar(60)

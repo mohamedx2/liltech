@@ -42,7 +42,7 @@ const nightStops = [
 ] as const;
 
 const teamPath = [
-  { title: 'Register.', text: 'The team leader signs up 3 to 5 members in one form.' },
+  { title: 'Register.', text: 'The team leader signs up 4 to 7 members in one form.' },
   { title: 'Get your badge.', text: 'Every member receives a personal QR code by email.' },
   { title: 'Check in.', text: 'Staff scan the code at the entrance.' },
   {
@@ -266,7 +266,7 @@ export default function HomePage() {
         </section>
 
         <section className={styles.final} id="login" data-motion="final">
-          <h2 className={styles.sectionTitle}>Teams of 3 to 5. One form to enter.</h2>
+          <h2 className={styles.sectionTitle}>Teams of 4 to 7. One form to enter.</h2>
           <p className={styles.sub}>
             Registration takes a few minutes. Your badges arrive by email.
           </p>

@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Express } from 'express';
+import { teamRegistrationResponseSchema } from 'api-contracts';
 import { createApp } from '../app';
 import { hashPassword } from '../modules/auth/password.service';
 import { createSessionForUser, login, createUser } from '../modules/auth/auth.service';
@@ -89,7 +90,7 @@ describeDb('api foundation modules', () => {
       .send({
         teamName: name,
         leader: { name: 'Team Leader', email: leaderEmail, password: LEADER_PASSWORD },
-        members: [{ name: 'Member One' }, { name: 'Member Two' }],
+        members: [{ name: 'Member One' }, { name: 'Member Two' }, { name: 'Member Three' }],
       });
 
     expect(response.status).toBe(201);
@@ -211,7 +212,7 @@ describeDb('api foundation modules', () => {
 
       expect(me.status).toBe(200);
       expect(me.body.name).toBe('Team Me Endpoint');
-      expect(me.body.participants).toHaveLength(3);
+      expect(me.body.participants).toHaveLength(4);
       expect(me.body.participants.filter((p: { isLeader: boolean }) => p.isLeader)).toHaveLength(1);
     });
 
@@ -277,10 +278,10 @@ describeDb('api foundation modules', () => {
   });
 
   describe('registration', () => {
-    it('registers a 3–5 member team and issues one badge per participant', async () => {
+    it('registers a 4–7 member team and issues one badge per participant', async () => {
       const created = await registerTeam('Hackers United', 'hackers-leader@test.local');
 
-      expect(created.tokens).toHaveLength(3);
+      expect(created.tokens).toHaveLength(4);
 
       const response = await request(app)
         .post('/api/registration/teams')
@@ -298,7 +299,7 @@ describeDb('api foundation modules', () => {
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('registers a full 5-member team and issues one badge per participant', async () => {
+    it('registers a full 7-member team and issues one badge per participant', async () => {
       const response = await request(app)
         .post('/api/registration/teams')
         .send({
@@ -313,14 +314,39 @@ describeDb('api foundation modules', () => {
             { name: 'Member Two' },
             { name: 'Member Three' },
             { name: 'Member Four' },
+            { name: 'Member Five' },
+            { name: 'Member Six' },
           ],
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.badges).toHaveLength(5);
+      expect(response.body.badges).toHaveLength(7);
+      // The web client parses this body with the shared contract, so it must match exactly.
+      expect(teamRegistrationResponseSchema.safeParse(response.body).success).toBe(true);
     });
 
-    it('enforces the 3–5 member size at the service layer', async () => {
+    it('rejects duplicate participant emails within a team', async () => {
+      const response = await request(app)
+        .post('/api/registration/teams')
+        .send({
+          teamName: 'Echo Chamber',
+          leader: {
+            name: 'Echo Leader',
+            email: 'echo-leader@test.local',
+            password: LEADER_PASSWORD,
+          },
+          members: [
+            { name: 'Echo One', email: 'ECHO-LEADER@test.local' },
+            { name: 'Echo Two' },
+            { name: 'Echo Three' },
+          ],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('enforces the 4–7 member size at the service layer', async () => {
       const tooSmall = {
         teamName: 'Too Small',
         leader: {
@@ -328,7 +354,7 @@ describeDb('api foundation modules', () => {
           email: 'too-small-leader@test.local',
           password: LEADER_PASSWORD,
         },
-        members: [{ name: 'Only Member' }],
+        members: [{ name: 'Only Member' }, { name: 'Second Member' }],
       };
       await expect(registerTeamWithBadges(tooSmall)).rejects.toMatchObject({
         code: 'VALIDATION_ERROR',
@@ -348,6 +374,8 @@ describeDb('api foundation modules', () => {
           { name: 'Three' },
           { name: 'Four' },
           { name: 'Five' },
+          { name: 'Six' },
+          { name: 'Seven' },
         ],
       };
       await expect(registerTeamWithBadges(tooLarge)).rejects.toMatchObject({
@@ -374,7 +402,7 @@ describeDb('api foundation modules', () => {
             email: 'other-leader@test.local',
             password: LEADER_PASSWORD,
           },
-          members: [{ name: 'M1' }, { name: 'M2' }],
+          members: [{ name: 'M1' }, { name: 'M2' }, { name: 'M3' }],
         });
       expect(sameName.status).toBe(409);
       expect(sameName.body.error.code).toBe('CONFLICT');
@@ -388,7 +416,7 @@ describeDb('api foundation modules', () => {
             email: 'probe-leader@test.local',
             password: LEADER_PASSWORD,
           },
-          members: [{ name: 'M1' }, { name: 'M2' }],
+          members: [{ name: 'M1' }, { name: 'M2' }, { name: 'M3' }],
         });
       expect(sameEmail.status).toBe(409);
       expect(sameEmail.body.error.code).toBe('CONFLICT');

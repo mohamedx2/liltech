@@ -20,18 +20,6 @@ export function createRegistrationsMockRoutes(): MockRouteMap {
       }
 
       const leaderEmail = parsed.data.leader.email.toLowerCase();
-      const allEmails = [
-        leaderEmail,
-        ...parsed.data.members.map((m) => m.email?.toLowerCase() ?? ''),
-      ];
-      if (new Set(allEmails).size !== allEmails.length) {
-        throw new ApiClientError({
-          message: 'Each team participant must use a unique email address.',
-          status: 400,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
       const teamId = `dev-team-${devMockState.registeredTeamEmails.size + 10}`;
       devMockState.registeredTeamEmails.set(leaderEmail, {
         id: `dev-user-${teamId}`,
@@ -51,6 +39,7 @@ export function createRegistrationsMockRoutes(): MockRouteMap {
         createdAt: new Date().toISOString(),
         message:
           'Development mock registration accepted. No email or QR code is sent in mock mode.',
+        badges: [],
       };
     },
   };

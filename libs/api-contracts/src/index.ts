@@ -6,6 +6,7 @@ export * from './lib/common.js';
 export * from './lib/auth-contracts.js';
 export * from './lib/registration-contracts.js';
 export * from './lib/checkin-contracts.js';
+export * from './lib/team-registration-contracts.js';
 export * from './lib/announcements-contracts.js';
 export * from './lib/event-state-contracts.js';
 export * from './lib/audit-contracts.js';

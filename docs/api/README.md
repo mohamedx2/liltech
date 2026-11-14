@@ -128,7 +128,7 @@ Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
 #### `POST /api/registration/teams`
 
-Public. Registers a team of 3–5 members (leader + 2–4 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Duplicate team name or leader email → `CONFLICT` (409).
+Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Participant emails that are provided must be unique within the team (case-insensitive) → otherwise `VALIDATION_ERROR` (400). Duplicate team name or leader email → `CONFLICT` (409).
 
 **Request body:**
 
@@ -142,7 +142,7 @@ Public. Registers a team of 3–5 members (leader + 2–4 members). Creates the 
 
 **Response `201`:** `teamResponseSchema` (id, name, progressState `registered`, leader, participants) plus a `badges` array of `issueBadgeResponseSchema` (participantId, participantName, raw token, issuedAt).
 
-Schema: `createTeamRequestSchema` / `teamResponseSchema` + `issueBadgeResponseSchema[]`.
+Schema: `createTeamRequestSchema` / `teamRegistrationResponseSchema` (`teamResponseSchema` + `badges: issueBadgeResponseSchema[]`). The web registration page shows each raw badge token once so the leader can hand them out; email delivery is pending (open question 8).
 
 #### `GET /api/registration/teams/me`
 

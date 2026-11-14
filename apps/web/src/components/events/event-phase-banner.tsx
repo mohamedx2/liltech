@@ -20,7 +20,7 @@ export function getPhaseMeta(phase: EventPhase): PhaseMeta {
     case EventPhase.Registration:
       return {
         label: 'Registration Open',
-        description: 'Team leaders can register teams of 3–5 participants ahead of the event.',
+        description: 'Team leaders can register teams of 4–7 participants ahead of the event.',
         tone: 'info',
       };
     case EventPhase.Checkin:

@@ -1,31 +1,31 @@
 import { Prisma } from '@prisma/client';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
-import type { CreateTeamRequest, TeamResponse } from 'api-contracts';
+import {
+  TEAM_MEMBERS_TOTAL_MAX,
+  TEAM_MEMBERS_TOTAL_MIN,
+  type CreateTeamRequest,
+  type TeamRegistrationResponse,
+  type TeamResponse,
+} from 'api-contracts';
 import { issueBadgeForParticipantInTx } from '../checkin/checkin.service';
 import { hashPassword } from '../auth/password.service';
 
 /**
  * Team registration: the team leader supplies their account credentials and
- * 2–4 additional member names. Team, account, and participants are created in
+ * 3–6 additional member names. Team, account, and participants are created in
  * one transaction — a partially registered team must never be observable.
  *
  * Deliberately NOT provided here (pending decisions): challenge track
  * assignment, QR badge email delivery, registration phase gating.
  */
 
-export interface TeamRegistrationResult extends TeamResponse {
-  /**
-   * QR badges issued for each participant, presented once. Delivery by email
-   * is pending (open question 8); until then issuance results are returned to
-   * the creator so staff can distribute them manually.
-   */
-  badges: Array<{
-    participantId: string;
-    participantName: string;
-    token: string;
-  }>;
-}
+/**
+ * QR badges issued for each participant are presented once in the response.
+ * Delivery by email is pending (open question 8); until then issuance results
+ * are returned to the creator so the team can distribute them.
+ */
+export type TeamRegistrationResult = TeamRegistrationResponse;
 
 const LEADER_ACCOUNT_ROLE = 'team' as const;
 
@@ -36,8 +36,10 @@ export async function registerTeamWithBadges(
   const leaderEmail = request.leader.email.toLowerCase();
 
   const totalSize = 1 + request.members.length;
-  if (totalSize < 3 || totalSize > 5) {
-    throw ApiError.badRequest('A team must have 3 to 5 members total, including the leader.');
+  if (totalSize < TEAM_MEMBERS_TOTAL_MIN || totalSize > TEAM_MEMBERS_TOTAL_MAX) {
+    throw ApiError.badRequest(
+      `A team must have ${TEAM_MEMBERS_TOTAL_MIN} to ${TEAM_MEMBERS_TOTAL_MAX} members total, including the leader.`,
+    );
   }
 
   const { team: created, badges } = await prisma
