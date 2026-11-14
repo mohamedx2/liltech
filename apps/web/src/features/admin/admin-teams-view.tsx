@@ -5,6 +5,7 @@ import type { TeamResponse } from 'api-contracts';
 import { api, ApiClientError } from '@/lib/api';
 import { ErrorState, EmptyState, LoadingState } from '@/components/feedback/state-panel';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Icon } from '@/components/ui/icon';
 import { DataTable } from '@/components/ui/table';
 import styles from './admin-teams-view.module.css';
 
@@ -120,7 +121,11 @@ export function AdminTeamsView() {
                   {team.participants.map((participant) => (
                     <li key={participant.id} className={styles.participantItem}>
                       <span>
-                        {participant.isLeader ? '★ ' : ''}
+                        {participant.isLeader ? (
+                          <span title="Team Leader">
+                            <Icon name="star" className={styles.leaderIcon} />
+                          </span>
+                        ) : null}
                         {participant.name}
                       </span>
                       {participant.checkedInAt ? (

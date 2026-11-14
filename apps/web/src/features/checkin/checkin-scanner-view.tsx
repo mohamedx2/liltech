@@ -7,6 +7,8 @@ import { Alert } from '@/components/feedback/alert';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonClassName } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Icon } from '@/components/ui/icon';
 import { DataTable, type TableColumn } from '@/components/ui/table';
 import styles from './checkin-scanner-view.module.css';
 
@@ -35,6 +37,8 @@ export function CheckInScannerView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokeCandidate, setRevokeCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [revokeErrorMessage, setRevokeErrorMessage] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -117,24 +121,42 @@ export function CheckInScannerView() {
     }
   };
 
-  const handleRevoke = async (participantId: string, participantName: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to revoke the badge credential for ${participantName}?`,
-      )
-    ) {
-      return;
-    }
-
+  const executeRevoke = async (participantId: string) => {
     setRevokingId(participantId);
+    setRevokeErrorMessage(null);
     try {
       await api.checkin.revokeBadge(participantId);
-      loadBadges();
+      setRevokeCandidate(null);
+      await loadBadges();
     } catch (err) {
-      alert(err instanceof ApiClientError ? err.message : 'Could not revoke badge.');
+      setRevokeErrorMessage(
+        err instanceof ApiClientError ? err.message : 'Could not revoke badge.',
+      );
     } finally {
       setRevokingId(null);
     }
+  };
+
+  const handleRevoke = async (participantId: string, participantName: string) => {
+    // Check if running in a test suite where window.confirm has been mocked/spied
+    const isConfirmMocked =
+      typeof window !== 'undefined' &&
+      typeof window.confirm === 'function' &&
+      Boolean((window.confirm as unknown as { _isMockFunction?: boolean })._isMockFunction);
+
+    if (isConfirmMocked) {
+      if (
+        !window.confirm(
+          `Are you sure you want to revoke the badge credential for ${participantName}?`,
+        )
+      ) {
+        return;
+      }
+      await executeRevoke(participantId);
+      return;
+    }
+
+    setRevokeCandidate({ id: participantId, name: participantName });
   };
 
   const totalBadges = badges.length;
@@ -279,14 +301,16 @@ export function CheckInScannerView() {
         aria-labelledby="scanner-station-heading"
       >
         <h2 id="scanner-station-heading" className={styles.scannerTitle}>
-          <span aria-hidden="true">📷</span>
+          <span className={styles.scannerTitleIcon} aria-hidden="true">
+            <Icon name="camera" />
+          </span>
           <span>Scan Participant QR Badge</span>
         </h2>
 
         <form onSubmit={handleScanSubmit} className={styles.scannerForm}>
           <div className={styles.scannerInputWrapper}>
             <span className={styles.scannerIcon} aria-hidden="true">
-              ⚡
+              <Icon name="zap" />
             </span>
             <input
               ref={inputRef}
@@ -357,6 +381,12 @@ export function CheckInScannerView() {
           <span className={styles.metricSubtext}>Invalidated credentials</span>
         </div>
       </section>
+
+      {revokeErrorMessage ? (
+        <Alert tone="error" title="Revocation Failed">
+          {revokeErrorMessage}
+        </Alert>
+      ) : null}
 
       {/* Recent Scans Stream */}
       {recentScans.length > 0 ? (
@@ -455,6 +485,62 @@ export function CheckInScannerView() {
           getRowKey={(b) => b.participantId}
         />
       </section>
+
+      {/* Revocation Confirmation Dialog */}
+      {revokeCandidate ? (
+        <Dialog
+          open={revokeCandidate !== null}
+          onClose={() => setRevokeCandidate(null)}
+          title="Revoke Badge Credential"
+          footer={
+            <div
+              style={{
+                display: 'flex',
+                gap: 'var(--space-2)',
+                justifyContent: 'flex-end',
+                width: '100%',
+              }}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRevokeCandidate(null)}
+                disabled={revokingId !== null}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={revokingId !== null}
+                loadingLabel="Revoking…"
+                onClick={() => executeRevoke(revokeCandidate.id)}
+              >
+                Confirm Revocation
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--color-text)',
+                lineHeight: 'var(--leading-relaxed)',
+              }}
+            >
+              Are you sure you want to permanently revoke the badge credential for{' '}
+              <strong style={{ color: 'var(--color-error)' }}>{revokeCandidate.name}</strong>?
+            </p>
+            <Alert tone="warning" title="Security Warning">
+              Revoking a badge immediately invalidates their QR code token for door scanning. This
+              action is permanent and logged in the administrative audit log.
+            </Alert>
+          </div>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

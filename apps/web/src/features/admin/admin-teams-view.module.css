@@ -36,6 +36,7 @@
   font-size: var(--text-sm);
   max-width: 65ch;
   margin: 0;
+  line-height: var(--leading-relaxed);
 }
 
 .statRow {
@@ -68,6 +69,7 @@
   font-size: var(--text-xl, 1.4rem);
   font-weight: 800;
   color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .panel {
@@ -119,4 +121,12 @@
   gap: var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text);
+}
+
+.leaderIcon {
+  --icon-size: 0.875rem;
+  display: inline-flex;
+  color: var(--color-accent);
+  margin-right: var(--space-1);
+  vertical-align: -1px;
 }
