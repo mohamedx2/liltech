@@ -6,6 +6,8 @@ import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
+import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
+import { handleGetAuditLog, handlePublishAdminAnnouncement } from './mocks/admin.mock';
 import {
   handleGetJuryEvaluation,
   handleGetJuryOverview,
@@ -53,6 +55,10 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`POST ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: (config) => handleCreateSubmission(config.body),
 
     [`GET ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: () => handleGetAnnouncements(),
+    [`POST ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: (config) => {
+      const body = (config.body ?? {}) as { body?: string };
+      return handlePublishAdminAnnouncement(body.body ?? '');
+    },
 
     [`GET ${PLANNED_ENDPOINTS.JURY_OVERVIEW}`]: () => handleGetJuryOverview(),
     [`GET ${PLANNED_ENDPOINTS.JURY_TEAMS}`]: () => handleGetJuryTeams(),
@@ -63,6 +69,23 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`POST ${PLANNED_ENDPOINTS.JURY_EVALUATION}`]: (config) => {
       const teamId = (config as { params?: Record<string, string> }).params?.teamId ?? '';
       return handleSubmitJuryEvaluation(teamId, (config.body ?? {}) as SubmitEvaluationRequest);
+    },
+
+    [`POST ${PLANNED_ENDPOINTS.CHECKIN_SCAN}`]: (config) => {
+      const body = (config.body ?? {}) as { token?: string };
+      return handleScanCheckIn(body.token ?? '');
+    },
+    [`POST ${PLANNED_ENDPOINTS.CHECKIN_REVOKE}`]: (config) => {
+      const body = (config.body ?? {}) as { participantId?: string };
+      return handleRevokeBadge(body.participantId ?? '');
+    },
+    [`GET ${PLANNED_ENDPOINTS.CHECKIN_BADGES}`]: () => handleGetBadges(),
+
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_AUDIT_LOG}`]: (config) => {
+      const params = (config as { params?: Record<string, string> }).params;
+      const limit = params?.limit ? parseInt(params.limit, 10) : 50;
+      const offset = params?.offset ? parseInt(params.offset, 10) : 0;
+      return handleGetAuditLog(limit, offset);
     },
   };
 

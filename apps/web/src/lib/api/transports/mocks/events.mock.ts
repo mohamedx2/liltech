@@ -23,5 +23,25 @@ export function createEventsMockRoutes(): MockRouteMap {
       nextPhaseAt: '2026-11-21T19:00:00.000Z',
       phaseLabel: 'Development Mock Phase',
     }),
+
+    [`POST ${PLANNED_ENDPOINTS.EVENT_STATE}`]: (config): EventStateResponse => {
+      const body = (config.body ?? {}) as { phase?: EventPhase };
+      if (body.phase) {
+        devMockState.phase = body.phase;
+        devMockState.auditLog.unshift({
+          id: `audit-${Date.now()}`,
+          action: 'event.phase_changed',
+          actorName: devMockState.currentUser?.name ?? 'Mock Organizer Admin',
+          createdAt: new Date().toISOString(),
+        });
+      }
+      return {
+        phase: devMockState.phase,
+        serverTime: new Date().toISOString(),
+        nextPhase: NEXT_PHASE_MAP[devMockState.phase],
+        nextPhaseAt: '2026-11-21T19:00:00.000Z',
+        phaseLabel: 'Development Mock Phase',
+      };
+    },
   };
 }

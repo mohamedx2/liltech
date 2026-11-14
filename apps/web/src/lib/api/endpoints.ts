@@ -32,4 +32,8 @@ export const PLANNED_ENDPOINTS = {
   JURY_OVERVIEW: '/jury/overview',
   JURY_TEAMS: '/jury/teams',
   JURY_EVALUATION: '/jury/evaluation',
+  CHECKIN_SCAN: '/checkin/scan',
+  CHECKIN_REVOKE: '/checkin/revoke',
+  CHECKIN_BADGES: '/checkin/badges',
+  ADMIN_AUDIT_LOG: '/admin/audit-log',
 } as const;

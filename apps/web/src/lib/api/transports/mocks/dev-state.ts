@@ -1,4 +1,11 @@
-import { ChallengeTrack, EventPhase, Role, TeamProgressState } from 'api-contracts';
+import {
+  ChallengeTrack,
+  EventPhase,
+  Role,
+  TeamProgressState,
+  type AuditLogEntry,
+  type BadgeSummary,
+} from 'api-contracts';
 import type {
   AnnouncementItem,
   AuthUser,
@@ -70,6 +77,8 @@ export interface DevMockState {
       evaluatedAt: string;
     }
   >;
+  auditLog: AuditLogEntry[];
+  badges: BadgeSummary[];
 }
 
 /**
@@ -288,6 +297,76 @@ function createPortalState() {
         },
       ],
     ]),
+    auditLog: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        action: 'event.phase_changed',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T18:00:00.000Z',
+      },
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        action: 'registration.team_created',
+        actorName: null,
+        createdAt: '2026-11-21T18:15:00.000Z',
+      },
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        action: 'checkin.scan',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T18:30:00.000Z',
+      },
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        action: 'announcement.published',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T19:30:00.000Z',
+      },
+    ],
+    badges: [
+      {
+        participantId: '00000000-0000-4000-8000-000000000001',
+        participantName: 'Mock Team Leader',
+        teamName: 'Sample Builders (Dev Mock)',
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: '2026-11-21T18:30:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000002',
+        participantName: 'Mock Teammate One',
+        teamName: 'Sample Builders (Dev Mock)',
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: '2026-11-21T18:45:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000003',
+        participantName: 'Mock Teammate Two',
+        teamName: 'Sample Builders (Dev Mock)',
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: undefined,
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000004',
+        participantName: 'Kais Ben Ali',
+        teamName: 'Quantum Coders',
+        issuedAt: '2026-11-20T11:00:00.000Z',
+        checkedInAt: '2026-11-21T19:00:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000005',
+        participantName: 'Nour Trabelsi',
+        teamName: 'Quantum Coders',
+        issuedAt: '2026-11-20T11:00:00.000Z',
+        checkedInAt: undefined,
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000006',
+        participantName: 'Yassine Gharbi',
+        teamName: 'Algorithmic Titans',
+        issuedAt: '2026-11-20T12:00:00.000Z',
+        checkedInAt: undefined,
+      },
+    ],
   } satisfies Pick<
     DevMockState,
     | 'team'
@@ -299,6 +378,8 @@ function createPortalState() {
     | 'rateLimitAttempts'
     | 'juryTeams'
     | 'juryEvaluations'
+    | 'auditLog'
+    | 'badges'
   >;
 }
 

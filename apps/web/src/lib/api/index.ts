@@ -1,8 +1,10 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
+import { createAdminApi, type AdminApi } from './modules/admin';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
+import { createCheckinApi, type CheckinApi } from './modules/checkin';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
 import { createJuryApi, type JuryApi } from './modules/jury';
@@ -36,6 +38,8 @@ export interface ApiClient {
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
   jury: JuryApi;
+  checkin: CheckinApi;
+  admin: AdminApi;
 }
 
 export function createApiClient(transport: ApiTransport): ApiClient {
@@ -53,6 +57,8 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),
     jury: createJuryApi(transport),
+    checkin: createCheckinApi(transport),
+    admin: createAdminApi(transport),
   };
 }
 

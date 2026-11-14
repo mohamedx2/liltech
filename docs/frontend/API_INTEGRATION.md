@@ -46,7 +46,8 @@ Currently in `apps/api`, **only `GET /api/health` is implemented**. All other en
 | `auth` | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `Role` & `ChallengeTrack` | `GET /auth/me` `401`/`404` treats visitor as signed out; login surfaces a clear pending-endpoint message |
 | `registrations` | `POST /api/registrations` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `TeamProgressState` | Validates 3–5 members locally; `404` surfaces a clear pending-endpoint message |
 | `jury` | `GET /api/jury/overview`, `GET /api/jury/teams`, `GET/POST /api/jury/evaluation` | **Planned (missing)** | `api.jury` module (`juryOverviewResponseSchema`, `juryTeamEvaluationResponseSchema`, etc.) | Isolated to assigned track (`track_a`/`track_b`); provides rubric scoring & private notes |
-| Team / Check-In / Admin / Results | Participant, check-in, admin & leaderboard routes | **Planned (missing)** | Owned by Persons 2 & 3 | To be added as modular `lib/api/modules/*.ts` files |
+| `checkin` | `POST /api/checkin/scan`, `POST /api/checkin/revoke`, `GET /api/checkin/badges` | **Planned (missing)** | Canonical contracts in `libs/api-contracts` (`checkInResponseSchema`, `badgeSummarySchema`, etc.) | Validates QR tokens, registers attendance timestamps, revokes badges |
+| `admin` | `GET /api/admin/audit-log`, `POST /api/announcements`, `POST /api/event-state` | **Planned (missing)** | Canonical contracts in `libs/api-contracts` (`auditLogEntrySchema`, `eventStateResponseSchema`) | Allows admins to override phases, broadcast alerts, and inspect audit logs |
 
 ### Migrating Provisional Contracts to `libs/api-contracts`
 
