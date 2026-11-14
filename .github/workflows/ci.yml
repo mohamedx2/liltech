@@ -172,6 +172,9 @@ jobs:
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN || format('http://{0}:3000', secrets.DEPLOY_SSH_HOST) }}
+          SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
         run: |
           cat > /tmp/liltech.env <<EOF
           NODE_ENV=production
@@ -186,6 +189,17 @@ jobs:
           API_IMAGE=${{ env.IMAGE_API }}:latest
           WEB_IMAGE=${{ env.IMAGE_WEB }}:latest
           EOF
+          # Optional administrator provisioning for the seed one-shot service:
+          # only written when the secrets exist, so deploys without them no-op.
+          if [ -n "$SEED_ADMIN_EMAIL" ]; then
+            echo "SEED_ADMIN_EMAIL=$SEED_ADMIN_EMAIL" >> /tmp/liltech.env
+          fi
+          if [ -n "$SEED_ADMIN_PASSWORD" ]; then
+            echo "SEED_ADMIN_PASSWORD=$SEED_ADMIN_PASSWORD" >> /tmp/liltech.env
+          fi
+          if [ -n "$SEED_ADMIN_NAME" ]; then
+            echo "SEED_ADMIN_NAME=$SEED_ADMIN_NAME" >> /tmp/liltech.env
+          fi
           scp -i ~/.ssh/deploy_key -P ${{ secrets.DEPLOY_SSH_PORT }} \
             /tmp/liltech.env \
             ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:/opt/liltech/.env

@@ -12,7 +12,8 @@ automatically, the `deploy` job in `.github/workflows/ci.yml`:
    and pushes them to GHCR as `latest` + `sha-<commit>`.
 2. SSHes to the VPS as root, copies `docker-compose.prod.yml` to
    `/opt/liltech`, writes `/opt/liltech/.env` from repository secrets,
-   pulls, applies Prisma migrations (one-shot `migrate` service), starts the
+   pulls, applies Prisma migrations and provisions the administrator
+   account (one-shot `migrate` + `seed` services), starts the
    stack, then smoke-tests health.
 
 The stack: web (:3000) + API (:4000) + Postgres 17 (internal only, data in a
@@ -84,6 +85,26 @@ Commits: `ci(deploy): ship main to the VPS with Docker Compose` (#16),
 - Consider a dedicated non-root deploy user instead of root.
 - `nx.json` `"analytics": true` and `next.config.ts` `agentRules: false` remain
   unreviewed side effects of PR #15 (flagged in that PR's review).
+
+## Administrator provisioning (seed, 2026-11-14)
+
+The production stack provisions an administrator account through a one-shot
+`seed` compose service (`node dist/seed-build/prisma/seed.js` in the API
+image), which runs after `migrate` and before the API starts:
+
+- Configuration comes from `/opt/liltech/.env`, written by the deploy job
+  **only when the repository secrets exist** (the seed otherwise no-ops):
+  `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (≥ 12 chars, required with the
+  email), `SEED_ADMIN_NAME` (optional, defaults to `LilTech Admin`).
+- Idempotent: the account is created once; re-deploys leave it untouched
+  unless `SEED_ADMIN_PASSWORD` changed, in which case the stored bcrypt hash
+  is reset (this is the password-rotation path). Set the password as a
+  GitHub secret, never in chat or the repo.
+- An email that already belongs to a non-admin account is rejected instead
+  of being taken over.
+
+To create or rotate the production admin: set/update the `SEED_ADMIN_*`
+secrets, then re-run the deploy (Actions → CI → Run workflow).
 
 ## Domain and TLS (liltechsousse.com, 2026-11-13)
 

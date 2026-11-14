@@ -40,6 +40,11 @@ RUN pnpm nx sync \
   && pnpm install --frozen-lockfile --prod \
   && node "$(ls -d /repo/node_modules/.pnpm/prisma@*/node_modules/prisma | head -1)/build/index.js" generate --schema=prisma/schema.prisma
 
+# Compile the database seed (plain CommonJS, no bundler) so the one-shot `seed`
+# compose service can run `node dist/seed-build/prisma/seed.js` in the runtime
+# stage. Imports resolve from the pruned node_modules next to the API bundle.
+RUN pnpm --filter api exec tsc -p tsconfig.seed.json
+
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:22-alpine
 WORKDIR /app
