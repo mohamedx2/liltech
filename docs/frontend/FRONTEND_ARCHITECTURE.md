@@ -43,7 +43,7 @@ apps/web/src/
 │   └── env.ts                 # Zod-validated NEXT_PUBLIC_* environment variables
 ├── features/
 │   ├── auth/                  # LoginForm, UnauthorizedView
-│   └── registration/          # TeamRegistrationForm (3–5 participants constraint)
+│   └── registration/          # TeamRegistrationForm (4–7 participants constraint)
 ├── lib/
 │   ├── api/                   # Centralized typed API client, endpoints, transports, mocks, pending contracts
 │   └── auth/                  # AuthProvider context, session state, role-to-route access helpers

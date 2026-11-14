@@ -24,7 +24,7 @@
 | Health endpoint | `apps/api/src/routes/health.routes.ts` | `GET /api/health`, distinguishes app-up/DB-down (200/503), documented in `docs/api/README.md` |
 | **Authentication** | `modules/auth/` | bcrypt passwords, opaque DB-backed bearer sessions, `POST /api/auth/login|logout`, `GET /api/auth/me`, `requireAuth`/`requireRole` middleware, login rate limit |
 | **Event-state machine** | `modules/event-state/` | `GET/POST /api/event-state`, audited atomic phase transitions, `EventPhaseState` single row |
-| **Registration & participants** | `modules/registration/` | `POST /api/registration/teams` (3–5 validation, QR badge issuance), `GET /api/registration/teams/me` |
+| **Registration & participants** | `modules/registration/` | `POST /api/registration/teams` (4–7 validation, QR badge issuance), `GET /api/registration/teams/me` |
 | **Check-in** | `modules/checkin/` | QR scan (single check-in, unique constraint), badge revocation, badge listing (admin) |
 | **Announcements** | `modules/announcements/` | `POST` (admin) / `GET` (authenticated) `/api/announcements` |
 | **Audit log** | `modules/audit/` + `modules/admin/` | transactional `recordAuditLog`, `GET /api/admin/audit-log` paginated |
@@ -64,7 +64,7 @@ Implemented-but-pending-open-questions fields are intentionally absent where the
 ### 2.1 Entities (spec-derived; candidate DB model in §4)
 
 - **User** (per role: `team`/`jury`/`admin`) + credentials (slow salted hash).
-- **Team** (3–5 members), leader, progress state, track (❓ Q1).
+- **Team** (4–7 members), leader, progress state, track (❓ Q1).
 - **Participant** (member of a team, incl. leader), profile data.
 - **QrBadge / QrToken** — one per participant, high-entropy, revocable, server-verifiable.
 - **CheckInRecord** — who, when, how verified; duplicate prevention.
@@ -80,7 +80,7 @@ Implemented-but-pending-open-questions fields are intentionally absent where the
 
 ### 2.2 Workflows to enforce server-side
 
-1. Team leader registers team (3–5 members, validation, duplicate prevention).
+1. Team leader registers team (4–7 members, validation, duplicate prevention).
 2. Each participant gets a QR badge; email delivery hook pending (Q8).
 3. Staff/admin scans QR → check-in recorded once; revocation honored.
 4. Admin launches event at 20:00 → phase `live`.
@@ -167,7 +167,7 @@ Hard rules for implementation (from `AGENTS.md` §8):
 | **P0 — Tooling/environment** | `corepack enable pnpm`, `pnpm install`, `.env`, postgres up, migrations baseline green | — |
 | **P1 — Contracts & auth foundation** | `libs/api-contracts`: auth schemas (login, session, error codes additions); `modules/auth`: argon2id hashing, session issue/verify/refresh-revoke, `requireRole` middleware; ratelimit on login | P0 |
 | **P2 — Event-state machine** | module `event-state`: current phase (DB-backed), server time endpoint, admin-only transitions with audit entries; contract `eventStateResponseSchema` | P1 (auth/admin) |
-| **P3 — Registration & participants** | team creation (3–5 validation), participants, QR token issuance + issuance hooks exposed for a future email module | P2 (uses phases for open/closed) |
+| **P3 — Registration & participants** | team creation (4–7 validation), participants, QR token issuance + issuance hooks exposed for a future email module | P2 (uses phases for open/closed) |
 | **P4 — Check-in** | module `checkin`: QR verification, single check-in (unique constraint + transaction), admin/staff endpoints | P3 |
 | **P5 — Mini-CTF (post-decision)** | after Q2: challenge/flags tables, attempt log, rate limiter, progress transition | P2–P4, Q2 |
 | **P6 — Challenges & submissions** | after Q1 (+ storage decision): challenge scoping, deadline enforcement | P5, Q1 |

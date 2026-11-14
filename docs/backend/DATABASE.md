@@ -13,7 +13,7 @@ Core models (applied via migrations under `apps/api/prisma/migrations/`):
 | `SystemSetting` | pre-existing minimal model (initial schema) |
 | `User` | accounts for roles `team` / `jury` / `admin`; email + `passwordHash` |
 | `Session` | opaque bearer sessions (token hash stored, expiresAt, revokedAt) |
-| `Team` | 3–5 members, `progressState` (`registered → checked_in → ctf_unlocked → ctf_solved → challenge_unlocked → submitted`), leader FK |
+| `Team` | 4–7 members, `progressState` (`registered → checked_in → ctf_unlocked → ctf_solved → challenge_unlocked → submitted`), leader FK |
 | `Participant` | team member; one `QrToken` per participant |
 | `QrToken` | raw token stored as SHA-256 hash only; unique per participant; revocable |
 | `CheckInRecord` | who/when/by-whom; unique constraint per participant (single check-in) |

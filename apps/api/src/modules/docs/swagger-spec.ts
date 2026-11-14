@@ -1,3 +1,5 @@
+import { TEAM_MEMBERS_TOTAL_MAX, TEAM_MEMBERS_TOTAL_MIN } from 'api-contracts';
+
 export const swaggerSpec = {
   openapi: '3.0.3',
   info: {
@@ -167,8 +169,8 @@ export const swaggerSpec = {
           },
           members: {
             type: 'array',
-            minItems: 2,
-            maxItems: 4,
+            minItems: TEAM_MEMBERS_TOTAL_MIN - 1,
+            maxItems: TEAM_MEMBERS_TOTAL_MAX - 1,
             items: {
               type: 'object',
               required: ['name'],
@@ -491,7 +493,7 @@ export const swaggerSpec = {
     '/registration/teams': {
       post: {
         tags: ['Registration'],
-        summary: 'Register a new team (3–5 members)',
+        summary: 'Register a new team (4–7 members)',
         description:
           'Creates team leader account, registers participants, and issues high-entropy QR badge tokens.',
         requestBody: {

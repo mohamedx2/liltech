@@ -98,10 +98,11 @@ describe('API Client, RealTransport, and MockTransport', () => {
       teammates: [
         { fullName: 'Mate One', email: 'mate1@liltech.mock' },
         { fullName: 'Mate Two', email: 'mate2@liltech.mock' },
+        { fullName: 'Mate Three', email: 'mate3@liltech.mock' },
       ],
     });
     expect(registered.status).toBe(TeamProgressState.Registered);
-    expect(registered.participantCount).toBe(3);
+    expect(registered.participantCount).toBe(4);
 
     const loginRes = await client.auth.login({
       email: 'leader.mock@liltech.mock',

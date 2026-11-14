@@ -215,7 +215,7 @@ export function LoginForm() {
       <div className={styles.prompt}>
         <p className={styles.promptText}>New team for LilTech 2026?</p>
         <Link href="/register" className={styles.promptLink}>
-          Register a 3–5 member team
+          Register a 4–7 member team
         </Link>
       </div>
 

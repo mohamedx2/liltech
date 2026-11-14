@@ -128,7 +128,7 @@ Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
 #### `POST /api/registration/teams`
 
-Public. Registers a team of 3–5 members (leader + 2–4 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Duplicate team name or leader email → `CONFLICT` (409).
+Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Duplicate team name or leader email → `CONFLICT` (409).
 
 **Request body:**
 

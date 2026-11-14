@@ -6,6 +6,8 @@ import {
   eventPhaseSchema,
   eventStateResponseSchema as canonicalEventStateResponseSchema,
   isoTimestampSchema,
+  TEAM_MEMBERS_TOTAL_MAX,
+  TEAM_MEMBERS_TOTAL_MIN,
   teamProgressStateSchema,
   teamResponseSchema as canonicalTeamResponseSchema,
 } from 'api-contracts';
@@ -130,9 +132,9 @@ export const teamMemberInputSchema = z.object({
 export type TeamMemberInput = z.infer<typeof teamMemberInputSchema>;
 
 /**
- * Team leader registers a team of 3–5 participants (1 leader + 2–4 teammates).
+ * Team leader registers a team of 4–7 participants (1 leader + 3–6 teammates).
  * Mirrors the canonical `createTeamRequestSchema` constraints in
- * `libs/api-contracts` (team name 3–60 chars, password ≥ 12 chars) so client
+ * `libs/api-contracts` (team size, team name 3–60 chars, password ≥ 12 chars) so client
  * validation matches what the server enforces.
  */
 export const teamRegistrationRequestSchema = z.object({
@@ -144,8 +146,14 @@ export const teamRegistrationRequestSchema = z.object({
   leader: teamMemberInputSchema,
   teammates: z
     .array(teamMemberInputSchema)
-    .min(2, 'Add at least 2 teammates (3–5 total participants including the leader).')
-    .max(4, 'A team can have at most 4 teammates (5 total participants including the leader).'),
+    .min(
+      TEAM_MEMBERS_TOTAL_MIN - 1,
+      `Add at least ${TEAM_MEMBERS_TOTAL_MIN - 1} teammates (${TEAM_MEMBERS_TOTAL_MIN}–${TEAM_MEMBERS_TOTAL_MAX} total participants including the leader).`,
+    )
+    .max(
+      TEAM_MEMBERS_TOTAL_MAX - 1,
+      `A team can have at most ${TEAM_MEMBERS_TOTAL_MAX - 1} teammates (${TEAM_MEMBERS_TOTAL_MAX} total participants including the leader).`,
+    ),
   password: z.string().min(12, 'Password must be at least 12 characters.'),
 });
 
@@ -156,7 +164,7 @@ export const teamRegistrationResponseSchema = z.union([
     teamId: z.string(),
     teamName: z.string(),
     status: teamProgressStateSchema,
-    participantCount: z.number().int().min(3).max(5),
+    participantCount: z.number().int().min(TEAM_MEMBERS_TOTAL_MIN).max(TEAM_MEMBERS_TOTAL_MAX),
     createdAt: isoTimestampSchema,
     message: z.string().optional().default('Team registered successfully.'),
   }),
