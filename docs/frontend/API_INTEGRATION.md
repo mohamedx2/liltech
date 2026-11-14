@@ -45,7 +45,8 @@ Currently in `apps/api`, **only `GET /api/health` is implemented**. All other en
 | `events` | `GET /api/event-state` | **Planned (missing)** | Provisional `eventStateResponseSchema` (`pending.ts`) | Returns `404`; UI falls back cleanly to `"Event State Pending API"` notice |
 | `auth` | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `Role` & `ChallengeTrack` | `GET /auth/me` `401`/`404` treats visitor as signed out; login surfaces a clear pending-endpoint message |
 | `registrations` | `POST /api/registrations` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `TeamProgressState` | Validates 3–5 members locally; `404` surfaces a clear pending-endpoint message |
-| Team / Check-In / Jury / Admin / Results | Participant, check-in, jury scoring, admin & leaderboard routes | **Planned (missing)** | Owned by Persons 2 & 3 | To be added as modular `lib/api/modules/*.ts` files |
+| `jury` | `GET /api/jury/overview`, `GET /api/jury/teams`, `GET/POST /api/jury/evaluation` | **Planned (missing)** | `api.jury` module (`juryOverviewResponseSchema`, `juryTeamEvaluationResponseSchema`, etc.) | Isolated to assigned track (`track_a`/`track_b`); provides rubric scoring & private notes |
+| Team / Check-In / Admin / Results | Participant, check-in, admin & leaderboard routes | **Planned (missing)** | Owned by Persons 2 & 3 | To be added as modular `lib/api/modules/*.ts` files |
 
 ### Migrating Provisional Contracts to `libs/api-contracts`
 

@@ -6,12 +6,18 @@ import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
+import {
+  handleGetJuryEvaluation,
+  handleGetJuryOverview,
+  handleGetJuryTeams,
+  handleSubmitJuryEvaluation,
+} from './mocks/jury.mock';
 import { handleGetMiniCtfStatus, handleSubmitMiniCtfFlag } from './mocks/mini-ctf.mock';
 import { handleGetMyBadge, handleGetMyTeam } from './mocks/participants.mock';
 import { handleCreateSubmission, handleGetMySubmissions } from './mocks/submissions.mock';
 import type { MockRouteMap } from './mocks/types';
 import { PLANNED_ENDPOINTS } from '../endpoints';
-import type { MiniCtfSubmitRequest } from '../contracts/pending';
+import type { MiniCtfSubmitRequest, SubmitEvaluationRequest } from '../contracts/pending';
 
 export interface MockTransportOptions {
   /** Simulated network latency in milliseconds. */
@@ -47,6 +53,17 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`POST ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: (config) => handleCreateSubmission(config.body),
 
     [`GET ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: () => handleGetAnnouncements(),
+
+    [`GET ${PLANNED_ENDPOINTS.JURY_OVERVIEW}`]: () => handleGetJuryOverview(),
+    [`GET ${PLANNED_ENDPOINTS.JURY_TEAMS}`]: () => handleGetJuryTeams(),
+    [`GET ${PLANNED_ENDPOINTS.JURY_EVALUATION}`]: (config) => {
+      const teamId = (config as { params?: Record<string, string> }).params?.teamId ?? '';
+      return handleGetJuryEvaluation(teamId);
+    },
+    [`POST ${PLANNED_ENDPOINTS.JURY_EVALUATION}`]: (config) => {
+      const teamId = (config as { params?: Record<string, string> }).params?.teamId ?? '';
+      return handleSubmitJuryEvaluation(teamId, (config.body ?? {}) as SubmitEvaluationRequest);
+    },
   };
 
   return {
@@ -64,7 +81,24 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
       }
 
       const method = config.method ?? 'GET';
-      const handler = routes[`${method} ${path}`];
+      const [cleanPath, queryString] = path.split('?');
+      const queryParams: Record<string, string> = {};
+      if (queryString) {
+        const sp = new URLSearchParams(queryString);
+        sp.forEach((value, key) => {
+          queryParams[key] = value;
+        });
+      }
+
+      const effectiveConfig = {
+        ...config,
+        params: {
+          ...queryParams,
+          ...((config as { params?: Record<string, string> }).params ?? {}),
+        },
+      };
+
+      const handler = routes[`${method} ${path}`] ?? routes[`${method} ${cleanPath}`];
       if (!handler) {
         throw new ApiClientError({
           message: `No mock defined for ${method} ${path}.`,
@@ -73,7 +107,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
         });
       }
 
-      return handler(config) as TResponse;
+      return handler(effectiveConfig) as TResponse;
     },
   };
 }

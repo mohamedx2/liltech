@@ -4,6 +4,7 @@ import type {
   AuthUser,
   BadgePassResponse,
   ChallengeDetailResponse,
+  JuryTeamItem,
   MiniCtfStatusResponse,
   SubmissionItem,
   TeamSummary,
@@ -59,6 +60,16 @@ export interface DevMockState {
   submissions: SubmissionItem[];
   announcements: AnnouncementItem[];
   rateLimitAttempts: number;
+  juryTeams: JuryTeamItem[];
+  juryEvaluations: Map<
+    string,
+    {
+      criteriaScores: Record<string, number>;
+      notes: string;
+      totalScore: number;
+      evaluatedAt: string;
+    }
+  >;
 }
 
 /**
@@ -183,9 +194,111 @@ function createPortalState() {
       },
     ],
     rateLimitAttempts: 0,
+    juryTeams: [
+      {
+        id: 'dev-team-01',
+        name: 'Sample Builders (Dev Mock)',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 3,
+        submitted: true,
+        submittedAt: '2026-11-21T21:15:00.000Z',
+        submissionTitle: 'Initial Architecture Draft & Prototype',
+        submissionRepoUrl: 'https://github.com/sample-builders/liltech-dispatcher',
+        submissionFileName: 'prototype-v1.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-02',
+        name: 'Quantum Coders',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 4,
+        submitted: true,
+        submittedAt: '2026-11-21T22:45:00.000Z',
+        submissionTitle: 'Neural Fleet Optimization Dispatcher',
+        submissionRepoUrl: 'https://github.com/quantum-coders/fleet-ai',
+        submissionFileName: 'quantum-dispatcher-v2.tar.gz',
+        evaluationStatus: 'graded' as const,
+        myScore: 88,
+        evaluatedAt: '2026-11-22T09:30:00.000Z',
+      },
+      {
+        id: 'dev-team-03',
+        name: 'Algorithmic Titans',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 4,
+        submitted: true,
+        submittedAt: '2026-11-22T04:10:00.000Z',
+        submissionTitle: 'Dynamic Urban Route Clustering',
+        submissionRepoUrl: 'https://github.com/algo-titans/route-clustering',
+        submissionFileName: 'algo-titans-solution.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-04',
+        name: 'DeepRoute Innovators',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.ChallengeUnlocked,
+        membersCount: 3,
+        submitted: false,
+        submittedAt: null,
+        submissionTitle: null,
+        submissionRepoUrl: null,
+        submissionFileName: null,
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-05',
+        name: 'CloudNexus Systems',
+        track: ChallengeTrack.TrackB,
+        progress: TeamProgressState.Submitted,
+        membersCount: 5,
+        submitted: true,
+        submittedAt: '2026-11-22T03:00:00.000Z',
+        submissionTitle: 'Serverless IoT Mesh Controller',
+        submissionRepoUrl: 'https://github.com/cloudnexus/iot-controller',
+        submissionFileName: 'cloudnexus-iot.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+    ],
+    juryEvaluations: new Map([
+      [
+        'dev-team-02',
+        {
+          criteriaScores: {
+            technical_execution: 22,
+            innovation_originality: 23,
+            ui_ux_design: 21,
+            pitch_presentation: 22,
+          },
+          notes:
+            'Very impressive neural network approach to traffic rerouting. Presentation was clear and defended architectural trade-offs well.',
+          totalScore: 88,
+          evaluatedAt: '2026-11-22T09:30:00.000Z',
+        },
+      ],
+    ]),
   } satisfies Pick<
     DevMockState,
-    'team' | 'badge' | 'ctf' | 'challenge' | 'submissions' | 'announcements' | 'rateLimitAttempts'
+    | 'team'
+    | 'badge'
+    | 'ctf'
+    | 'challenge'
+    | 'submissions'
+    | 'announcements'
+    | 'rateLimitAttempts'
+    | 'juryTeams'
+    | 'juryEvaluations'
   >;
 }
 

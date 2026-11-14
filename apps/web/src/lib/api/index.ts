@@ -5,6 +5,7 @@ import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
+import { createJuryApi, type JuryApi } from './modules/jury';
 import { createMiniCtfApi, type MiniCtfApi } from './modules/mini-ctf';
 import { createParticipantsApi, type ParticipantsApi } from './modules/participants';
 import { createRegistrationsApi, type RegistrationsApi } from './modules/registrations';
@@ -34,6 +35,7 @@ export interface ApiClient {
   challenges: ChallengesApi;
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
+  jury: JuryApi;
 }
 
 export function createApiClient(transport: ApiTransport): ApiClient {
@@ -50,6 +52,7 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     challenges: createChallengesApi(transport),
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),
+    jury: createJuryApi(transport),
   };
 }
 

@@ -29,4 +29,7 @@ export const PLANNED_ENDPOINTS = {
   SUBMISSIONS: '/submissions',
   SUBMISSIONS_MY_TEAM: '/submissions/my-team',
   ANNOUNCEMENTS: '/announcements',
+  JURY_OVERVIEW: '/jury/overview',
+  JURY_TEAMS: '/jury/teams',
+  JURY_EVALUATION: '/jury/evaluation',
 } as const;

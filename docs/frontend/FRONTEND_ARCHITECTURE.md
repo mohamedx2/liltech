@@ -96,6 +96,13 @@ export default function ParticipantLayout({ children }: { children: ReactNode })
 }
 ```
 
+### Jury Evaluation Portal (`(jury)`)
+
+The Jury workspace (`/jury` and `/jury/evaluate/[teamId]`) enforces strict challenge track isolation (e.g. `track_a` or `track_b`):
+- **Jury Layout (`apps/web/src/app/(jury)/layout.tsx`):** Guarded with `RoleGuard allowedRoles={[Role.Jury]}` and wrapped in `DashboardShell role={Role.Jury}`.
+- **Assigned Teams Overview (`/jury`):** Track banner with track title/description, evaluation progress metrics (Assigned, Evaluated, Pending, Average score), search & status filter tabs ('All', 'Pending', 'Graded'), and a semantic `DataTable` listing deliverables and actions.
+- **Team Evaluation Workspace (`/jury/evaluate/[teamId]`):** Detailed review of team deliverables (GitHub repo and uploaded files), 4 standardized criteria (Technical Execution, Innovation, UI/UX, Pitch — 25 pts each, 100 pts total) with synchronized range sliders, number inputs, and fast presets, real-time total score calculation with rating bands, qualitative jury notes, and submission locking.
+
 Role home routes and portal navigation links are already centralized in [`apps/web/src/lib/auth/route-access.ts`](../../apps/web/src/lib/auth/route-access.ts):
 - `Role.Team` → `/team` (`/team`, `/team/ctf`, `/team/challenge`, `/team/submissions`, `/team/announcements`)
 - `Role.Jury` → `/jury` (`/jury`, `/schedule`)
