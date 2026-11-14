@@ -99,9 +99,10 @@ describeDb('admin listings and badge roster', () => {
         .set('Authorization', `Bearer ${await tokenFor(admin)}`);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(3);
+      expect(response.body.items).toHaveLength(3);
+      expect(response.body.total).toBe(3);
 
-      const leaderEntry = response.body.find(
+      const leaderEntry = response.body.items.find(
         (badge: { participantName: string }) => badge.participantName === 'Roster Leader',
       );
       expect(leaderEntry).toMatchObject({

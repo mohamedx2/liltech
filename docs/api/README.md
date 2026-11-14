@@ -162,9 +162,9 @@ Revokes a badge token (treated as a credential). Audit entry `checkin.badge_revo
 
 #### `GET /api/checkin/badges`
 
-Admin only. Returns all badges (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
+Admin only. Returns the badge roster (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
 
-Schema: `badgeSummarySchema[]`.
+**Response `200`:** `{ items: badgeSummarySchema[], total }`.
 
 ### Announcements
 
