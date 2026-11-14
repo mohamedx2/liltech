@@ -1,0 +1,7 @@
+.icon {
+  display: inline-block;
+  width: var(--icon-size, 1.25rem);
+  height: var(--icon-size, 1.25rem);
+  flex-shrink: 0;
+  vertical-align: text-bottom;
+}

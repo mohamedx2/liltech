@@ -44,6 +44,7 @@
   font-size: var(--text-sm);
   max-width: 65ch;
   margin: 0;
+  line-height: var(--leading-relaxed);
 }
 
 .scannerCard {
@@ -54,6 +55,7 @@
   background: var(--color-surface);
   border: 2px solid var(--color-border-strong);
   border-radius: var(--radius-lg, 0.75rem);
+  transition: border-color 0.2s ease;
 }
 
 .scannerCard[data-state='success'] {
@@ -72,6 +74,12 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0;
+}
+
+.scannerTitleIcon {
+  --icon-size: 1.25rem;
+  display: inline-flex;
+  color: var(--color-accent);
 }
 
 .scannerForm {
@@ -104,6 +112,9 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .scannerInput:focus-visible {
@@ -116,7 +127,8 @@
   left: var(--space-4);
   top: 50%;
   transform: translateY(-50%);
-  font-size: var(--text-lg);
+  --icon-size: 1.125rem;
+  display: inline-flex;
   color: var(--color-text-dim);
   pointer-events: none;
 }
@@ -162,6 +174,7 @@
   font-weight: 800;
   color: var(--color-text);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .metricSubtext {
@@ -242,6 +255,7 @@
   font-size: var(--text-xs);
   color: var(--color-text-dim);
   font-family: monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .rosterSection {
@@ -291,10 +305,18 @@
   border-radius: var(--radius-sm, 0.25rem);
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .filterTab:hover {
   color: var(--color-text);
+}
+
+.filterTab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
 }
 
 .filterTab[aria-selected='true'] {
@@ -312,6 +334,9 @@
   font-size: var(--text-sm);
   outline: none;
   min-width: 16rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .searchInput:focus-visible {
