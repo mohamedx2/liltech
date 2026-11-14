@@ -212,7 +212,7 @@ describeDb('api foundation modules', () => {
 
       expect(me.status).toBe(200);
       expect(me.body.name).toBe('Team Me Endpoint');
-      expect(me.body.participants).toHaveLength(3);
+      expect(me.body.participants).toHaveLength(4);
       expect(me.body.participants.filter((p: { isLeader: boolean }) => p.isLeader)).toHaveLength(1);
     });
 
