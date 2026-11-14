@@ -36,4 +36,6 @@ export const PLANNED_ENDPOINTS = {
   CHECKIN_REVOKE: '/checkin/revoke',
   CHECKIN_BADGES: '/checkin/badges',
   ADMIN_AUDIT_LOG: '/admin/audit-log',
+  ADMIN_TEAMS: '/admin/teams',
+  ADMIN_JURY: '/admin/jury',
 } as const;

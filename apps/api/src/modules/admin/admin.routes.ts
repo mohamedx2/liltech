@@ -3,10 +3,13 @@ import { auditLogListRequestSchema, type AuditLogEntry } from 'api-contracts';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
 import { requireAuth, requireRole } from '../../middleware/auth';
+import { listJuryAccounts, listTeams } from './admin.service';
 
 /**
  * Admin operational endpoints.
  * - `GET /api/admin/audit-log` — audited administrative actions, newest first.
+ * - `GET /api/admin/teams`     — full team roster with check-in state.
+ * - `GET /api/admin/jury`      — jury accounts (read-only, no credentials).
  */
 
 export const adminRouter: Router = Router();
@@ -38,6 +41,22 @@ adminRouter.get(
       .catch(next);
   },
 );
+
+adminRouter.get('/admin/teams', requireAuth, requireRole('admin'), (_req, res, next) => {
+  listTeams()
+    .then((result) => {
+      res.status(200).json(result);
+    })
+    .catch(next);
+});
+
+adminRouter.get('/admin/jury', requireAuth, requireRole('admin'), (_req, res, next) => {
+  listJuryAccounts()
+    .then((result) => {
+      res.status(200).json(result);
+    })
+    .catch(next);
+});
 
 async function listAuditLog(
   limit: number,

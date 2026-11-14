@@ -51,10 +51,13 @@ export function createCheckinApi(transport: ApiTransport): CheckinApi {
     },
 
     async getBadges(config) {
+      // The endpoint wraps the roster: `{ items: BadgeSummary[], total }`.
       const data = await transport.request<unknown>(PLANNED_ENDPOINTS.CHECKIN_BADGES, {
         signal: config?.signal,
       });
-      const parsed = z.array(badgeSummarySchema).safeParse(data);
+      const parsed = z
+        .object({ items: z.array(badgeSummarySchema), total: z.number().int().nonnegative() })
+        .safeParse(data);
       if (!parsed.success) {
         throw new ApiClientError({
           message: 'Badge listing response did not match the expected contract.',
@@ -63,7 +66,7 @@ export function createCheckinApi(transport: ApiTransport): CheckinApi {
           details: parsed.error.issues,
         });
       }
-      return parsed.data;
+      return parsed.data.items;
     },
   };
 }

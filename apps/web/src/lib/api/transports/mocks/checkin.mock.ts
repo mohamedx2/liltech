@@ -138,6 +138,6 @@ export function handleRevokeBadge(participantId: string): {
   return { participantId, revokedAt: now };
 }
 
-export function handleGetBadges(): BadgeSummary[] {
-  return [...devMockState.badges];
+export function handleGetBadges(): { items: BadgeSummary[]; total: number } {
+  return { items: [...devMockState.badges], total: devMockState.badges.length };
 }
