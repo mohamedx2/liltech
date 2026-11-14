@@ -20,7 +20,7 @@ export const PLANNED_ENDPOINTS = {
   AUTH_LOGIN: '/auth/login',
   AUTH_LOGOUT: '/auth/logout',
   AUTH_SESSION: '/auth/me',
-  REGISTRATIONS: '/registrations',
+  REGISTRATIONS: '/registration/teams',
   PARTICIPANTS_TEAM: '/participants/team',
   PARTICIPANTS_BADGE: '/participants/badge',
   MINI_CTF_STATUS: '/mini-ctf/status',

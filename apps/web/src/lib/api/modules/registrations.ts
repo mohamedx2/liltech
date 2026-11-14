@@ -17,9 +17,25 @@ export interface RegistrationsApi {
 export function createRegistrationsApi(transport: ApiTransport): RegistrationsApi {
   return {
     async registerTeam(payload, config) {
+      const body = {
+        teamName: payload.teamName,
+        leader: {
+          name: payload.leader.fullName,
+          fullName: payload.leader.fullName,
+          email: payload.leader.email,
+          password: payload.password ?? 'DefaultPassword2026!',
+        },
+        members: payload.teammates.map((m) => ({
+          name: m.fullName,
+          email: m.email,
+        })),
+        teammates: payload.teammates,
+        password: payload.password,
+      };
+
       const data = await transport.request<unknown>(PLANNED_ENDPOINTS.REGISTRATIONS, {
         method: 'POST',
-        body: payload,
+        body,
         signal: config?.signal,
       });
       const parsed = teamRegistrationResponseSchema.safeParse(data);

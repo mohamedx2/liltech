@@ -24,9 +24,10 @@ export const eventStateResponseSchema = z.object({
   phase: eventPhaseSchema,
   /** Authoritative server UTC timestamp for countdown synchronization. */
   serverTime: isoTimestampSchema,
-  nextPhase: eventPhaseSchema.nullable(),
+  phaseChangedAt: isoTimestampSchema.optional(),
+  nextPhase: eventPhaseSchema.nullable().optional(),
   /** Server UTC timestamp when `nextPhase` begins, if scheduled. */
-  nextPhaseAt: isoTimestampSchema.nullable(),
+  nextPhaseAt: isoTimestampSchema.nullable().optional(),
   /** Optional schedule window metadata from the event state service. */
   phaseLabel: z.string().optional(),
 });
@@ -52,17 +53,59 @@ export const loginRequestSchema = z.object({
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
-export const loginResponseSchema = z.object({
-  user: authUserSchema,
-  expiresAt: isoTimestampSchema.optional(),
-});
+export const loginResponseSchema = z.union([
+  z.object({
+    user: authUserSchema,
+    token: z.string().optional(),
+    expiresAt: isoTimestampSchema.optional(),
+  }),
+  z
+    .object({
+      account: z.object({
+        id: z.string(),
+        role: roleSchema,
+        name: z.string(),
+        email: z.string(),
+      }),
+      token: z.string(),
+      expiresAt: isoTimestampSchema,
+    })
+    .transform((data) => ({
+      user: {
+        id: data.account.id,
+        name: data.account.name,
+        email: data.account.email,
+        role: data.account.role,
+      },
+      token: data.token,
+      expiresAt: data.expiresAt,
+    })),
+]);
 
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
-export const sessionResponseSchema = z.object({
-  user: authUserSchema.nullable(),
-  serverTime: isoTimestampSchema,
-});
+export const sessionResponseSchema = z.union([
+  z.object({
+    user: authUserSchema.nullable(),
+    serverTime: isoTimestampSchema.optional().default(() => new Date().toISOString()),
+  }),
+  z
+    .object({
+      id: z.string(),
+      role: roleSchema,
+      name: z.string(),
+      email: z.string(),
+    })
+    .transform((data) => ({
+      user: {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      },
+      serverTime: new Date().toISOString(),
+    })),
+]);
 
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
@@ -93,14 +136,36 @@ export const teamRegistrationRequestSchema = z.object({
 
 export type TeamRegistrationRequest = z.infer<typeof teamRegistrationRequestSchema>;
 
-export const teamRegistrationResponseSchema = z.object({
-  teamId: z.string(),
-  teamName: z.string(),
-  status: teamProgressStateSchema,
-  participantCount: z.number().int().min(3).max(5),
-  createdAt: isoTimestampSchema,
-  message: z.string(),
-});
+export const teamRegistrationResponseSchema = z.union([
+  z.object({
+    teamId: z.string(),
+    teamName: z.string(),
+    status: teamProgressStateSchema,
+    participantCount: z.number().int().min(3).max(5),
+    createdAt: isoTimestampSchema,
+    message: z.string().optional().default('Team registered successfully.'),
+  }),
+  z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      progressState: teamProgressStateSchema,
+      createdAt: isoTimestampSchema,
+      leader: z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+      participants: z.array(z.any()),
+    })
+    .transform((team) => ({
+      teamId: team.id,
+      teamName: team.name,
+      status: team.progressState,
+      participantCount: team.participants.length,
+      createdAt: team.createdAt,
+      message: 'Team registered successfully.',
+    })),
+]);
 
 export type TeamRegistrationResponse = z.infer<typeof teamRegistrationResponseSchema>;
 
@@ -222,13 +287,24 @@ export const announcementPrioritySchema = z.enum(['normal', 'urgent', 'broadcast
 
 export type AnnouncementPriority = z.infer<typeof announcementPrioritySchema>;
 
-export const announcementItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  content: z.string(),
-  priority: announcementPrioritySchema,
-  createdAt: isoTimestampSchema,
-});
+export const announcementItemSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().optional(),
+    content: z.string().optional(),
+    body: z.string().optional(),
+    priority: announcementPrioritySchema.optional().default('normal'),
+    createdAt: isoTimestampSchema.optional(),
+    publishedAt: isoTimestampSchema.optional(),
+    authorName: z.string().optional(),
+  })
+  .transform((item) => ({
+    id: item.id,
+    title: item.title ?? (item.authorName ? `Update by ${item.authorName}` : 'Announcement'),
+    content: item.content ?? item.body ?? '',
+    priority: item.priority ?? 'normal',
+    createdAt: item.createdAt ?? item.publishedAt ?? new Date().toISOString(),
+  }));
 
 export type AnnouncementItem = z.infer<typeof announcementItemSchema>;
 

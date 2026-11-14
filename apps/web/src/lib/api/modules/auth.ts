@@ -1,3 +1,4 @@
+import { clearAuthToken, setAuthToken } from '../../auth/token-storage';
 import {
   loginResponseSchema,
   sessionResponseSchema,
@@ -35,30 +36,49 @@ export function createAuthApi(transport: ApiTransport): AuthApi {
           details: parsed.error.issues,
         });
       }
+      if (parsed.data.token) {
+        setAuthToken(parsed.data.token);
+      }
       return parsed.data;
     },
 
     async logout(config) {
-      await transport.request<void>(PLANNED_ENDPOINTS.AUTH_LOGOUT, {
-        method: 'POST',
-        signal: config?.signal,
-      });
+      try {
+        await transport.request<void>(PLANNED_ENDPOINTS.AUTH_LOGOUT, {
+          method: 'POST',
+          signal: config?.signal,
+        });
+      } finally {
+        clearAuthToken();
+      }
     },
 
     async getSession(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.AUTH_SESSION, {
-        signal: config?.signal,
-      });
-      const parsed = sessionResponseSchema.safeParse(data);
-      if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Session response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
+      try {
+        const data = await transport.request<unknown>(PLANNED_ENDPOINTS.AUTH_SESSION, {
+          signal: config?.signal,
         });
+        const parsed = sessionResponseSchema.safeParse(data);
+        if (!parsed.success) {
+          throw new ApiClientError({
+            message: 'Session response did not match the expected contract.',
+            status: null,
+            code: 'INVALID_RESPONSE',
+            details: parsed.error.issues,
+          });
+        }
+        return parsed.data;
+      } catch (err) {
+        // If unauthenticated or token expired, return null user cleanly
+        if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
+          clearAuthToken();
+          return {
+            user: null,
+            serverTime: new Date().toISOString(),
+          };
+        }
+        throw err;
       }
-      return parsed.data;
     },
   };
 }
