@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import {
+  EventPhase,
   Role,
   challengeTrackSchema,
   eventPhaseSchema,
+  eventStateResponseSchema as canonicalEventStateResponseSchema,
   isoTimestampSchema,
   teamProgressStateSchema,
+  teamResponseSchema as canonicalTeamResponseSchema,
 } from 'api-contracts';
 
 /**
@@ -20,17 +23,27 @@ import {
 
 export const roleSchema = z.enum([Role.Team, Role.Jury, Role.Admin]);
 
-export const eventStateResponseSchema = z.object({
-  phase: eventPhaseSchema,
-  /** Authoritative server UTC timestamp for countdown synchronization. */
-  serverTime: isoTimestampSchema,
-  phaseChangedAt: isoTimestampSchema.optional(),
-  nextPhase: eventPhaseSchema.nullable().optional(),
-  /** Server UTC timestamp when `nextPhase` begins, if scheduled. */
-  nextPhaseAt: isoTimestampSchema.nullable().optional(),
-  /** Optional schedule window metadata from the event state service. */
-  phaseLabel: z.string().optional(),
-});
+/**
+ * Web view of the canonical event-state contract (`libs/api-contracts`).
+ * The backend stays the single source of truth for the wire shape; the derived
+ * fields below exist only for rendering (phase stepper labels) and never gate
+ * business rules.
+ */
+const EVENT_PHASE_ORDER: EventPhase[] = [
+  EventPhase.Registration,
+  EventPhase.Checkin,
+  EventPhase.Live,
+  EventPhase.SubmissionsClosed,
+  EventPhase.Pitching,
+  EventPhase.Results,
+];
+
+export const eventStateResponseSchema = canonicalEventStateResponseSchema.transform((state) => ({
+  ...state,
+  nextPhase: EVENT_PHASE_ORDER[EVENT_PHASE_ORDER.indexOf(state.phase) + 1] ?? null,
+  nextPhaseAt: null,
+  phaseLabel: undefined,
+}));
 
 export type EventStateResponse = z.infer<typeof eventStateResponseSchema>;
 
@@ -87,7 +100,8 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>;
 export const sessionResponseSchema = z.union([
   z.object({
     user: authUserSchema.nullable(),
-    serverTime: isoTimestampSchema.optional().default(() => new Date().toISOString()),
+    /** Authoritative server time when the backend provides it; never fabricated client-side. */
+    serverTime: isoTimestampSchema.optional(),
   }),
   z
     .object({
@@ -96,14 +110,13 @@ export const sessionResponseSchema = z.union([
       name: z.string(),
       email: z.string(),
     })
-    .transform((data) => ({
+    .transform((data): { user: AuthUser; serverTime?: string } => ({
       user: {
         id: data.id,
         name: data.name,
         email: data.email,
         role: data.role,
       },
-      serverTime: new Date().toISOString(),
     })),
 ]);
 
@@ -118,20 +131,22 @@ export type TeamMemberInput = z.infer<typeof teamMemberInputSchema>;
 
 /**
  * Team leader registers a team of 3–5 participants (1 leader + 2–4 teammates).
- * Matches the team size rule in `README.md` and `AGENTS.md`.
+ * Mirrors the canonical `createTeamRequestSchema` constraints in
+ * `libs/api-contracts` (team name 3–60 chars, password ≥ 12 chars) so client
+ * validation matches what the server enforces.
  */
 export const teamRegistrationRequestSchema = z.object({
   teamName: z
     .string()
     .trim()
-    .min(2, 'Team name must be at least 2 characters.')
-    .max(80, 'Team name must be 80 characters or fewer.'),
+    .min(3, 'Team name must be at least 3 characters.')
+    .max(60, 'Team name must be 60 characters or fewer.'),
   leader: teamMemberInputSchema,
   teammates: z
     .array(teamMemberInputSchema)
     .min(2, 'Add at least 2 teammates (3–5 total participants including the leader).')
     .max(4, 'A team can have at most 4 teammates (5 total participants including the leader).'),
-  password: z.string().min(8, 'Password must be at least 8 characters.'),
+  password: z.string().min(12, 'Password must be at least 12 characters.'),
 });
 
 export type TeamRegistrationRequest = z.infer<typeof teamRegistrationRequestSchema>;
@@ -145,26 +160,15 @@ export const teamRegistrationResponseSchema = z.union([
     createdAt: isoTimestampSchema,
     message: z.string().optional().default('Team registered successfully.'),
   }),
-  z
-    .object({
-      id: z.string(),
-      name: z.string(),
-      progressState: teamProgressStateSchema,
-      createdAt: isoTimestampSchema,
-      leader: z.object({
-        id: z.string(),
-        name: z.string(),
-      }),
-      participants: z.array(z.any()),
-    })
-    .transform((team) => ({
-      teamId: team.id,
-      teamName: team.name,
-      status: team.progressState,
-      participantCount: team.participants.length,
-      createdAt: team.createdAt,
-      message: 'Team registered successfully.',
-    })),
+  /** The real backend returns the canonical `TeamResponse` — map it explicitly. */
+  canonicalTeamResponseSchema.transform((team) => ({
+    teamId: team.id,
+    teamName: team.name,
+    status: team.progressState,
+    participantCount: team.participants.length,
+    createdAt: team.createdAt,
+    message: 'Team registered successfully.',
+  })),
 ]);
 
 export type TeamRegistrationResponse = z.infer<typeof teamRegistrationResponseSchema>;

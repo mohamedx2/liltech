@@ -58,7 +58,7 @@ describe('TeamRegistrationForm', () => {
 
   it('enforces the 3–5 participant team size constraint in roster controls', () => {
     render(<TeamRegistrationForm />);
-    completeTeamStep('Alpha Squad', 'secret1234');
+    completeTeamStep('Alpha Squad', 'secret12345678');
     completeLeaderStep('Amira Ben Ali', 'amira@example.com');
 
     const addButton = screen.getByRole('button', { name: /add teammate/i }) as HTMLButtonElement;
@@ -90,7 +90,7 @@ describe('TeamRegistrationForm', () => {
     const registerSpy = vi.spyOn(api.registrations, 'registerTeam');
     render(<TeamRegistrationForm />);
 
-    completeTeamStep('Alpha Squad', 'secret1234');
+    completeTeamStep('Alpha Squad', 'secret12345678');
     completeLeaderStep('Amira Ben Ali', 'shared@example.com');
     fillMinimumTeammates(
       { fullName: 'Youssef Trabelsi', email: 'shared@example.com' },

@@ -57,6 +57,8 @@ export const DEV_MOCK_USERS: readonly AuthUser[] = [
 export interface DevMockState {
   currentUser: AuthUser | null;
   phase: EventPhase;
+  /** Mock stand-in for the server-owned phase entry timestamp. */
+  phaseChangedAt: string;
   registeredTeamEmails: Map<string, AuthUser>;
 
   /** Participant portal mock domain (provisional contracts, see `pending.ts`). */
@@ -386,6 +388,8 @@ function createPortalState() {
 const initialState = (): DevMockState => ({
   currentUser: null,
   phase: EventPhase.Registration,
+  // Event kickoff reference timestamp from the LilTech specification (Nov 21, 2026 19:00 UTC / 20:00 CET)
+  phaseChangedAt: '2026-11-21T19:00:00.000Z',
   registeredTeamEmails: new Map(),
   ...createPortalState(),
 });
@@ -395,6 +399,7 @@ export const devMockState: DevMockState = initialState();
 export function resetDevMockState(): void {
   devMockState.currentUser = null;
   devMockState.phase = EventPhase.Registration;
+  devMockState.phaseChangedAt = '2026-11-21T19:00:00.000Z';
   devMockState.registeredTeamEmails.clear();
   Object.assign(devMockState, createPortalState());
 }

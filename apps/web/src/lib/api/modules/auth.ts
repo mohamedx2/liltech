@@ -69,13 +69,11 @@ export function createAuthApi(transport: ApiTransport): AuthApi {
         }
         return parsed.data;
       } catch (err) {
-        // If unauthenticated or token expired, return null user cleanly
-        if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
+        // Only a 401 means "unauthenticated" (missing/expired/revoked token).
+        // Any other status (e.g. 404) is a real backend problem and must surface.
+        if (err instanceof ApiClientError && err.status === 401) {
           clearAuthToken();
-          return {
-            user: null,
-            serverTime: new Date().toISOString(),
-          };
+          return { user: null };
         }
         throw err;
       }

@@ -483,7 +483,7 @@ export function TeamRegistrationForm() {
                   <FormField
                     id="reg-team-name"
                     label="Team name"
-                    hint="2 to 80 characters. Visible on check-in lists and scoreboards."
+                    hint="3 to 60 characters. Visible on check-in lists and scoreboards."
                     required
                     error={errors.teamName}
                   >
@@ -492,7 +492,7 @@ export function TeamRegistrationForm() {
                         id={id}
                         name="teamName"
                         type="text"
-                        maxLength={80}
+                        maxLength={60}
                         required
                         invalid={invalid}
                         aria-describedby={describedBy}
@@ -510,7 +510,7 @@ export function TeamRegistrationForm() {
                   <FormField
                     id="reg-password"
                     label="Team account password"
-                    hint="At least 8 characters. Used by the team to sign in on event night."
+                    hint="At least 12 characters. Used by the team to sign in on event night."
                     required
                     error={errors.password}
                   >
@@ -522,7 +522,7 @@ export function TeamRegistrationForm() {
                             name="password"
                             type={showPassword ? 'text' : 'password'}
                             autoComplete="new-password"
-                            minLength={8}
+                            minLength={12}
                             required
                             invalid={invalid}
                             aria-describedby={describedBy}
