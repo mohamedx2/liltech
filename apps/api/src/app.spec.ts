@@ -26,6 +26,32 @@ describe('api app', () => {
     expect(response.headers['x-request-id']).toBeDefined();
   });
 
+  describe('Swagger & OpenAPI documentation endpoints', () => {
+    it('serves the OpenAPI 3.0 specification JSON at /api/docs/openapi.json', async () => {
+      const response = await request(createApp()).get('/api/docs/openapi.json');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/json/);
+      expect(response.body.openapi).toBe('3.0.3');
+      expect(response.body.info.title).toBe('LilTech 2026 Platform API');
+      expect(response.body.paths['/health']).toBeDefined();
+      expect(response.body.paths['/auth/login']).toBeDefined();
+      expect(response.body.paths['/event-state']).toBeDefined();
+      expect(response.body.paths['/registration/teams']).toBeDefined();
+      expect(response.body.paths['/checkin/scan']).toBeDefined();
+      expect(response.body.paths['/announcements']).toBeDefined();
+      expect(response.body.paths['/admin/audit-log']).toBeDefined();
+    });
+
+    it('serves Swagger UI HTML documentation at /api/docs/', async () => {
+      const response = await request(createApp()).get('/api/docs/');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/html/);
+      expect(response.text).toContain('swagger-ui');
+    });
+  });
+
   // When a test database is configured (TEST_DATABASE_URL) the health check
   // reaches it, so the degraded path only holds in the database-free default run.
   const dbReachable = Boolean(process.env.TEST_DATABASE_URL);

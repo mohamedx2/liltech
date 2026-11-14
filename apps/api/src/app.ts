@@ -17,7 +17,11 @@ export function createApp(): Express {
 
   app.disable('x-powered-by');
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
   app.use(
     cors({
       origin: corsOrigins(),

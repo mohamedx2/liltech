@@ -67,3 +67,5 @@ tmp/
 out
 vitest.config.*.timestamp*
 .vitest
+__pycache__/
+*.py[cod]
