@@ -48,6 +48,19 @@ services:
         condition: service_healthy
     command: ['prisma', 'migrate', 'deploy']
 
+  # One-shot service: provisions the administrator account from the
+  # SEED_ADMIN_* variables in .env (idempotent; no-op when unset).
+  seed:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: 'no'
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-liltech}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-liltech}?schema=public
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ['node', 'dist/seed-build/prisma/seed.js']
+
   api:
     image: ${API_IMAGE:?API_IMAGE is required}
     container_name: liltech-api-prod
@@ -60,7 +73,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
 
   web:

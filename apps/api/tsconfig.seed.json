@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "importHelpers": false,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "outDir": "dist/seed-build",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/seed-build/tsconfig.seed.tsbuildinfo"
+  },
+  "include": ["prisma/seed.ts", "src/seed/seed-admin.ts"]
+}
