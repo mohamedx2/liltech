@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { healthRouter } from './health.routes';
+import { docsRouter } from '../modules/docs/docs.routes';
 import { authRouter } from '../modules/auth/auth.routes';
 import { eventStateRouter } from '../modules/event-state/event-state.routes';
 import { registrationRouter } from '../modules/registration/registration.routes';
@@ -15,6 +16,7 @@ import { adminRouter } from '../modules/admin/admin.routes';
 export const apiRouter: Router = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use(docsRouter);
 apiRouter.use(authRouter);
 apiRouter.use(eventStateRouter);
 apiRouter.use(registrationRouter);

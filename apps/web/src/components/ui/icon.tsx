@@ -23,7 +23,9 @@ export type IconName =
   | 'refresh'
   | 'trash'
   | 'search'
-  | 'award';
+  | 'award'
+  | 'video'
+  | 'video-off';
 
 /** Static, hand-checked path data (`d` attributes only). */
 const PATHS: Record<IconName, readonly string[]> = {
@@ -82,6 +84,17 @@ const PATHS: Record<IconName, readonly string[]> = {
   award: [
     'm15.477 12.89 1.515 8.526a.5.5 0 0 1-.722.522L12 19.805l-4.27 2.133a.5.5 0 0 1-.722-.522l1.515-8.526',
     'M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14z',
+  ],
+  video: [
+    'm22 8-6 4 6 4V8Z',
+    'M2 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z',
+  ],
+  'video-off': [
+    'm22 8-6 4 6 4V8Z',
+    'M2 2l20 20',
+    'M16 16v2a2 2 0 0 1-2 2H6',
+    'M2 6a2 2 0 0 1 2-2h2',
+    'm10 4 6 0a2 2 0 0 1 2 2v8',
   ],
 };
 

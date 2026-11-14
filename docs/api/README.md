@@ -25,6 +25,16 @@ Current codes: `CONFLICT`, `CTF_NOT_SOLVED`, `FORBIDDEN`, `INTERNAL`, `NOT_FOUND
 
 ## Implemented Endpoints
 
+### Documentation & Spec
+
+#### `GET /api/docs`
+
+Interactive Swagger UI documentation. Renders complete OpenAPI 3.0 specs with executable API test console, authorization token persistence, and schema inspectors.
+
+#### `GET /api/docs/openapi.json`
+
+Machine-readable OpenAPI 3.0.3 specification in JSON format.
+
 ### Health
 
 #### `GET /api/health`

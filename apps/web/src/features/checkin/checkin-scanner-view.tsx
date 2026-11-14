@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BadgeSummary, CheckInResponse } from 'api-contracts';
+import jsQR from 'jsqr';
 import { api, ApiClientError } from '@/lib/api';
 import { Alert } from '@/components/feedback/alert';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
@@ -23,12 +24,60 @@ interface RecentScan {
 
 type FilterTab = 'all' | 'checked_in' | 'pending' | 'revoked';
 
+/** Extracts raw token if QR string is an URL (e.g. ?token=XYZ or /badge/XYZ) */
+export function extractTokenFromQr(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const url = new URL(trimmed);
+      const tokenParam = url.searchParams.get('token') || url.searchParams.get('t');
+      if (tokenParam) return tokenParam.trim();
+      const segments = url.pathname.split('/').filter(Boolean);
+      const last = segments[segments.length - 1];
+      if (last && last.length >= 10) return last.trim();
+    } catch {
+      // Fallback to raw text
+    }
+  }
+  return trimmed;
+}
+
+function playBeep() {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.08);
+  } catch {
+    // AudioContext blocked or not supported
+  }
+}
+
 export function CheckInScannerView() {
   const [tokenInput, setTokenInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<CheckInResponse | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+
+  // Camera scanner state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const lastScannedRef = useRef<{ token: string; time: number }>({ token: '', time: 0 });
 
   const [badges, setBadges] = useState<BadgeSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,62 +113,191 @@ export function CheckInScannerView() {
   }, [loadBadges]);
 
   useEffect(() => {
-    // Keep focus in scanner input for barcode scanner guns
-    inputRef.current?.focus();
-  }, [lastScanResult, scanError]);
+    if (!isCameraActive) {
+      inputRef.current?.focus();
+    }
+  }, [lastScanResult, scanError, isCameraActive]);
+
+  const processScanToken = useCallback(
+    async (rawToken: string) => {
+      const token = extractTokenFromQr(rawToken);
+      if (!token || isScanning) return;
+
+      setIsScanning(true);
+      setScanError(null);
+      setLastScanResult(null);
+
+      try {
+        const result = await api.checkin.scanBadge(token);
+        setLastScanResult(result);
+
+        // Add to recent scans
+        setRecentScans((prev) => [
+          {
+            id: `scan-${Date.now()}`,
+            status: 'success',
+            participantName: result.participant.name,
+            teamName: result.team.name,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+          ...prev.slice(0, 4),
+        ]);
+
+        // Refresh badge roster
+        await loadBadges();
+        setTokenInput('');
+      } catch (err) {
+        const message =
+          err instanceof ApiClientError
+            ? err.message
+            : 'Invalid or unrecognized badge token. Check credentials.';
+
+        setScanError(message);
+
+        setRecentScans((prev) => [
+          {
+            id: `scan-${Date.now()}`,
+            status: 'error',
+            participantName: 'Unverified Token',
+            teamName: 'Check-In Rejected',
+            timestamp: new Date().toLocaleTimeString(),
+            errorMessage: message,
+          },
+          ...prev.slice(0, 4),
+        ]);
+      } finally {
+        setIsScanning(false);
+        if (!isCameraActive) {
+          inputRef.current?.focus();
+        }
+      }
+    },
+    [isScanning, loadBadges, isCameraActive],
+  );
 
   const handleScanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = tokenInput.trim();
-    if (!token || isScanning) return;
+    await processScanToken(tokenInput);
+  };
 
-    setIsScanning(true);
-    setScanError(null);
-    setLastScanResult(null);
+  // Camera activation and scanning frame loop
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  }, []);
 
+  const startCamera = async () => {
+    setCameraError(null);
     try {
-      const result = await api.checkin.scanBadge(token);
-      setLastScanResult(result);
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access is not supported by your browser.');
+      }
 
-      // Add to recent scans
-      setRecentScans((prev) => [
-        {
-          id: `scan-${Date.now()}`,
-          status: 'success',
-          participantName: result.participant.name,
-          teamName: result.team.name,
-          timestamp: new Date().toLocaleTimeString(),
-        },
-        ...prev.slice(0, 4),
-      ]);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+      });
 
-      // Refresh badge roster
-      loadBadges();
-      setTokenInput('');
-    } catch (err) {
-      const message =
-        err instanceof ApiClientError
-          ? err.message
-          : 'Invalid or unrecognized badge token. Check credentials.';
+      streamRef.current = stream;
+      setIsCameraActive(true);
 
-      setScanError(message);
-
-      setRecentScans((prev) => [
-        {
-          id: `scan-${Date.now()}`,
-          status: 'error',
-          participantName: 'Unverified Token',
-          teamName: 'Check-In Rejected',
-          timestamp: new Date().toLocaleTimeString(),
-          errorMessage: message,
-        },
-        ...prev.slice(0, 4),
-      ]);
-    } finally {
-      setIsScanning(false);
-      inputRef.current?.focus();
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        try {
+          const promise = videoRef.current.play();
+          if (promise && typeof promise.catch === 'function') {
+            promise.catch(() => undefined);
+          }
+        } catch {
+          // Ignore play errors
+        }
+      }
+    } catch (err: unknown) {
+      const errName = err instanceof Error ? err.name : '';
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        setCameraError('Camera access was denied. Please grant permission in browser settings.');
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        setCameraError('No camera device detected on this device.');
+      } else {
+        setCameraError('Could not start camera scanner. Use manual token entry.');
+      }
+      setIsCameraActive(false);
     }
   };
+
+  // Attach stream when video element mounts
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      try {
+        const promise = videoRef.current.play();
+        if (promise && typeof promise.catch === 'function') {
+          promise.catch(() => undefined);
+        }
+      } catch {
+        // Ignore play errors
+      }
+    }
+  }, [isCameraActive]);
+
+  // Frame processing loop using jsQR
+  useEffect(() => {
+    if (!isCameraActive) return;
+
+    let animId: number;
+
+    const tick = () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth',
+          });
+
+          if (code && code.data) {
+            const raw = code.data.trim();
+            const now = Date.now();
+            // 2.5s cooldown per token to avoid duplicate scans
+            if (raw !== lastScannedRef.current.token || now - lastScannedRef.current.time > 2500) {
+              lastScannedRef.current = { token: raw, time: now };
+              playBeep();
+              processScanToken(raw);
+            }
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [isCameraActive, processScanToken]);
+
+  // Cleanup camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
 
   const executeRevoke = async (participantId: string) => {
     setRevokingId(participantId);
@@ -138,7 +316,6 @@ export function CheckInScannerView() {
   };
 
   const handleRevoke = async (participantId: string, participantName: string) => {
-    // Check if running in a test suite where window.confirm has been mocked/spied
     const isConfirmMocked =
       typeof window !== 'undefined' &&
       typeof window.confirm === 'function' &&
@@ -277,6 +454,9 @@ export function CheckInScannerView() {
 
   return (
     <div className={styles.container}>
+      {/* Hidden Canvas for QR video frame decoding */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Hero Header */}
       <section className={styles.hero} aria-labelledby="checkin-heading">
         <div className={styles.heroTop}>
@@ -289,8 +469,8 @@ export function CheckInScannerView() {
           QR Badge Check-In Scanner
         </h1>
         <p className={styles.description}>
-          Scan participant QR tokens using a handheld 2D barcode scanner or manual entry. Tokens are
-          high-entropy credentials verified against stored server hashes.
+          Scan participant QR tokens using live device camera, a handheld 2D barcode scanner, or
+          manual entry. Tokens are high-entropy credentials verified against stored server hashes.
         </p>
       </section>
 
@@ -300,13 +480,80 @@ export function CheckInScannerView() {
         data-state={scannerCardState}
         aria-labelledby="scanner-station-heading"
       >
-        <h2 id="scanner-station-heading" className={styles.scannerTitle}>
-          <span className={styles.scannerTitleIcon} aria-hidden="true">
-            <Icon name="camera" />
-          </span>
-          <span>Scan Participant QR Badge</span>
-        </h2>
+        <div className={styles.scannerHeader}>
+          <h2 id="scanner-station-heading" className={styles.scannerTitle}>
+            <span className={styles.scannerTitleIcon} aria-hidden="true">
+              <Icon name="camera" />
+            </span>
+            <span>Scan Participant QR Badge</span>
+          </h2>
 
+          {/* Scanner Mode Selector */}
+          <div className={styles.modeToggleGroup} role="group" aria-label="Scanner input mode">
+            <button
+              type="button"
+              className={styles.modeToggleBtn}
+              data-active={!isCameraActive}
+              onClick={() => {
+                if (isCameraActive) stopCamera();
+              }}
+            >
+              <Icon name="zap" />
+              <span>Barcode Gun / Manual</span>
+            </button>
+            <button
+              type="button"
+              className={styles.modeToggleBtn}
+              data-active={isCameraActive}
+              onClick={() => {
+                if (!isCameraActive) {
+                  startCamera();
+                } else {
+                  stopCamera();
+                }
+              }}
+            >
+              <Icon name={isCameraActive ? 'video-off' : 'video'} />
+              <span>{isCameraActive ? 'Stop Camera' : 'Live Camera Scanner'}</span>
+            </button>
+          </div>
+        </div>
+
+        {cameraError ? (
+          <Alert tone="warning" title="Camera Unavailable">
+            {cameraError}
+          </Alert>
+        ) : null}
+
+        {/* Live Video Camera Viewfinder */}
+        {isCameraActive ? (
+          <div className={styles.cameraSection}>
+            <div className={styles.cameraViewport}>
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                className={styles.cameraVideo}
+                aria-label="Live QR code camera feed"
+              />
+              <div className={styles.cameraOverlay}>
+                <div className={styles.reticleBox}>
+                  <div className={styles.scanLine} />
+                </div>
+                <span className={styles.cameraHint}>Align QR code inside frame</span>
+              </div>
+            </div>
+
+            <div className={styles.cameraControls}>
+              <Button type="button" variant="outline" size="sm" onClick={stopCamera}>
+                Close Camera
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Manual / Barcode Gun Form */}
         <form onSubmit={handleScanSubmit} className={styles.scannerForm}>
           <div className={styles.scannerInputWrapper}>
             <span className={styles.scannerIcon} aria-hidden="true">
@@ -317,7 +564,7 @@ export function CheckInScannerView() {
               type="text"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="Scan or paste 43-character QR token…"
+              placeholder="Scan with camera, barcode gun, or paste 43-char token…"
               className={styles.scannerInput}
               autoComplete="off"
               spellCheck={false}

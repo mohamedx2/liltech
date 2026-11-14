@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { EventPhase, Role, type BadgeSummary, type CheckInResponse } from 'api-contracts';
 import { AdminDashboardView } from '@/features/admin/admin-dashboard-view';
-import { CheckInScannerView } from '@/features/checkin/checkin-scanner-view';
+import { CheckInScannerView, extractTokenFromQr } from '@/features/checkin/checkin-scanner-view';
 import { RoleGuard } from '@/components/auth/role-guard';
 import { AuthProvider } from '@/lib/auth/session';
 import { api, ApiClientError } from '@/lib/api';
@@ -168,6 +168,121 @@ describe('Admin & Check-In Portal Features', () => {
       fireEvent.change(searchInput, { target: { value: 'Quantum' } });
 
       expect(screen.getByText('Quantum Coders')).toBeTruthy();
+    });
+
+    describe('extractTokenFromQr helper', () => {
+      it('extracts token from URL query params ?token= and ?t=', () => {
+        expect(extractTokenFromQr('https://liltech.tn/checkin?token=TOKEN-123-PARAM')).toBe(
+          'TOKEN-123-PARAM',
+        );
+        expect(extractTokenFromQr('https://liltech.tn/checkin?t=SHORT-TOKEN-456')).toBe(
+          'SHORT-TOKEN-456',
+        );
+      });
+
+      it('extracts token from URL path segment', () => {
+        expect(extractTokenFromQr('https://liltech.tn/badges/BADGE-TOKEN-PATH-789')).toBe(
+          'BADGE-TOKEN-PATH-789',
+        );
+      });
+
+      it('returns plain string when not a formatted URL', () => {
+        expect(extractTokenFromQr('PLAIN-RAW-BADGE-TOKEN-VAL')).toBe('PLAIN-RAW-BADGE-TOKEN-VAL');
+      });
+    });
+
+    describe('Live Camera Scanner', () => {
+      let mockMediaDevices: {
+        getUserMedia: ReturnType<typeof vi.fn>;
+      };
+      let mockTrack: { stop: ReturnType<typeof vi.fn> };
+      let mockStream: { getTracks: () => (typeof mockTrack)[] };
+
+      beforeEach(() => {
+        mockTrack = { stop: vi.fn() };
+        mockStream = { getTracks: () => [mockTrack] };
+        mockMediaDevices = {
+          getUserMedia: vi.fn().mockResolvedValue(mockStream),
+        };
+        Object.defineProperty(navigator, 'mediaDevices', {
+          value: mockMediaDevices,
+          configurable: true,
+          writable: true,
+        });
+      });
+
+      it('activates camera when switched to camera mode and allows stopping it', async () => {
+        vi.spyOn(api.checkin, 'getBadges').mockResolvedValue(MOCK_BADGES);
+
+        render(<CheckInScannerView />);
+
+        await waitFor(() => {
+          expect(screen.getByText('QR Badge Check-In Scanner')).toBeTruthy();
+        });
+
+        // Switch to camera scanner mode
+        const cameraModeBtn = screen.getByRole('button', { name: /live camera scanner/i });
+        fireEvent.click(cameraModeBtn);
+
+        await waitFor(() => {
+          expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith({
+            video: { facingMode: { ideal: 'environment' } },
+          });
+          expect(screen.getByText(/Align QR code inside frame/i)).toBeTruthy();
+          expect(screen.getByRole('button', { name: /stop camera/i })).toBeTruthy();
+          expect(screen.getByRole('button', { name: /close camera/i })).toBeTruthy();
+        });
+
+        // Stop camera
+        const stopBtn = screen.getByRole('button', { name: /stop camera/i });
+        fireEvent.click(stopBtn);
+
+        expect(mockTrack.stop).toHaveBeenCalled();
+      });
+
+      it('surfaces accessible error alert when camera permission is denied', async () => {
+        vi.spyOn(api.checkin, 'getBadges').mockResolvedValue(MOCK_BADGES);
+        const deniedErr = new Error('Permission denied');
+        deniedErr.name = 'NotAllowedError';
+        mockMediaDevices.getUserMedia.mockRejectedValue(deniedErr);
+
+        render(<CheckInScannerView />);
+
+        await waitFor(() => {
+          expect(screen.getByText('QR Badge Check-In Scanner')).toBeTruthy();
+        });
+
+        const cameraModeBtn = screen.getByRole('button', { name: /live camera scanner/i });
+        fireEvent.click(cameraModeBtn);
+
+        await waitFor(() => {
+          expect(
+            screen.getByText(
+              /Camera access was denied. Please grant permission in browser settings/i,
+            ),
+          ).toBeTruthy();
+        });
+      });
+
+      it('surfaces error alert when no camera device is found', async () => {
+        vi.spyOn(api.checkin, 'getBadges').mockResolvedValue(MOCK_BADGES);
+        const notFoundErr = new Error('No devices');
+        notFoundErr.name = 'NotFoundError';
+        mockMediaDevices.getUserMedia.mockRejectedValue(notFoundErr);
+
+        render(<CheckInScannerView />);
+
+        await waitFor(() => {
+          expect(screen.getByText('QR Badge Check-In Scanner')).toBeTruthy();
+        });
+
+        const cameraModeBtn = screen.getByRole('button', { name: /live camera scanner/i });
+        fireEvent.click(cameraModeBtn);
+
+        await waitFor(() => {
+          expect(screen.getByText(/No camera device detected on this device/i)).toBeTruthy();
+        });
+      });
     });
   });
 
