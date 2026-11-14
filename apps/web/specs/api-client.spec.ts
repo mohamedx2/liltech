@@ -82,6 +82,62 @@ describe('API Client, RealTransport, and MockTransport', () => {
     });
   });
 
+  it('accepts the real backend registration response and keeps the one-time badge tokens', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = createApiClient(
+      createRealTransport({ baseUrl: 'http://localhost:4000/api', fetchImpl: fetchMock }),
+    );
+    const participants = [
+      { id: '11111111-1111-4111-8111-111111111111', name: 'Leader Real', isLeader: true },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Mate One', isLeader: false },
+      { id: '33333333-3333-4333-8333-333333333333', name: 'Mate Three', isLeader: false },
+      { id: '44444444-4444-4444-8444-444444444444', name: 'Mate Two', isLeader: false },
+    ];
+    const badges = participants.map((participant, index) => ({
+      participantId: participant.id,
+      participantName: participant.name,
+      token: String(index).repeat(43),
+      issuedAt: '2026-11-14T20:00:00.000Z',
+    }));
+
+    // Exact shape of `POST /api/registration/teams` (201) from apps/api.
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: '55555555-5555-4555-8555-555555555555',
+          name: 'Real Pioneers',
+          progressState: 'registered',
+          createdAt: '2026-11-14T20:00:00.000Z',
+          leader: { id: '66666666-6666-4666-8666-666666666666', name: 'Leader Real' },
+          participants,
+          badges,
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const registered = await client.registrations.registerTeam({
+      teamName: 'Real Pioneers',
+      password: 'password123456',
+      leader: { fullName: 'Leader Real', email: 'leader.real@example.com' },
+      teammates: [
+        { fullName: 'Mate One', email: 'mate1@example.com' },
+        { fullName: 'Mate Two', email: 'mate2@example.com' },
+        { fullName: 'Mate Three', email: 'mate3@example.com' },
+      ],
+    });
+
+    expect(registered.teamName).toBe('Real Pioneers');
+    expect(registered.participantCount).toBe(4);
+    expect(registered.badges).toEqual(
+      badges.map(({ participantId, participantName, token }) => ({
+        participantId,
+        participantName,
+        token,
+      })),
+    );
+  });
+
   it('supports health, event state, registration, and auth session flows in MockTransport', async () => {
     const client = createApiClient(createMockTransport({ latencyMs: 0 }));
 

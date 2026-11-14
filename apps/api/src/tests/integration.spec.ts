@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Express } from 'express';
+import { teamRegistrationResponseSchema } from 'api-contracts';
 import { createApp } from '../app';
 import { hashPassword } from '../modules/auth/password.service';
 import { createSessionForUser, login, createUser } from '../modules/auth/auth.service';
@@ -320,6 +321,29 @@ describeDb('api foundation modules', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.badges).toHaveLength(7);
+      // The web client parses this body with the shared contract, so it must match exactly.
+      expect(teamRegistrationResponseSchema.safeParse(response.body).success).toBe(true);
+    });
+
+    it('rejects duplicate participant emails within a team', async () => {
+      const response = await request(app)
+        .post('/api/registration/teams')
+        .send({
+          teamName: 'Echo Chamber',
+          leader: {
+            name: 'Echo Leader',
+            email: 'echo-leader@test.local',
+            password: LEADER_PASSWORD,
+          },
+          members: [
+            { name: 'Echo One', email: 'ECHO-LEADER@test.local' },
+            { name: 'Echo Two' },
+            { name: 'Echo Three' },
+          ],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('enforces the 4–7 member size at the service layer', async () => {

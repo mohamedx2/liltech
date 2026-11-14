@@ -227,6 +227,35 @@
   color: var(--ok);
 }
 
+.badgeNotice {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--red);
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.badgeNotice p {
+  margin: 6px 0 0;
+}
+
+.doneList li.badgeRow {
+  align-items: center;
+}
+
+.badgeToken {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 720px) {

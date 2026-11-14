@@ -69,6 +69,18 @@ export function TeamRegistrationForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdTeam, setCreatedTeam] = useState<TeamRegistrationResponse | null>(null);
+  const [copiedBadgeId, setCopiedBadgeId] = useState<string | null>(null);
+
+  async function copyBadgeToken(participantId: string, token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopiedBadgeId(participantId);
+    } catch {
+      // Clipboard can be unavailable (permissions, insecure context); the code
+      // stays visible and selectable, so the leader can copy it by hand.
+      setCopiedBadgeId(null);
+    }
+  }
 
   function focusErrorSummary() {
     window.setTimeout(() => summaryRef.current?.focus(), 0);
@@ -174,27 +186,57 @@ export function TeamRegistrationForm() {
   }
 
   if (createdTeam) {
+    const hasBadges = createdTeam.badges.length > 0;
     return (
       <div className={styles.shell}>
         <div className={styles.page}>
           <section className={styles.card} aria-live="polite">
             <h1 className={styles.doneTitle}>Team &quot;{createdTeam.teamName}&quot; registered</h1>
-            <p className={styles.lede}>
-              {createdTeam.participantCount} participants recorded. Each person receives their QR
-              badge by email.
-            </p>
-            <ul className={styles.doneList}>
-              <li>
-                <b>{leaderName} (leader)</b>
-                <span>{leaderEmail}</span>
-              </li>
-              {teammates.map((member) => (
-                <li key={member.rowKey}>
-                  <b>{member.fullName}</b>
-                  <span>{member.email}</span>
-                </li>
-              ))}
-            </ul>
+            <p className={styles.lede}>{createdTeam.participantCount} participants recorded.</p>
+
+            {hasBadges ? (
+              <>
+                <div className={styles.badgeNotice} role="note">
+                  <strong>Save these badge codes now. They are shown only once.</strong>
+                  <p>
+                    Badges are not sent by email yet. Send each person their own code: staff scan or
+                    type it at the entrance for check-in. Treat each code like a password.
+                  </p>
+                </div>
+                <ul className={styles.doneList} aria-label="Participant badge codes">
+                  {createdTeam.badges.map((badge) => (
+                    <li key={badge.participantId} className={styles.badgeRow}>
+                      <b>{badge.participantName}</b>
+                      <code className={styles.badgeToken}>{badge.token}</code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Copy badge code for ${badge.participantName}`}
+                        onClick={() => void copyBadgeToken(badge.participantId, badge.token)}
+                      >
+                        {copiedBadgeId === badge.participantId ? 'Copied' : 'Copy'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <>
+                <p className={styles.lede}>{createdTeam.message}</p>
+                <ul className={styles.doneList}>
+                  <li>
+                    <b>{leaderName} (leader)</b>
+                    <span>{leaderEmail}</span>
+                  </li>
+                  {teammates.map((member) => (
+                    <li key={member.rowKey}>
+                      <b>{member.fullName}</b>
+                      <span>{member.email}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <Link href="/login" className={buttonClassName({ variant: 'primary', size: 'md' })}>
               Go to sign in
             </Link>

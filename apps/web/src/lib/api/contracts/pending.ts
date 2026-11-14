@@ -9,7 +9,7 @@ import {
   TEAM_MEMBERS_TOTAL_MAX,
   TEAM_MEMBERS_TOTAL_MIN,
   teamProgressStateSchema,
-  teamResponseSchema as canonicalTeamResponseSchema,
+  teamRegistrationResponseSchema as canonicalTeamRegistrationResponseSchema,
 } from 'api-contracts';
 
 /**
@@ -159,7 +159,17 @@ export const teamRegistrationRequestSchema = z.object({
 
 export type TeamRegistrationRequest = z.infer<typeof teamRegistrationRequestSchema>;
 
+/** One participant's QR badge, as issued at registration (raw token shown once). */
+export const registeredBadgeSchema = z.object({
+  participantId: z.string(),
+  participantName: z.string(),
+  token: z.string(),
+});
+
+export type RegisteredBadge = z.infer<typeof registeredBadgeSchema>;
+
 export const teamRegistrationResponseSchema = z.union([
+  /** Development mock shape. */
   z.object({
     teamId: z.string(),
     teamName: z.string(),
@@ -167,15 +177,24 @@ export const teamRegistrationResponseSchema = z.union([
     participantCount: z.number().int().min(TEAM_MEMBERS_TOTAL_MIN).max(TEAM_MEMBERS_TOTAL_MAX),
     createdAt: isoTimestampSchema,
     message: z.string().optional().default('Team registered successfully.'),
+    badges: z.array(registeredBadgeSchema).optional().default([]),
   }),
-  /** The real backend returns the canonical `TeamResponse` — map it explicitly. */
-  canonicalTeamResponseSchema.transform((team) => ({
+  /**
+   * The real backend returns the canonical team plus one QR badge per
+   * participant (`libs/api-contracts`) — map it explicitly.
+   */
+  canonicalTeamRegistrationResponseSchema.transform((team) => ({
     teamId: team.id,
     teamName: team.name,
     status: team.progressState,
     participantCount: team.participants.length,
     createdAt: team.createdAt,
     message: 'Team registered successfully.',
+    badges: team.badges.map(({ participantId, participantName, token }) => ({
+      participantId,
+      participantName,
+      token,
+    })),
   })),
 ]);
 

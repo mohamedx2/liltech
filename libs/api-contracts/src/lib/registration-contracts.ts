@@ -27,18 +27,36 @@ export const teamMemberInputSchema = z.strictObject({
   email: z.email().optional(),
 });
 
-export const createTeamRequestSchema = z.strictObject({
-  teamName: z.string().trim().min(TEAM_NAME_MIN).max(TEAM_NAME_MAX),
-  leader: z.strictObject({
-    name: participantNameSchema,
-    email: z.email(),
-    password: z.string().min(PASSWORD_MIN).max(256),
-  }),
-  members: z
-    .array(teamMemberInputSchema)
-    .min(TEAM_MEMBERS_TOTAL_MIN - 1)
-    .max(TEAM_MEMBERS_TOTAL_MAX - 1),
-});
+export const createTeamRequestSchema = z
+  .strictObject({
+    teamName: z.string().trim().min(TEAM_NAME_MIN).max(TEAM_NAME_MAX),
+    leader: z.strictObject({
+      name: participantNameSchema,
+      email: z.email(),
+      password: z.string().min(PASSWORD_MIN).max(256),
+    }),
+    members: z
+      .array(teamMemberInputSchema)
+      .min(TEAM_MEMBERS_TOTAL_MIN - 1)
+      .max(TEAM_MEMBERS_TOTAL_MAX - 1),
+  })
+  .superRefine((request, context) => {
+    // Every participant email that is provided must be unique within the team
+    // (case-insensitive). Member emails are optional; absent ones never collide.
+    const seen = new Set([request.leader.email.toLowerCase()]);
+    request.members.forEach((member, index) => {
+      if (!member.email) return;
+      const email = member.email.toLowerCase();
+      if (seen.has(email)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['members', index, 'email'],
+          message: 'Each team participant must use a unique email address.',
+        });
+      }
+      seen.add(email);
+    });
+  });
 
 export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
 

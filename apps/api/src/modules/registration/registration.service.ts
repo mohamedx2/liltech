@@ -5,6 +5,7 @@ import {
   TEAM_MEMBERS_TOTAL_MAX,
   TEAM_MEMBERS_TOTAL_MIN,
   type CreateTeamRequest,
+  type TeamRegistrationResponse,
   type TeamResponse,
 } from 'api-contracts';
 import { issueBadgeForParticipantInTx } from '../checkin/checkin.service';
@@ -19,18 +20,12 @@ import { hashPassword } from '../auth/password.service';
  * assignment, QR badge email delivery, registration phase gating.
  */
 
-export interface TeamRegistrationResult extends TeamResponse {
-  /**
-   * QR badges issued for each participant, presented once. Delivery by email
-   * is pending (open question 8); until then issuance results are returned to
-   * the creator so staff can distribute them manually.
-   */
-  badges: Array<{
-    participantId: string;
-    participantName: string;
-    token: string;
-  }>;
-}
+/**
+ * QR badges issued for each participant are presented once in the response.
+ * Delivery by email is pending (open question 8); until then issuance results
+ * are returned to the creator so the team can distribute them.
+ */
+export type TeamRegistrationResult = TeamRegistrationResponse;
 
 const LEADER_ACCOUNT_ROLE = 'team' as const;
 

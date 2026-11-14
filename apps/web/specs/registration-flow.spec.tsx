@@ -142,12 +142,51 @@ describe('TeamRegistrationForm', () => {
       participantCount: 4,
       createdAt: '2026-11-10T20:00:00.000Z',
       message: 'QR badges queued.',
+      badges: [],
     });
 
     await waitFor(() => {
       expect(screen.getByText('Team "EPI Builders" registered')).toBeTruthy();
       expect(screen.getByText(/4 participants recorded/i)).toBeTruthy();
     });
+  });
+
+  it('shows every one-time badge code after registration and lets the leader copy them', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const badges = [
+      { participantId: 'p-1', participantName: 'Nour Haddad', token: 'a'.repeat(43) },
+      { participantId: 'p-2', participantName: 'Karim Mansour', token: 'b'.repeat(43) },
+      { participantId: 'p-3', participantName: 'Ines Khelifi', token: 'c'.repeat(43) },
+      { participantId: 'p-4', participantName: 'Omar Zouari', token: 'd'.repeat(43) },
+    ];
+    vi.spyOn(api.registrations, 'registerTeam').mockResolvedValue({
+      teamId: 'team-100',
+      teamName: 'Badge Builders',
+      status: TeamProgressState.Registered,
+      participantCount: 4,
+      createdAt: '2026-11-10T20:00:00.000Z',
+      message: 'Team registered successfully.',
+      badges,
+    });
+
+    render(<TeamRegistrationForm />);
+    fillForm('Badge Builders', { fullName: 'Nour Haddad', email: 'nour@example.com' });
+    submit();
+
+    await waitFor(() => {
+      expect(screen.getByText(/shown only once/i)).toBeTruthy();
+    });
+    for (const badge of badges) {
+      expect(screen.getByText(badge.token)).toBeTruthy();
+    }
+    expect(screen.queryByText(/by email\./i)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('b'.repeat(43)));
+    expect(
+      screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }).textContent,
+    ).toBe('Copied');
   });
 
   it('surfaces backend errors clearly when registration fails', async () => {
