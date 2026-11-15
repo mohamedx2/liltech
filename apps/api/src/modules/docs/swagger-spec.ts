@@ -372,6 +372,7 @@ export const swaggerSpec = {
     { name: 'Check-In', description: 'Entrance gate QR badge verification and badge revocation' },
     { name: 'Announcements', description: 'Live announcements stream and admin broadcaster' },
     { name: 'Admin', description: 'Audit log, team roster, jury accounts and badge emails' },
+    { name: 'Challenges', description: 'Two sequential challenges with Mini-CTF early access' },
     { name: 'Team Portal', description: 'The signed-in team members, QR badges and badge emails' },
   ],
   paths: {
@@ -1126,6 +1127,166 @@ export const swaggerSpec = {
           429: errorResponse(
             'Sent less than an hour ago; details.emailResendAvailableAt says when',
           ),
+        },
+      },
+    },
+    '/challenges': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'Both challenges with the caller team access state (Team only)',
+        description:
+          'Before the event: { available: false, reason: "EVENT_NOT_STARTED" }. Each item: { challenge, access: locked|early|public, ctfSolved, content|null }.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Challenge list or unavailable state'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/challenges/current': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'The running (or last ended) challenge for the caller team (Team only)',
+        description:
+          'Content is returned before publicAt only to teams that solved this challenge Mini-CTF. Unavailable reasons: EVENT_NOT_STARTED, NO_CHALLENGE_STARTED.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Current challenge or unavailable state'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/admin/challenges': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'List challenges with content, status and Mini-CTF solves (Admin only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Challenges'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+      post: {
+        tags: ['Challenges'],
+        summary: 'Create a challenge (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['position', 'title', 'description'],
+                additionalProperties: false,
+                properties: {
+                  position: { type: 'integer', minimum: 1, example: 1 },
+                  title: { type: 'string', maxLength: 150 },
+                  summary: { type: 'string', maxLength: 500 },
+                  description: { type: 'string' },
+                  problemStatement: { type: 'string' },
+                  deliverables: { type: 'array', items: { type: 'string' } },
+                  resources: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        url: { type: 'string', format: 'uri' },
+                      },
+                    },
+                  },
+                  publicDelayMinutes: { type: 'integer', minimum: 0, example: 60 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: json({ type: 'object' }, 'Created challenge'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          409: errorResponse('Position already taken'),
+        },
+      },
+    },
+    '/admin/challenges/{id}': {
+      patch: {
+        tags: ['Challenges'],
+        summary: 'Update challenge content or public delay (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                minProperties: 1,
+                additionalProperties: false,
+                properties: {
+                  title: { type: 'string', maxLength: 150 },
+                  summary: { type: 'string', maxLength: 500 },
+                  description: { type: 'string' },
+                  problemStatement: { type: 'string' },
+                  deliverables: { type: 'array', items: { type: 'string' } },
+                  resources: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        url: { type: 'string', format: 'uri' },
+                      },
+                    },
+                  },
+                  publicDelayMinutes: { type: 'integer', minimum: 0, example: 60 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+        },
+      },
+    },
+    '/admin/challenges/{id}/start': {
+      post: {
+        tags: ['Challenges'],
+        summary: 'Start a challenge (Admin only, audited; event must be live)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+          409: errorResponse(
+            'Event not live, another challenge running, an earlier challenge not ended, or already started',
+          ),
+        },
+      },
+    },
+    '/admin/challenges/{id}/end': {
+      post: {
+        tags: ['Challenges'],
+        summary: 'End a challenge (Admin only, audited; event must be live)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+          409: errorResponse('Event not live, or challenge not running'),
         },
       },
     },

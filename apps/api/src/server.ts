@@ -3,6 +3,7 @@ import { createApp } from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { waitForScheduledBadgeEmails } from './modules/badges/badges.service';
 
 /**
  * Server startup — separated from `app.ts` so the Express app itself can be
@@ -35,6 +36,8 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'graceful shutdown started');
     server.close(async () => {
+      // Let queued badge emails finish (bounded by the forced-exit timer below).
+      await waitForScheduledBadgeEmails();
       await disconnectDatabase();
       logger.info('graceful shutdown complete');
       process.exit(0);

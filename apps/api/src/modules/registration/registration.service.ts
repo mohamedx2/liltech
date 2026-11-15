@@ -10,7 +10,7 @@ import {
   type TeamRegistrationResponse,
   type TeamResponse,
 } from 'api-contracts';
-import { deliverBadgeEmails, issueBadgeInTx } from '../badges/badges.service';
+import { issueBadgeInTx, scheduleBadgeEmails } from '../badges/badges.service';
 import { hashPassword } from '../auth/password.service';
 
 /**
@@ -19,8 +19,8 @@ import { hashPassword } from '../auth/password.service';
  * QR badges are created in one serializable transaction — a partially
  * registered team must never be observable, and two concurrent registrations
  * cannot both take the same "least used" color. Badge emails are sent once
- * the transaction has committed; a delivery failure never undoes a
- * registration.
+ * the transaction has committed, in the background (the response does not
+ * wait for SMTP); a delivery failure never undoes a registration.
  */
 
 export type TeamRegistrationResult = TeamRegistrationResponse;
@@ -222,7 +222,9 @@ async function registerOnce(
 
   const tokens = new Map(badges.map((badge) => [badge.participantId, badge.token]));
 
-  await deliverBadgeEmails(
+  // Emails go out in the background: the response returns as soon as the
+  // registration is committed.
+  scheduleBadgeEmails(
     created.participants.flatMap((participant) => {
       const token = tokens.get(participant.id);
       return participant.email && token

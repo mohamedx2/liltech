@@ -21,6 +21,11 @@ export default defineConfig(() => ({
         process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/vitest_placeholder',
       // Test-only key (32 zero bytes); real keys come from the environment.
       QR_TOKEN_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      // Never reach a real mailbox from tests, even when a local .env has SMTP
+      // credentials (empty values count as unset).
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SMTP_PASS: '',
     },
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     passWithNoTests: true,

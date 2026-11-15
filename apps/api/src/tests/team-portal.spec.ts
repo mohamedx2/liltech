@@ -13,6 +13,7 @@ import { createApp } from '../app';
 import { hashPassword } from '../modules/auth/password.service';
 import { createSessionForUser, createUser } from '../modules/auth/auth.service';
 import { assignBalancedColors } from '../modules/registration/registration.service';
+import { waitForScheduledBadgeEmails } from '../modules/badges/badges.service';
 import {
   setBadgeMailTransport,
   type BadgeMailMessage,
@@ -132,6 +133,7 @@ describeDb('team portal, badges and jury management', () => {
       .post('/api/registration/teams')
       .send(teamPayload(slug, memberCount));
     expect(response.status).toBe(201);
+    await waitForScheduledBadgeEmails();
 
     // Sessions are issued directly: the login endpoint is rate limited per IP,
     // and its behavior is covered by the auth tests.
@@ -185,12 +187,39 @@ describeDb('team portal, badges and jury management', () => {
       expect(statuses.every((row) => row.emailStatus === 'sent' && row.emailLastSentAt)).toBe(true);
     });
 
+    it('responds as soon as the team is stored, without waiting for the emails', async () => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      setBadgeMailTransport({
+        sendMail: async () => {
+          await gate;
+          return {};
+        },
+      });
+
+      const response = await request(app)
+        .post('/api/registration/teams')
+        .send(teamPayload('async'));
+
+      expect(response.status).toBe(201);
+      const pending = await prisma.qrToken.findMany({ select: { emailStatus: true } });
+      expect(pending.every((row) => row.emailStatus === 'pending')).toBe(true);
+
+      release();
+      await waitForScheduledBadgeEmails();
+      const sent = await prisma.qrToken.findMany({ select: { emailStatus: true } });
+      expect(sent.every((row) => row.emailStatus === 'sent')).toBe(true);
+    });
+
     it('still registers the team when email delivery is unavailable', async () => {
       setBadgeMailTransport(null);
 
       const response = await request(app).post('/api/registration/teams').send(teamPayload('echo'));
 
       expect(response.status).toBe(201);
+      await waitForScheduledBadgeEmails();
       const statuses = await prisma.qrToken.findMany({ select: { emailStatus: true } });
       expect(statuses.every((row) => row.emailStatus === 'failed')).toBe(true);
     });

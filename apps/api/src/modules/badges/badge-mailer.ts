@@ -86,14 +86,35 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-/** PNG of the QR code for a badge token (black on white for reliable scanning). */
-export function renderQrPng(token: string): Promise<Buffer> {
-  return QRCode.toBuffer(token, { type: 'png', errorCorrectionLevel: 'M', margin: 2, width: 360 });
+/**
+ * QR module colors per badge group. They are darker than the brand colors so
+ * every code keeps strong contrast on white and still scans reliably (the
+ * yellow group uses a deep amber for that reason).
+ */
+const QR_MODULE_COLORS: Record<BadgeColor, string> = {
+  blue: '#1a56c4',
+  red: '#c5221f',
+  yellow: '#a86200',
+  green: '#137333',
+};
+
+function qrOptions(color: BadgeColor | null) {
+  return {
+    errorCorrectionLevel: 'M' as const,
+    margin: 2,
+    width: 360,
+    color: { dark: color ? QR_MODULE_COLORS[color] : '#000000', light: '#ffffff' },
+  };
+}
+
+/** PNG of the QR code for a badge token, drawn in the badge group color. */
+export function renderQrPng(token: string, color: BadgeColor | null): Promise<Buffer> {
+  return QRCode.toBuffer(token, { type: 'png', ...qrOptions(color) });
 }
 
 /** Data URL variant used by the team portal. */
-export function renderQrDataUrl(token: string): Promise<string> {
-  return QRCode.toDataURL(token, { errorCorrectionLevel: 'M', margin: 2, width: 360 });
+export function renderQrDataUrl(token: string, color: BadgeColor | null): Promise<string> {
+  return QRCode.toDataURL(token, qrOptions(color));
 }
 
 export async function buildBadgeEmail(email: BadgeEmail, from: string): Promise<BadgeMailMessage> {
@@ -135,7 +156,7 @@ export async function buildBadgeEmail(email: BadgeEmail, from: string): Promise<
     attachments: [
       {
         filename: 'liltech-badge.png',
-        content: await renderQrPng(email.token),
+        content: await renderQrPng(email.token, email.color),
         cid: 'badge-qr',
         contentType: 'image/png',
       },

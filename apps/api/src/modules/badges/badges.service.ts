@@ -37,7 +37,12 @@ export async function issueBadgeInTx(
   const { token, tokenHash } = generateQrToken();
 
   const created = await tx.qrToken.create({
-    data: { participantId, tokenHash, tokenCiphertext: encryptQrToken(token, qrTokenKey()) },
+    data: {
+      participantId,
+      tokenHash,
+      tokenCiphertext: encryptQrToken(token, qrTokenKey()),
+      emailStatus: 'pending',
+    },
     select: { issuedAt: true },
   });
 
@@ -88,7 +93,7 @@ async function deliverOne(delivery: BadgeDelivery): Promise<'sent' | 'failed'> {
     logger.error(
       {
         participantId: delivery.participantId,
-        err: error instanceof Error ? error.message : error,
+        reason: error instanceof Error ? error.message : String(error),
       },
       'badge email delivery failed',
     );
@@ -102,9 +107,24 @@ async function deliverOne(delivery: BadgeDelivery): Promise<'sent' | 'failed'> {
   return status;
 }
 
-/** Delivers the badges issued at registration, in parallel. */
-export async function deliverBadgeEmails(deliveries: BadgeDelivery[]): Promise<void> {
-  await Promise.allSettled(deliveries.map((delivery) => deliverOne(delivery)));
+const inFlightDeliveries = new Set<Promise<unknown>>();
+
+/**
+ * Queues the badge emails of a new registration and returns immediately:
+ * the HTTP response never waits for SMTP. Each badge starts as `pending`
+ * and ends `sent` or `failed`; the team can read its badges meanwhile.
+ */
+export function scheduleBadgeEmails(deliveries: BadgeDelivery[]): void {
+  const batch = Promise.allSettled(deliveries.map((delivery) => deliverOne(delivery)));
+  inFlightDeliveries.add(batch);
+  void batch.finally(() => inFlightDeliveries.delete(batch));
+}
+
+/** Resolves once every queued badge email has been attempted (tests, shutdown). */
+export async function waitForScheduledBadgeEmails(): Promise<void> {
+  while (inFlightDeliveries.size > 0) {
+    await Promise.allSettled([...inFlightDeliveries]);
+  }
 }
 
 function resendAvailableAt(lastSentAt: Date | null): Date | null {
@@ -149,7 +169,7 @@ export async function listTeamBadges(leaderUserId: string): Promise<TeamBadgesRe
         roleInTeam: participant.isLeader ? ('leader' as const) : ('member' as const),
         color: participant.color,
         qrToken: token,
-        qrImageDataUrl: token ? await renderQrDataUrl(token) : null,
+        qrImageDataUrl: token ? await renderQrDataUrl(token, participant.color) : null,
         isRevoked,
         isCheckedIn: Boolean(participant.checkIn),
         email: participant.email,
