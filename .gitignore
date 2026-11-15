@@ -67,3 +67,5 @@ tmp/
 out
 vitest.config.*.timestamp*
 .vitest
+# Organizer-only CTF material (answers, passwords, original assets).
+ctf-assests/

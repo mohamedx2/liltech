@@ -9,3 +9,4 @@ export * from './lib/checkin-contracts.js';
 export * from './lib/announcements-contracts.js';
 export * from './lib/event-state-contracts.js';
 export * from './lib/audit-contracts.js';
+export * from './lib/ctf-contracts.js';

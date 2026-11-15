@@ -5,9 +5,13 @@
 // badge tokens, check-in, the event phase state (single writer), live
 // announcements, and the audit log.
 //
+// The Mini-CTF gate (stage 1, "Louage 404") is modelled below: a stage holds
+// only a SHA-256 hash of its answer, teams keep per-stage progress and a
+// timestamped attempt log, and a correct answer unlocks the main challenge.
+//
 // Still intentionally absent (blocked on `docs/decisions/OPEN_QUESTIONS.md`):
-// challenge tracks/assignment, Mini-CTF material and attempt log, challenge
-// unlocking, submissions, jury scoping, scores, leaderboards, results.
+// challenge tracks/assignment, stages 2-7, submissions, jury scoping, scores,
+// leaderboards, results. Answers are never stored in plaintext anywhere.
 
 generator client {
   provider = "prisma-client-js"
@@ -83,6 +87,8 @@ model Team {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   participants  Participant[]
+  ctfProgress   CtfProgress[]
+  ctfAttempts   CtfAttempt[]
 
   @@index([progressState])
   @@map("teams")
@@ -192,4 +198,90 @@ model Announcement {
 
   @@index([publishedAt])
   @@map("announcements")
+}
+
+/// Publication state of a Mini-CTF stage. Only `live` stages accept answers.
+enum CtfStageStatus {
+  draft
+  live
+  closed
+
+  @@map("ctf_stage_status")
+}
+
+/// One Mini-CTF stage. `answerHash` is the SHA-256 (hex) of the normalized
+/// answer — the plaintext answer never enters the database, the API, or the repo.
+model CtfStage {
+  id            String         @id @default(uuid()) @db.Uuid
+  slug          String         @unique @db.VarChar(60)
+  position      Int            @unique
+  title         String         @db.VarChar(140)
+  description   String?        @db.Text
+  status        CtfStageStatus @default(draft)
+  /// SHA-256 hex of the normalized answer (see `ctf-answer.ts`).
+  answerHash    String         @db.VarChar(64)
+  /// Public download paths (served from the web app's `public/` directory).
+  assetImageUrl String?        @db.VarChar(300)
+  assetZipUrl   String?        @db.VarChar(300)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  hints         CtfHint[]
+  progress      CtfProgress[]
+  attempts      CtfAttempt[]
+
+  @@map("ctf_stages")
+}
+
+/// Progressive hint for a stage. Teams unlock them one at a time, on demand.
+model CtfHint {
+  id       String   @id @default(uuid()) @db.Uuid
+  stage    CtfStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId  String   @db.Uuid
+  position Int
+  body     String   @db.VarChar(300)
+
+  @@unique([stageId, position])
+  @@map("ctf_hints")
+}
+
+/// Per-team progress on one stage. Unique per team+stage so a solve is
+/// recorded exactly once, no matter how many submissions arrive.
+model CtfProgress {
+  id        String    @id @default(uuid()) @db.Uuid
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String    @db.Uuid
+  stage     CtfStage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId   String    @db.Uuid
+  attempts  Int       @default(0)
+  hintsUsed Int       @default(0)
+  solvedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([teamId, stageId])
+  @@index([stageId, solvedAt])
+  @@map("ctf_progress")
+}
+
+/// Append-only attempt log (used for rate limiting evidence and review).
+/// The submitted answer is never stored.
+model CtfAttempt {
+  id        String     @id @default(uuid()) @db.Uuid
+  team      Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String     @db.Uuid
+  stage     CtfStage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId   String     @db.Uuid
+  outcome   CtfOutcome
+  createdAt DateTime   @default(now())
+
+  @@index([teamId, createdAt])
+  @@map("ctf_attempts")
+}
+
+enum CtfOutcome {
+  correct
+  incorrect
+  rate_limited
+
+  @@map("ctf_outcome")
 }

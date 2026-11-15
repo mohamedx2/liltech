@@ -41,6 +41,16 @@
           "envFile": ".env"
         }
       },
+      "db-seed-ctf": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "prisma-generate"
+        ],
+        "options": {
+          "command": "pnpm --filter api exec tsx prisma/seed-ctf.ts",
+          "envFile": ".env"
+        }
+      },
       "db-reset": {
         "executor": "nx:run-commands",
         "options": {
