@@ -89,7 +89,11 @@ describeDb('admin operations', () => {
   }
 
   async function setPhase(phase: string) {
-    const response = await asAdmin(request(app).post('/api/event-state')).send({ phase });
+    // Tests jump between phases, which the API treats as an audited override.
+    const response = await asAdmin(request(app).post('/api/event-state')).send({
+      phase,
+      force: true,
+    });
     expect(response.status).toBe(200);
   }
 

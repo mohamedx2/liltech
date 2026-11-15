@@ -327,6 +327,17 @@ export async function endChallenge(
 // ── Mini-CTF integration ─────────────────────────────────────────────────────
 
 /**
+ * Whether at least one member of the team has been checked in at the
+ * entrance. Organizer rule: a team with nobody checked in sees neither the
+ * challenges nor the Mini-CTF; the Mini-CTF module must apply it too.
+ */
+export async function isTeamCheckedIn(teamId: string): Promise<boolean> {
+  const prisma = getPrismaClient();
+  const count = await prisma.checkInRecord.count({ where: { participant: { teamId } } });
+  return count > 0;
+}
+
+/**
  * Called by the Mini-CTF module once it has validated a team's flag for a
  * challenge. Idempotent: a second solve keeps the first `solvedAt`. Returns
  * `false` when the challenge does not exist.
@@ -380,7 +391,11 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
 
   const team = await prisma.team.findUnique({
     where: { leaderId: leaderUserId },
-    select: { status: true, ctfSolves: { select: { challengeId: true } } },
+    select: {
+      status: true,
+      ctfSolves: { select: { challengeId: true } },
+      participants: { where: { checkIn: { isNot: null } }, select: { id: true }, take: 1 },
+    },
   });
   if (!team) {
     throw ApiError.notFound('No registered team found for this account.');
@@ -389,6 +404,20 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
     throw ApiError.forbidden(
       `Your team is ${team.status} and cannot access challenges. Please contact the organizers.`,
     );
+  }
+
+  // Only teams present at the venue (at least one member checked in) take part.
+  if (team.participants.length === 0) {
+    return {
+      available: false,
+      response: {
+        available: false,
+        reason: 'NOT_CHECKED_IN',
+        phase,
+        message:
+          'Your team has not been checked in yet. Show your QR codes at the entrance to take part in the challenges.',
+      },
+    };
   }
 
   const challenges = await prisma.challenge.findMany({ orderBy: { position: 'asc' } });

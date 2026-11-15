@@ -6,7 +6,8 @@ import { isoTimestampSchema } from './common.js';
  * - `GET /api/admin/audit-log` — admin only, offset-paginated, newest first.
  *
  * Sensitive administrative actions (phase transitions, badge revocation) are
- * recorded server-side with their target type and id.
+ * recorded server-side with their target type and id, and a short
+ * non-sensitive `summary` where useful (e.g. phase changes).
  */
 
 export const auditLogListRequestSchema = z.strictObject({
@@ -30,6 +31,8 @@ export const auditLogEntrySchema = z.object({
   /** What the action touched (e.g. `team`, `participant`) and its id. */
   targetType: z.string().nullable().optional(),
   targetId: z.string().nullable().optional(),
+  /** Short context such as `registration -> checkin (override)`. */
+  summary: z.string().nullable().optional(),
   createdAt: isoTimestampSchema,
 });
 

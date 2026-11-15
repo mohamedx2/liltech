@@ -3,7 +3,7 @@ import type { Role } from 'api-contracts';
 import { env } from '../../config/env';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
-import { verifyPassword } from './password.service';
+import { hashPassword, verifyPassword } from './password.service';
 
 /**
  * Session management.
@@ -23,6 +23,14 @@ export interface AuthenticatedUser {
 export interface IssuedSession {
   token: string;
   expiresAt: Date;
+}
+
+let dummyHash: Promise<string> | null = null;
+
+/** A bcrypt hash of a random value, computed once, for constant-cost failures. */
+function timingDummyHash(): Promise<string> {
+  dummyHash ??= hashPassword(randomBytes(16).toString('hex'));
+  return dummyHash;
 }
 
 function hashToken(token: string): string {
@@ -55,8 +63,10 @@ export async function login(
 
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
-  // Same generic failure for unknown email and wrong password.
+  // Same generic failure, and the same bcrypt cost, for an unknown email and
+  // a wrong password: response timing must not reveal which emails exist.
   if (!user) {
+    await verifyPassword(password, await timingDummyHash());
     throw ApiError.unauthorized('Invalid credentials.');
   }
 

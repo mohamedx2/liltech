@@ -158,7 +158,8 @@ describeDb('team portal, badges and jury management', () => {
       expect(groups.every((group) => group.color !== null)).toBe(true);
       expect(groups).toHaveLength(4);
       expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
-    });
+      // Three registrations with bcrypt hashing: slow on CI and Windows machines.
+    }, 30_000);
 
     it('emails every participant their own QR badge and records the delivery', async () => {
       const team = await registerTeam('delta', 3);

@@ -257,6 +257,7 @@ async function listAuditLog(
     actorName: entry.actor?.name ?? null,
     targetType: entry.targetType,
     targetId: entry.targetId,
+    summary: entry.summary,
     createdAt: entry.createdAt.toISOString(),
   }));
 

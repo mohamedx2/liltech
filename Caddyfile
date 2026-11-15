@@ -12,6 +12,16 @@
 liltechsousse.com, www.liltechsousse.com {
 	encode gzip
 
+	# Security headers for every response (the API also sets its own via helmet).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=()"
+		-Server
+	}
+
 	handle /api/* {
 		reverse_proxy api:4000
 	}

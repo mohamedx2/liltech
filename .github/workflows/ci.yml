@@ -195,6 +195,8 @@ jobs:
           API_HOST=0.0.0.0
           CORS_ORIGIN=${CORS_ORIGIN}
           SESSION_TTL_HOURS=24
+          TRUST_PROXY_HOPS=1
+          API_DOCS_ENABLED=${{ vars.API_DOCS_ENABLED || 'true' }}
           LOG_LEVEL=info
           API_IMAGE=${{ env.IMAGE_API }}:latest
           WEB_IMAGE=${{ env.IMAGE_WEB }}:latest

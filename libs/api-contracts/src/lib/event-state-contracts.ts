@@ -20,8 +20,13 @@ export const eventStateResponseSchema = z.strictObject({
 
 export type EventStateResponse = z.infer<typeof eventStateResponseSchema>;
 
+/**
+ * Phases normally advance one step at a time. Skipping ahead or going back
+ * needs `force: true` (an audited administrative override).
+ */
 export const updateEventStateRequestSchema = z.strictObject({
   phase: eventPhaseSchema,
+  force: z.boolean().optional(),
 });
 
 export type UpdateEventStateRequest = z.infer<typeof updateEventStateRequestSchema>;

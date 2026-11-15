@@ -306,7 +306,14 @@ export function AdminDashboardView() {
   };
 
   const executePhaseTransition = async (targetPhase: EventPhase) => {
-    const updated = await api.events.updatePhase(targetPhase);
+    // The server accepts only the next phase; anything else is an override
+    // the admin just confirmed, and it is audited as such.
+    const isNext =
+      eventState !== null &&
+      ORDERED_PHASES.indexOf(targetPhase) === ORDERED_PHASES.indexOf(eventState.phase) + 1;
+    const updated = isNext
+      ? await api.events.updatePhase(targetPhase)
+      : await api.events.updatePhase(targetPhase, { force: true });
     setEventState(updated);
     setFeedback({
       tone: 'success',

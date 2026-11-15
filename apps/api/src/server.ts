@@ -4,6 +4,7 @@ import { connectDatabase, disconnectDatabase } from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { waitForScheduledBadgeEmails } from './modules/badges/badges.service';
+import { runBadgeMaintenance } from './modules/badges/badge-maintenance.service';
 
 /**
  * Server startup — separated from `app.ts` so the Express app itself can be
@@ -21,6 +22,9 @@ if (!env) {
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
+
+  // Make every badge readable and re-send emails cut off by a restart.
+  await runBadgeMaintenance();
 
   const app = createApp();
 

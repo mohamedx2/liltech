@@ -155,6 +155,8 @@ export type TeamChallengeView = z.infer<typeof teamChallengeViewSchema>;
 /** Why no challenge content can be returned yet. */
 export const challengeUnavailableReasonSchema = z.enum([
   'EVENT_NOT_STARTED',
+  /** No member of the team has been checked in at the entrance. */
+  'NOT_CHECKED_IN',
   'NO_CHALLENGE_STARTED',
 ]);
 

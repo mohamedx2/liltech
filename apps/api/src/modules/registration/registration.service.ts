@@ -12,6 +12,7 @@ import {
 } from 'api-contracts';
 import { issueBadgeInTx, scheduleBadgeEmails } from '../badges/badges.service';
 import { hashPassword } from '../auth/password.service';
+import { getEventState } from '../event-state/event-state.service';
 
 /**
  * Team registration: the team leader supplies the team account credentials
@@ -68,6 +69,12 @@ export async function registerTeamWithBadges(
     throw ApiError.badRequest(
       `A team must have ${TEAM_MEMBERS_TOTAL_MIN} to ${TEAM_MEMBERS_TOTAL_MAX} members total, including the leader.`,
     );
+  }
+
+  // Registration stays open through check-in and closes when the event goes live.
+  const { phase } = await getEventState();
+  if (phase !== 'registration' && phase !== 'checkin') {
+    throw ApiError.conflict('Registration is closed.');
   }
 
   const leaderEmail = request.leader.email.toLowerCase();

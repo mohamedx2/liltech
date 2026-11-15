@@ -37,6 +37,21 @@ const envSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
 
   /**
+   * Reverse-proxy hops in front of the API whose X-Forwarded-For is trusted
+   * (1 behind Caddy in production, 0 when the API is reached directly).
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+
+  /** Team registrations accepted per client IP per hour. */
+  REGISTRATION_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).max(10_000).default(10),
+
+  /** Serve Swagger UI and the OpenAPI JSON. Off by default in production. */
+  API_DOCS_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+
+  /**
    * 32-byte key (base64) encrypting stored QR badge tokens so a team can see
    * its badges again. Generate with:
    * `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
@@ -91,3 +106,6 @@ export function corsOrigins(): string[] {
     .map((origin) => origin.trim())
     .filter(Boolean);
 }
+
+/** Swagger is public in development and test, opt-in in production. */
+export const apiDocsEnabled = env.API_DOCS_ENABLED ?? !isProduction;
