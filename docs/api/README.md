@@ -231,7 +231,11 @@ Admin only. Publishes a live announcement (body 1–500 chars). Records audit en
 
 Any authenticated role (`team`, `jury`, `admin`). Reads the announcement feed, newest first.
 
-Schema: `createAnnouncementRequestSchema` / `announcementSchema`.
+#### `DELETE /api/announcements/:announcementId`
+
+Admin only. Removes a wrong or outdated announcement from every feed. `204`; unknown id → 404. Audited as `announcement.deleted`.
+
+Schema: `createAnnouncementRequestSchema` / `announcementSchema` / `announcementIdParamsSchema`.
 
 Note: real-time delivery transport is pending (OPEN_QUESTIONS #7); clients may poll with the server-provided timestamps until then.
 
@@ -239,21 +243,48 @@ Note: real-time delivery transport is pending (OPEN_QUESTIONS #7); clients may p
 
 #### `GET /api/admin/audit-log`
 
-Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest first. Returns sensitive administrative actions recorded server-side (actions: `event.phase_changed`, `checkin.scan`, `checkin.badge_revoked`, `announcement.published`, `registration.team_created`). Entry `details` are intentionally not exposed.
+Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest first. Optional `action` query filters by action prefix (e.g. `team.`, `checkin.`, `ctf.`). Returns sensitive administrative actions recorded server-side with their target type and id (actions include `event.phase_changed`, `checkin.scan`, `checkin.manual`, `checkin.undone`, `checkin.badge_revoked`, `badge.reissued`, `badge.email_resent`, `badge.email_bulk_resent`, `team.renamed`, `team.status_changed`, `team.password_reset`, `team.deleted`, `participant.added|updated|removed`, `ctf.solve_granted|revoked`, `challenge.*`, `jury.*`, `announcement.published|deleted`, `registration.team_created`).
 
-**Response `200`:** `{ entries: [{ id, action, actorName?, createdAt }], limit, offset }`.
+**Response `200`:** `{ items: [{ id, action, actorName, targetType?, targetId?, createdAt }], total }`.
 
 Schema: `auditLogListRequestSchema` / `auditLogEntrySchema` list.
 
-### Admin team roster
+### Admin operations toolkit
 
-#### `GET /api/admin/teams`
+Admin only; contract in `libs/api-contracts/src/lib/admin-operations-contracts.ts`. These are the fixes organizers apply on event night. Every write is audited in the same transaction as the change, and team/participant writes respond with the refreshed `AdminTeam`.
 
-Admin only. Full team roster, newest first: every team with its progress state, leader, and per-participant check-in state.
+#### `GET /api/admin/overview`
 
-**Response `200`:** `{ items: TeamResponse[], total }`.
+Situation board aggregates: phase, team counts by standing and progress, check-in coverage (fully / partially / not checked in, per badge color), badge email delivery (sent / pending / failed / missing email), revoked badges, challenge timing with Mini-CTF solve counts, jury account and announcement counts. Schema: `adminOverviewResponseSchema`.
 
-Schema: `adminTeamListResponseSchema` (reuses `teamResponseSchema`).
+#### `GET /api/admin/teams`, `GET /api/admin/teams/:teamId`
+
+Roster (newest first) / one team: standing (`status`, `statusReason`, `statusChangedAt`), progress, leader account email (the team login), every participant with email, badge color, check-in time and the staff member who recorded it, badge state (`issuedAt`, `revokedAt`, `emailStatus`, `emailLastSentAt` — never the token), and Mini-CTF solves. Schemas: `adminTeamListResponseSchema` / `adminTeamSchema`.
+
+#### Team tools
+
+| Endpoint | Body | Rules |
+|---|---|---|
+| `PATCH /api/admin/teams/:teamId` | `{ name }` | 3–60 chars; taken name → 409. Audit `team.renamed`. |
+| `POST /api/admin/teams/:teamId/status` | `{ status: active\|withdrawn\|disqualified, reason? }` | Reason required unless `active`. A non-active team cannot be checked in (scan → 403, manual → 409) and gets 403 on `/api/challenges*`. Reversible. Audit `team.status_changed`. |
+| `POST /api/admin/teams/:teamId/reset-password` | — | New 16-char password returned once (`temporaryPassword`, hash stored only); every session of the team account is revoked. Audit `team.password_reset`. |
+| `DELETE /api/admin/teams/:teamId` | — | Only in phases `registration`/`checkin` (409 otherwise); deletes team, members, badges and team account. `204`. Audit `team.deleted`. |
+| `POST /api/admin/teams/:teamId/participants` | `{ name, email }` | Max 7 members (409); email unique across teams (409). Balanced badge color, new badge emailed in the background. `201`. Audit `participant.added`. |
+| `POST /api/admin/teams/:teamId/ctf-solves` | `{ challengeId }` | Grants Mini-CTF early access (already granted → 409). `201`. Audit `ctf.solve_granted`. |
+| `DELETE /api/admin/teams/:teamId/ctf-solves/:challengeId` | — | Withdraws it (none → 404). Audit `ctf.solve_revoked`. |
+
+#### Participant tools
+
+| Endpoint | Body | Rules |
+|---|---|---|
+| `PATCH /api/admin/participants/:participantId` | `{ name?, email? }` | Email unique across teams (409). For the leader, the team login email/name change too. Audit `participant.updated`. |
+| `DELETE /api/admin/participants/:participantId` | — | The leader cannot be removed (409). Audit `participant.removed`. |
+| `POST /api/admin/participants/:participantId/check-in` | — | Manual check-in without QR (works with a revoked badge; team must be `active`); already checked in → 409. Audit `checkin.manual`. |
+| `DELETE /api/admin/participants/:participantId/check-in` | — | Undo; a team with no check-in left goes back from `checked_in` to `registered`. Audit `checkin.undone`. |
+| `POST /api/admin/participants/:participantId/reissue-badge` | — | New QR token (old one stops working, revocation lifted), emailed in the background → `{ participantId, issuedAt, emailQueued }`. Audit `badge.reissued`. |
+| `POST /api/admin/badges/resend-failed` | — | Requeues every failed (or stuck > 10 min pending) badge email of a non-revoked badge → `{ queued }`. Audit `badge.email_bulk_resent`. |
+
+Check-in no longer moves a team back to `checked_in` from a later progress state when a late member is scanned (scan and manual check-in both only advance from `registered`).
 
 ### Admin jury accounts
 
@@ -294,9 +325,7 @@ From the LilTech specification. Groups below are **contract plans**, not commitm
 | Challenge | Briefs and resources for the unlocked track |
 | Submissions | Team deliverables with deadline enforcement |
 | Announcements | Live announcement feed |
-| Admin teams | Team management |
 | Admin CTF | CTF administration (no flags in public responses) |
-| Admin challenges | Challenge management |
 | Jury | Jury accounts, challenge scoping |
 | Jury scoring | Score entry (own scores only) |
 | Admin jury management | Jury assignment |

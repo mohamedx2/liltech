@@ -8,7 +8,10 @@ import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
 import {
+  handleGetAdminChallenges,
   handleGetAdminJury,
+  handleGetAdminOverview,
+  handleGetAdminTeam,
   handleGetAdminTeams,
   handleGetAuditLog,
   handlePublishAdminAnnouncement,
@@ -95,7 +98,22 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
 
     [`GET ${PLANNED_ENDPOINTS.ADMIN_TEAMS}`]: () => handleGetAdminTeams(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
   };
+
+  /** Parameterized read routes (`:id` segments). Writes need the real API. */
+  const patternRoutes: ReadonlyArray<{
+    method: string;
+    pattern: RegExp;
+    handle: (match: RegExpMatchArray) => unknown;
+  }> = [
+    {
+      method: 'GET',
+      pattern: /^\/admin\/teams\/([^/]+)$/,
+      handle: (match) => handleGetAdminTeam(decodeURIComponent(match[1])),
+    },
+  ];
 
   return {
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
@@ -131,6 +149,12 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
 
       const handler = routes[`${method} ${path}`] ?? routes[`${method} ${cleanPath}`];
       if (!handler) {
+        for (const route of patternRoutes) {
+          const match = route.method === method ? cleanPath.match(route.pattern) : null;
+          if (match) {
+            return route.handle(match) as TResponse;
+          }
+        }
         throw new ApiClientError({
           message: `No mock defined for ${method} ${path}.`,
           status: 404,

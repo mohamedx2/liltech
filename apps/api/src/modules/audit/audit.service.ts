@@ -24,6 +24,20 @@ export const AuditAction = {
   ChallengeUpdated: 'challenge.updated',
   ChallengeStarted: 'challenge.started',
   ChallengeEnded: 'challenge.ended',
+  AnnouncementDeleted: 'announcement.deleted',
+  TeamRenamed: 'team.renamed',
+  TeamStatusChanged: 'team.status_changed',
+  TeamPasswordReset: 'team.password_reset',
+  TeamDeleted: 'team.deleted',
+  ParticipantAdded: 'participant.added',
+  ParticipantUpdated: 'participant.updated',
+  ParticipantRemoved: 'participant.removed',
+  CheckInManual: 'checkin.manual',
+  CheckInUndone: 'checkin.undone',
+  BadgeReissued: 'badge.reissued',
+  BadgeEmailBulkResent: 'badge.email_bulk_resent',
+  CtfSolveGranted: 'ctf.solve_granted',
+  CtfSolveRevoked: 'ctf.solve_revoked',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

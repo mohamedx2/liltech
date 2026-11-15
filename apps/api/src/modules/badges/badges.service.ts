@@ -2,7 +2,9 @@ import type { Prisma } from '@prisma/client';
 import {
   BADGE_EMAIL_RESEND_INTERVAL_MS,
   type BadgeColor,
+  type BulkResendBadgeEmailsResponse,
   type IssueBadgeResponse,
+  type ReissueBadgeResponse,
   type ResendBadgeEmailResponse,
   type TeamBadgesResponse,
 } from 'api-contracts';
@@ -300,4 +302,157 @@ export async function resendBadgeEmail(
       lastSentAt.getTime() + BADGE_EMAIL_RESEND_INTERVAL_MS,
     ).toISOString(),
   };
+}
+
+/**
+ * Issues a brand-new QR badge for a participant (lost badge, leaked QR code,
+ * or a revoked badge that must work again). The previous token stops working
+ * immediately; the new badge is emailed in the background when the
+ * participant has an email address. Admin only, audited.
+ */
+export async function reissueBadge(
+  participantId: string,
+  adminUserId: string,
+): Promise<ReissueBadgeResponse> {
+  const prisma = getPrismaClient();
+  const { token, tokenHash } = generateQrToken();
+  const issuedAt = new Date();
+
+  const participant = await prisma.$transaction(async (tx) => {
+    const found = await tx.participant.findUnique({
+      where: { id: participantId },
+      select: { id: true, name: true, email: true, color: true, team: { select: { name: true } } },
+    });
+    if (!found) {
+      throw ApiError.notFound('Participant not found.');
+    }
+
+    const badgeData = {
+      tokenHash,
+      tokenCiphertext: encryptQrToken(token, qrTokenKey()),
+      issuedAt,
+      revokedAt: null,
+      emailStatus: found.email ? ('pending' as const) : null,
+      emailLastSentAt: found.email ? issuedAt : null,
+    };
+    await tx.qrToken.upsert({
+      where: { participantId },
+      update: badgeData,
+      create: { participantId, ...badgeData },
+    });
+
+    await recordAuditLog(
+      {
+        action: AuditAction.BadgeReissued,
+        actorId: adminUserId,
+        targetType: 'participant',
+        targetId: participantId,
+      },
+      tx,
+    );
+    return found;
+  });
+
+  if (participant.email) {
+    scheduleBadgeEmails([
+      {
+        participantId,
+        participantName: participant.name,
+        email: participant.email,
+        teamName: participant.team.name,
+        color: participant.color,
+        token,
+      },
+    ]);
+  }
+
+  return {
+    participantId,
+    issuedAt: issuedAt.toISOString(),
+    emailQueued: Boolean(participant.email),
+  };
+}
+
+/** A `pending` email older than this is considered lost (e.g. a restart mid-send). */
+const STALE_PENDING_EMAIL_MS = 10 * 60 * 1000;
+
+/**
+ * Retries every badge email that failed (or has been pending for too long),
+ * e.g. after SMTP was misconfigured during registration. Revoked badges and
+ * participants without an email are skipped. Emails go out in the
+ * background; the call returns how many were queued. Admin only, audited.
+ */
+export async function resendFailedBadgeEmails(
+  adminUserId: string,
+): Promise<BulkResendBadgeEmailsResponse> {
+  const prisma = getPrismaClient();
+  const now = new Date();
+  const stalePendingBefore = new Date(now.getTime() - STALE_PENDING_EMAIL_MS);
+
+  const badges = await prisma.qrToken.findMany({
+    where: {
+      revokedAt: null,
+      participant: { email: { not: null } },
+      OR: [
+        { emailStatus: 'failed' },
+        { emailStatus: 'pending', emailLastSentAt: { lt: stalePendingBefore } },
+        { emailStatus: 'pending', emailLastSentAt: null },
+        { emailStatus: null },
+      ],
+    },
+    include: {
+      participant: {
+        select: { name: true, email: true, color: true, team: { select: { name: true } } },
+      },
+    },
+  });
+
+  const deliveries: BadgeDelivery[] = [];
+  for (const badge of badges) {
+    const email = badge.participant.email;
+    if (!email) {
+      continue;
+    }
+
+    let token = badge.tokenCiphertext ? decryptQrToken(badge.tokenCiphertext, qrTokenKey()) : null;
+    if (!token) {
+      // Issued before retrievable storage: the badge has to be reissued.
+      const issued = generateQrToken();
+      await prisma.qrToken.update({
+        where: { id: badge.id },
+        data: {
+          tokenHash: issued.tokenHash,
+          tokenCiphertext: encryptQrToken(issued.token, qrTokenKey()),
+          issuedAt: now,
+        },
+      });
+      token = issued.token;
+    }
+
+    deliveries.push({
+      participantId: badge.participantId,
+      participantName: badge.participant.name,
+      email,
+      teamName: badge.participant.team.name,
+      color: badge.participant.color,
+      token,
+    });
+  }
+
+  if (deliveries.length > 0) {
+    await prisma.qrToken.updateMany({
+      where: { participantId: { in: deliveries.map((delivery) => delivery.participantId) } },
+      data: { emailStatus: 'pending', emailLastSentAt: now },
+    });
+  }
+
+  await recordAuditLog({
+    action: AuditAction.BadgeEmailBulkResent,
+    actorId: adminUserId,
+    targetType: 'badge_batch',
+    targetId: String(deliveries.length),
+  });
+
+  scheduleBadgeEmails(deliveries);
+  return { queued: deliveries.length };
 }

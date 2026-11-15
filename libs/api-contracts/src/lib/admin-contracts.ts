@@ -1,20 +1,20 @@
 import { z } from 'zod';
-import { teamResponseSchema } from './registration-contracts.js';
+import { adminTeamSchema } from './admin-operations-contracts.js';
 import { adminJuryAccountDetailSchema } from './jury-admin-contracts.js';
 
 /**
  * Contract for admin operational listing endpoints (read-only):
- * - `GET /api/admin/teams` — full team roster with participant check-in state
+ * - `GET /api/admin/teams` — full team roster with contact, badge, check-in and
+ *   Mini-CTF state (team shape: `admin-operations-contracts`)
  * - `GET /api/admin/jury`  — jury accounts with their admin-readable password
  *   (management endpoints: `jury-admin-contracts`)
  *
- * Challenge track and results administration are intentionally absent — they
- * are blocked on `docs/decisions/OPEN_QUESTIONS.md` questions 1 and 3–5 and
- * must not be invented.
+ * Results administration is intentionally absent — it is blocked on
+ * `docs/decisions/OPEN_QUESTIONS.md` questions 3–5 and must not be invented.
  */
 
 export const adminTeamListResponseSchema = z.object({
-  items: z.array(teamResponseSchema),
+  items: z.array(adminTeamSchema),
   total: z.number().int().nonnegative(),
 });
 

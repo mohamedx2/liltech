@@ -380,10 +380,15 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
 
   const team = await prisma.team.findUnique({
     where: { leaderId: leaderUserId },
-    select: { ctfSolves: { select: { challengeId: true } } },
+    select: { status: true, ctfSolves: { select: { challengeId: true } } },
   });
   if (!team) {
     throw ApiError.notFound('No registered team found for this account.');
+  }
+  if (team.status !== 'active') {
+    throw ApiError.forbidden(
+      `Your team is ${team.status} and cannot access challenges. Please contact the organizers.`,
+    );
   }
 
   const challenges = await prisma.challenge.findMany({ orderBy: { position: 'asc' } });

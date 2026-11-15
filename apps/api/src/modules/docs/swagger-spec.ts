@@ -838,6 +838,12 @@ export const swaggerSpec = {
             in: 'query',
             schema: { type: 'integer', default: 0, minimum: 0 },
           },
+          {
+            name: 'action',
+            in: 'query',
+            description: 'Only actions starting with this prefix, e.g. `team.`',
+            schema: { type: 'string', pattern: '^[a-z_.]+$' },
+          },
         ],
         responses: {
           200: {
@@ -875,7 +881,7 @@ export const swaggerSpec = {
     '/admin/teams': {
       get: {
         tags: ['Admin'],
-        summary: 'List all teams with member check-in states (Admin only)',
+        summary: 'Team roster with contact, badge, check-in and Mini-CTF state (Admin only)',
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
@@ -887,7 +893,11 @@ export const swaggerSpec = {
                   properties: {
                     items: {
                       type: 'array',
-                      items: { $ref: '#/components/schemas/TeamResponse' },
+                      items: {
+                        type: 'object',
+                        description:
+                          'AdminTeam (adminTeamSchema): standing, progress, leader login, participants with email, color, check-in and badge state, Mini-CTF solves',
+                      },
                     },
                     total: { type: 'number' },
                   },
@@ -1287,6 +1297,343 @@ export const swaggerSpec = {
           403: errorResponse('Requires admin role'),
           404: errorResponse('Unknown challenge'),
           409: errorResponse('Event not live, or challenge not running'),
+        },
+      },
+    },
+    '/admin/overview': {
+      get: {
+        tags: ['Admin Operations'],
+        summary: 'Situation board aggregates (Admin only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object', description: 'adminOverviewResponseSchema' }, 'Overview'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}': {
+      get: {
+        tags: ['Admin Operations'],
+        summary: 'One team (Admin only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+        },
+      },
+      patch: {
+        tags: ['Admin Operations'],
+        summary: 'Rename a team (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name'],
+                properties: { name: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+          409: errorResponse('Name taken'),
+        },
+      },
+      delete: {
+        tags: ['Admin Operations'],
+        summary: 'Delete a team before the event goes live (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        responses: {
+          204: { description: 'Done' },
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+          409: errorResponse('Event already live'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/status': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Set team standing: active, withdrawn or disqualified (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['status'],
+                properties: {
+                  status: { type: 'string', enum: ['active', 'withdrawn', 'disqualified'] },
+                  reason: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          400: errorResponse('Reason missing'),
+          404: errorResponse('Unknown team'),
+          409: errorResponse('Already in this status'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/reset-password': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Generate a new team password and end its sessions (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        responses: {
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                teamId: { type: 'string' },
+                temporaryPassword: { type: 'string' },
+                revokedSessions: { type: 'integer' },
+              },
+            },
+            'Password shown once',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/participants': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Add a member and email their badge (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email'],
+                properties: { name: { type: 'string' }, email: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+          409: errorResponse('Team full or email already registered'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/ctf-solves': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Grant Mini-CTF early access (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['challengeId'],
+                properties: { challengeId: { type: 'string', format: 'uuid' } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team or challenge'),
+          409: errorResponse('Already granted'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/ctf-solves/{challengeId}': {
+      delete: {
+        tags: ['Admin Operations'],
+        summary: 'Withdraw Mini-CTF early access (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId'), uuidPathParam('challengeId')],
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('No such solve'),
+        },
+      },
+    },
+    '/admin/participants/{participantId}': {
+      patch: {
+        tags: ['Admin Operations'],
+        summary: 'Fix a participant name or email (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { name: { type: 'string' }, email: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+          409: errorResponse('Email already registered'),
+        },
+      },
+      delete: {
+        tags: ['Admin Operations'],
+        summary: 'Remove a non-leader member (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+          409: errorResponse('Leader cannot be removed'),
+        },
+      },
+    },
+    '/admin/participants/{participantId}/check-in': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Manual check-in without QR (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+          409: errorResponse('Already checked in or team not active'),
+        },
+      },
+      delete: {
+        tags: ['Admin Operations'],
+        summary: 'Undo a check-in (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+          409: errorResponse('Not checked in'),
+        },
+      },
+    },
+    '/admin/participants/{participantId}/reissue-badge': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Issue a new QR badge; the old one stops working (audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                participantId: { type: 'string' },
+                issuedAt: { type: 'string' },
+                emailQueued: { type: 'boolean' },
+              },
+            },
+            'New badge',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+        },
+      },
+    },
+    '/admin/badges/resend-failed': {
+      post: {
+        tags: ['Admin Operations'],
+        summary: 'Requeue every failed badge email (audited)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json(
+            { type: 'object', properties: { queued: { type: 'integer' } } },
+            'Emails queued',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+    },
+    '/announcements/{announcementId}': {
+      delete: {
+        tags: ['Admin Operations'],
+        summary: 'Delete an announcement (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('announcementId')],
+        responses: {
+          204: { description: 'Done' },
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown announcement'),
         },
       },
     },
