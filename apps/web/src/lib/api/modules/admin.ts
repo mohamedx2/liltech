@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import {
+  adminChallengeListResponseSchema,
+  adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
+  challengeAdminDetailSchema,
+  sendUnsentBadgeEmailsResponseSchema,
+  type AdminChallengeListResponse,
+  type AdminJuryAccountDetail,
+  type ChallengeAdminDetail,
+  type CreateChallengeRequest,
+  type CreateJuryAccountRequest,
+  type SendUnsentBadgeEmailsResponse,
+  type UpdateChallengeRequest,
+  type UpdateJuryAccountRequest,
   adminTeamListResponseSchema,
   auditLogEntrySchema,
   type AdminJuryListResponse,
@@ -32,6 +44,41 @@ export interface AdminApi {
   ) => Promise<{ id: string; body: string; publishedAt: string; authorName?: string }>;
   getTeams: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminTeamListResponse>;
   getJuryAccounts: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminJuryListResponse>;
+  createJuryAccount: (input: CreateJuryAccountRequest) => Promise<AdminJuryAccountDetail>;
+  updateJuryAccount: (
+    id: string,
+    input: UpdateJuryAccountRequest,
+  ) => Promise<AdminJuryAccountDetail>;
+  deleteJuryAccount: (id: string) => Promise<void>;
+  sendUnsentBadgeEmails: () => Promise<SendUnsentBadgeEmailsResponse>;
+  getChallenges: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminChallengeListResponse>;
+  createChallenge: (input: CreateChallengeRequest) => Promise<ChallengeAdminDetail>;
+  updateChallenge: (id: string, input: UpdateChallengeRequest) => Promise<ChallengeAdminDetail>;
+  /** Server refuses unless the event phase is `live`. */
+  startChallenge: (id: string) => Promise<ChallengeAdminDetail>;
+  /** Server refuses unless the event phase is `live`. */
+  endChallenge: (id: string) => Promise<ChallengeAdminDetail>;
+}
+
+function parseOrThrow<T>(
+  schema: {
+    safeParse: (
+      data: unknown,
+    ) => { success: true; data: T } | { success: false; error: { issues: unknown } };
+  },
+  data: unknown,
+  what: string,
+): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw new ApiClientError({
+      message: `${what} response did not match the expected contract.`,
+      status: null,
+      code: 'INVALID_RESPONSE',
+      details: parsed.error.issues,
+    });
+  }
+  return parsed.data;
 }
 
 export function createAdminApi(transport: ApiTransport): AdminApi {
@@ -101,6 +148,77 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
         });
       }
       return parsed.data;
+    },
+
+    async createJuryAccount(input) {
+      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_JURY, {
+        method: 'POST',
+        body: input,
+      });
+      return parseOrThrow(adminJuryAccountDetailSchema, data, 'Jury account');
+    },
+
+    async updateJuryAccount(id, input) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_JURY}/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: input },
+      );
+      return parseOrThrow(adminJuryAccountDetailSchema, data, 'Jury account');
+    },
+
+    async deleteJuryAccount(id) {
+      await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_JURY}/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+        },
+      );
+    },
+
+    async sendUnsentBadgeEmails() {
+      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_UNSENT, {
+        method: 'POST',
+      });
+      return parseOrThrow(sendUnsentBadgeEmailsResponseSchema, data, 'Badge email');
+    },
+
+    async getChallenges(config) {
+      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_CHALLENGES, {
+        signal: config?.signal,
+      });
+      return parseOrThrow(adminChallengeListResponseSchema, data, 'Challenge list');
+    },
+
+    async createChallenge(input) {
+      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_CHALLENGES, {
+        method: 'POST',
+        body: input,
+      });
+      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
+    },
+
+    async updateChallenge(id, input) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: input },
+      );
+      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
+    },
+
+    async startChallenge(id) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}/start`,
+        { method: 'POST' },
+      );
+      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
+    },
+
+    async endChallenge(id) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}/end`,
+        { method: 'POST' },
+      );
+      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
     },
   };
 }

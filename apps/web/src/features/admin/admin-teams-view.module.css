@@ -130,3 +130,15 @@
   margin-right: var(--space-1);
   vertical-align: -1px;
 }
+
+.emailRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.emailResult {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

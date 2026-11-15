@@ -7,6 +7,7 @@ import { ErrorState, EmptyState, LoadingState } from '@/components/feedback/stat
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Icon } from '@/components/ui/icon';
 import { DataTable } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import styles from './admin-teams-view.module.css';
 
 /**
@@ -25,6 +26,49 @@ const PROGRESS_TONE: Record<string, BadgeTone> = {
 
 function progressLabel(state: string): string {
   return state.replace('_', ' ');
+}
+
+/** Emails every badge that was never sent or failed (runs in the background). */
+function SendUnsentBadgeEmails() {
+  const [isSending, setIsSending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const send = async () => {
+    setIsSending(true);
+    setResult(null);
+    try {
+      const { queued } = await api.admin.sendUnsentBadgeEmails();
+      setResult(
+        queued === 0
+          ? 'Every badge email has already been sent.'
+          : `${queued} badge email${queued === 1 ? '' : 's'} queued.`,
+      );
+    } catch (err) {
+      setResult(err instanceof ApiClientError ? err.message : 'Could not queue the emails.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div className={styles.emailRow}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={send}
+        loading={isSending}
+        loadingLabel="Queuing…"
+      >
+        Send unsent badge emails
+      </Button>
+      {result ? (
+        <span role="status" className={styles.emailResult}>
+          {result}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function AdminTeamsView() {
@@ -175,6 +219,7 @@ function RosterHeader({
         Live roster from the backend — registration records, team progress, and entrance check-in
         state for every participant.
       </p>
+      <SendUnsentBadgeEmails />
       <dl className={styles.statRow}>
         <div className={styles.stat}>
           <dt>Teams</dt>
