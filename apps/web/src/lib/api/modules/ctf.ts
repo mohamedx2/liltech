@@ -1,7 +1,9 @@
 import {
+  ctfChainResponseSchema,
   ctfHintResponseSchema,
   ctfStageResponseSchema,
   ctfSubmitResponseSchema,
+  type CtfChainResponse,
   type CtfHintResponse,
   type CtfStageResponse,
   type CtfSubmitRequest,
@@ -12,72 +14,100 @@ import { ApiClientError } from '../errors';
 import type { ApiRequestConfig, ApiTransport } from '../transport';
 
 /**
- * Mini-CTF gate client (`/ctf/stage`, `/ctf/stage/hints`, `/ctf/stage/submit`).
+ * LOUAGE 404 client.
  *
- * The server owns every rule here: whether the gate is open, whether an answer
- * is correct, how many hints are revealed, and how often a team may submit.
- * The client only renders what it is given.
+ * Sequential eligibility, correctness, hint counts and the main-challenge
+ * unlock are decided by the server. The client renders `/ctf/chain` and sends
+ * a stage slug plus an answer — it never decides what a team may access.
  */
 export interface CtfApi {
-  getStage: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<CtfStageResponse>;
-  revealHint: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<CtfHintResponse>;
+  getChain: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<CtfChainResponse>;
+  getStage: (slug: string, config?: Pick<ApiRequestConfig, 'signal'>) => Promise<CtfStageResponse>;
+  revealHint: (slug: string, config?: Pick<ApiRequestConfig, 'signal'>) => Promise<CtfHintResponse>;
   submitAnswer: (
+    slug: string,
     payload: CtfSubmitRequest,
     config?: Pick<ApiRequestConfig, 'signal'>,
   ) => Promise<CtfSubmitResponse>;
 }
 
+function invalidResponse(message: string, issues: unknown): ApiClientError {
+  return new ApiClientError({
+    message,
+    status: null,
+    code: 'INVALID_RESPONSE',
+    details: issues,
+  });
+}
+
 export function createCtfApi(transport: ApiTransport): CtfApi {
+  const stagePath = (slug: string, suffix = '') =>
+    `${PLANNED_ENDPOINTS.CTF_STAGES}/${encodeURIComponent(slug)}${suffix}`;
+
   return {
-    async getStage(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.CTF_STAGE, {
+    async getChain(config) {
+      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.CTF_CHAIN, {
         signal: config?.signal,
       });
-      const parsed = ctfStageResponseSchema.safeParse(data);
+      const parsed = ctfChainResponseSchema.safeParse(data);
+
       if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Mini-CTF stage response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
+        throw invalidResponse(
+          'Mini-CTF chain response did not match the contract.',
+          parsed.error.issues,
+        );
       }
+
       return parsed.data;
     },
 
-    async revealHint(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.CTF_HINT, {
+    async getStage(slug, config) {
+      const data = await transport.request<unknown>(stagePath(slug), { signal: config?.signal });
+      const parsed = ctfStageResponseSchema.safeParse(data);
+
+      if (!parsed.success) {
+        throw invalidResponse(
+          'Mini-CTF stage response did not match the contract.',
+          parsed.error.issues,
+        );
+      }
+
+      return parsed.data;
+    },
+
+    async revealHint(slug, config) {
+      const data = await transport.request<unknown>(stagePath(slug, '/hints'), {
         method: 'POST',
         body: {},
         signal: config?.signal,
       });
       const parsed = ctfHintResponseSchema.safeParse(data);
+
       if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Mini-CTF hint response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
+        throw invalidResponse(
+          'Mini-CTF hint response did not match the contract.',
+          parsed.error.issues,
+        );
       }
+
       return parsed.data;
     },
 
-    async submitAnswer(payload, config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.CTF_SUBMIT, {
+    async submitAnswer(slug, payload, config) {
+      const data = await transport.request<unknown>(stagePath(slug, '/submit'), {
         method: 'POST',
         body: payload,
         signal: config?.signal,
       });
       const parsed = ctfSubmitResponseSchema.safeParse(data);
+
       if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Mini-CTF submission response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
+        throw invalidResponse(
+          'Mini-CTF submission response did not match the contract.',
+          parsed.error.issues,
+        );
       }
+
       return parsed.data;
     },
   };

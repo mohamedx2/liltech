@@ -155,3 +155,126 @@
   font-weight: 700;
   color: var(--color-accent);
 }
+
+/* Seven-stage tracker */
+.tracker {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 860px) {
+  .tracker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.trackerItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 0.75rem);
+  background: var(--color-surface-sunken, transparent);
+  font-size: var(--text-xs);
+  min-width: 0;
+}
+
+.trackerIndex {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.trackerTitle {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.trackerState {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.trackerItemSolved {
+  border-color: var(--palette-gold);
+}
+
+.trackerItemSolved .trackerState {
+  color: var(--palette-gold);
+}
+
+.trackerItemCurrent {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.trackerItemCurrent .trackerState {
+  color: var(--color-accent);
+}
+
+.trackerItemLocked {
+  opacity: 0.62;
+}
+
+.stageHeading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stageNumber {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--palette-gold);
+}
+
+.stageContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.stageMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md, 0.75rem);
+}
+
+.resourcesTitle {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.resourceNote {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}

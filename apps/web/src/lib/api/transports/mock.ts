@@ -7,7 +7,12 @@ import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetMiniCtfStatus, handleSubmitMiniCtfFlag } from './mocks/mini-ctf.mock';
-import { handleGetCtfStage, handleRevealCtfHint, handleSubmitCtfAnswer } from './mocks/ctf.mock';
+import {
+  handleGetCtfChain,
+  handleGetCtfStage,
+  handleRevealCtfHint,
+  handleSubmitCtfAnswer,
+} from './mocks/ctf.mock';
 import { handleGetMyBadge, handleGetMyTeam } from './mocks/participants.mock';
 import { handleCreateSubmission, handleGetMySubmissions } from './mocks/submissions.mock';
 import type { MockRouteMap } from './mocks/types';
@@ -43,10 +48,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`POST ${PLANNED_ENDPOINTS.MINI_CTF_SUBMIT}`]: (config) =>
       handleSubmitMiniCtfFlag((config.body ?? {}) as MiniCtfSubmitRequest),
 
-    [`GET ${PLANNED_ENDPOINTS.CTF_STAGE}`]: () => handleGetCtfStage(),
-    [`POST ${PLANNED_ENDPOINTS.CTF_HINT}`]: () => handleRevealCtfHint(),
-    [`POST ${PLANNED_ENDPOINTS.CTF_SUBMIT}`]: (config) =>
-      handleSubmitCtfAnswer((config.body ?? {}) as CtfSubmitAnswerRequest),
+    [`GET ${PLANNED_ENDPOINTS.CTF_CHAIN}`]: () => handleGetCtfChain(),
 
     [`GET ${PLANNED_ENDPOINTS.CHALLENGES_CURRENT}`]: () => handleGetCurrentChallenge(),
 
@@ -55,6 +57,35 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
 
     [`GET ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: () => handleGetAnnouncements(),
   };
+
+  /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */
+  function ctfStageRoute(
+    method: string,
+    path: string,
+    config: ApiRequestConfig,
+  ): (() => unknown) | undefined {
+    const match = /^\/ctf\/stages\/([^/]+)(\/(hints|submit))?$/.exec(path);
+
+    if (!match) {
+      return undefined;
+    }
+
+    const slug = decodeURIComponent(match[1]);
+
+    if (!match[2] && method === 'GET') {
+      return () => handleGetCtfStage(slug);
+    }
+
+    if (match[3] === 'hints' && method === 'POST') {
+      return () => handleRevealCtfHint(slug);
+    }
+
+    if (match[3] === 'submit' && method === 'POST') {
+      return () => handleSubmitCtfAnswer(slug, (config.body ?? {}) as CtfSubmitAnswerRequest);
+    }
+
+    return undefined;
+  }
 
   return {
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
@@ -71,7 +102,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
       }
 
       const method = config.method ?? 'GET';
-      const handler = routes[`${method} ${path}`];
+      const handler = routes[`${method} ${path}`] ?? ctfStageRoute(method, path, config);
       if (!handler) {
         throw new ApiClientError({
           message: `No mock defined for ${method} ${path}.`,

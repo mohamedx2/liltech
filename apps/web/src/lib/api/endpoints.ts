@@ -25,10 +25,10 @@ export const PLANNED_ENDPOINTS = {
   PARTICIPANTS_BADGE: '/participants/badge',
   MINI_CTF_STATUS: '/mini-ctf/status',
   MINI_CTF_SUBMIT: '/mini-ctf/submit',
-  /** Shipped by the CTF gate module (`apps/api/src/modules/ctf`). */
-  CTF_STAGE: '/ctf/stage',
-  CTF_HINT: '/ctf/stage/hints',
-  CTF_SUBMIT: '/ctf/stage/submit',
+  /** Shipped by the LOUAGE 404 module (`apps/api/src/modules/ctf`). */
+  CTF_CHAIN: '/ctf/chain',
+  /** Stage-scoped paths; append `/<slug>`, `/<slug>/hints`, `/<slug>/submit`. */
+  CTF_STAGES: '/ctf/stages',
   CHALLENGES_CURRENT: '/challenges/current',
   SUBMISSIONS: '/submissions',
   SUBMISSIONS_MY_TEAM: '/submissions/my-team',

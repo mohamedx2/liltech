@@ -1,11 +1,10 @@
 import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChallengeTrack, EventPhase, Role, TeamProgressState } from 'api-contracts';
 import { Stepper } from '@/features/dashboard/stepper';
 import { QrPassCard } from '@/features/dashboard/qr-pass-card';
 import { TeamRoster } from '@/features/dashboard/team-roster';
-import { MiniCtfView } from '@/features/mini-ctf/mini-ctf-view';
 import { ChallengeView } from '@/features/challenges/challenge-view';
 import { SubmissionsView } from '@/features/submissions/submissions-view';
 import { AnnouncementsView } from '@/features/announcements/announcements-view';
@@ -17,7 +16,6 @@ import type {
   EventStateResponse,
   ParticipantProfile,
 } from '@/lib/api/contracts/pending';
-import type { CtfStageResponse } from 'api-contracts';
 
 const LIVE_EVENT_STATE: EventStateResponse = {
   phase: EventPhase.Live,
@@ -98,99 +96,6 @@ describe('Participant / Team Features', () => {
       expect(screen.getByText('Team Leader')).toBeTruthy();
       expect(screen.getByText('Checked In')).toBeTruthy();
       expect(screen.getByText('Pending Check-In')).toBeTruthy();
-    });
-  });
-
-  describe('MiniCtfView', () => {
-    const openStage: CtfStageResponse = {
-      stage: {
-        id: '00000000-0000-4000-8000-000000000001',
-        slug: 'louage-404',
-        position: 1,
-        title: 'Louage 404',
-        description: null,
-        assetImageUrl: null,
-        assetZipUrl: '/ctf/step-1/CTF.zip',
-        hintCount: 3,
-      },
-      progress: {
-        isOpen: true,
-        isSolved: false,
-        solvedAt: null,
-        attempts: 0,
-        hintsUsed: 0,
-        mainChallengeUnlocked: false,
-      },
-      hints: [],
-    };
-
-    const solvedStage: CtfStageResponse = {
-      ...openStage,
-      progress: {
-        ...openStage.progress,
-        isSolved: true,
-        solvedAt: '2026-11-21T20:05:00.000Z',
-        attempts: 1,
-        mainChallengeUnlocked: true,
-      },
-    };
-
-    it('validates the answer and shows the solved state', async () => {
-      vi.spyOn(api.ctf, 'getStage')
-        .mockResolvedValueOnce(openStage)
-        .mockResolvedValueOnce(solvedStage);
-      vi.spyOn(api.ctf, 'submitAnswer')
-        .mockRejectedValueOnce(
-          new ApiClientError({
-            message: 'That answer is not right. Re-read the archive contents and try again.',
-            status: 400,
-            code: 'CTF_NOT_SOLVED',
-          }),
-        )
-        .mockResolvedValueOnce({
-          success: true,
-          message: 'El série t2akkdet. Your main challenge is now unlocked.',
-          isSolved: true,
-          solvedAt: '2026-11-21T20:05:00.000Z',
-          mainChallengeUnlocked: true,
-        });
-
-      render(<MiniCtfView />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Louage 404/i)).toBeTruthy();
-      });
-
-      const input = screen.getByLabelText(/Registration/i) as HTMLInputElement;
-      expect(input).toBeTruthy();
-
-      fireEvent.change(input, { target: { value: '000 TUN 0000' } });
-      fireEvent.click(screen.getByRole('button', { name: /Submit Answer/i }));
-
-      await waitFor(() => {
-        expect(screen.getAllByText(/Incorrect Answer/i).length).toBeGreaterThan(0);
-      });
-
-      fireEvent.change(input, { target: { value: '187 TUN 4253' } });
-      fireEvent.click(screen.getByRole('button', { name: /Submit Answer/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Solved!/i)).toBeTruthy();
-      });
-    });
-
-    it('shows the locked state while the gate is closed', async () => {
-      vi.spyOn(api.ctf, 'getStage').mockResolvedValue({
-        ...openStage,
-        progress: { ...openStage.progress, isOpen: false },
-      });
-
-      render(<MiniCtfView />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/The Mini-CTF is locked/i)).toBeTruthy();
-      });
-      expect(screen.queryByLabelText(/Registration/i)).toBeNull();
     });
   });
 

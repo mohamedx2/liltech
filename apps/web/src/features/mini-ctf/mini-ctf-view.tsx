@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { api, ApiClientError } from '@/lib/api';
-import type { CtfStageResponse } from 'api-contracts';
+import type { CtfChainResponse, CtfTrackItem } from 'api-contracts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField, TextInput } from '@/components/ui/input';
 import { Button, buttonClassName } from '@/components/ui/button';
@@ -14,8 +13,46 @@ import { Badge } from '@/components/ui/badge';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import styles from './mini-ctf-view.module.css';
 
+const STATE_LABEL: Record<CtfTrackItem['state'], string> = {
+  solved: 'Solved',
+  unlocked: 'Current',
+  locked: 'Locked',
+};
+
+const STATE_CLASS: Record<CtfTrackItem['state'], string> = {
+  solved: 'trackerItemSolved',
+  unlocked: 'trackerItemCurrent',
+  locked: 'trackerItemLocked',
+};
+
+function StageTracker({ stages }: { stages: CtfTrackItem[] }) {
+  return (
+    <ol className={styles.tracker} aria-label="Mini-CTF stages">
+      {stages.map((stage) => (
+        <li
+          key={stage.slug}
+          className={`${styles.trackerItem} ${styles[STATE_CLASS[stage.state]] ?? ''}`}
+          aria-current={stage.state === 'unlocked' ? 'step' : undefined}
+        >
+          <span className={styles.trackerIndex}>{String(stage.position).padStart(2, '0')}</span>
+          <span className={styles.trackerTitle}>{stage.title}</span>
+          <span className={styles.trackerState}>
+            {stage.state === 'locked' ? (
+              <>
+                <LockIcon size={12} /> {STATE_LABEL[stage.state]}
+              </>
+            ) : (
+              STATE_LABEL[stage.state]
+            )}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function MiniCtfView() {
-  const [stageData, setStageData] = useState<CtfStageResponse | null>(null);
+  const [chain, setChain] = useState<CtfChainResponse | null>(null);
   const [answerInput, setAnswerInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,16 +63,15 @@ export function MiniCtfView() {
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
     setSubmitError(null);
     try {
-      // The server owns gate availability, attempts, hints and unlock state.
-      setStageData(await api.ctf.getStage());
+      // The server owns which stage is current; the client renders it.
+      setChain(await api.ctf.getChain());
     } catch (err) {
       if (err instanceof ApiClientError) {
         setSubmitError({ code: err.code, message: err.message });
       } else {
-        setSubmitError({ code: 'UNKNOWN', message: 'Failed to retrieve the Mini-CTF stage.' });
+        setSubmitError({ code: 'UNKNOWN', message: 'Failed to load the Mini-CTF.' });
       }
     } finally {
       setIsLoading(false);
@@ -46,17 +82,18 @@ export function MiniCtfView() {
     loadData();
   }, [loadData]);
 
+  const current = chain?.current ?? null;
+  const currentSlug = current?.stage.slug;
+
   const handleRevealHint = async () => {
-    if (isRevealingHint || !stageData) return;
+    if (!currentSlug || isRevealingHint) return;
 
     setIsRevealingHint(true);
     setSubmitError(null);
 
     try {
-      const result = await api.ctf.revealHint();
-      setStageData((current) =>
-        current ? { ...current, hints: [...current.hints, result.hint] } : current,
-      );
+      await api.ctf.revealHint(currentSlug);
+      await loadData();
     } catch (err) {
       if (err instanceof ApiClientError) {
         setSubmitError({ code: err.code, message: err.message });
@@ -70,25 +107,25 @@ export function MiniCtfView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!answerInput.trim() || isSubmitting) return;
+    if (!currentSlug || !answerInput.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
     setSuccessMessage(null);
 
     try {
-      const result = await api.ctf.submitAnswer({ answer: answerInput.trim() });
+      const result = await api.ctf.submitAnswer(currentSlug, { answer: answerInput.trim() });
       setSuccessMessage(result.message);
       setAnswerInput('');
-      // Re-read the authoritative state instead of assuming the unlock locally.
-      setStageData(await api.ctf.getStage());
+      // Always trust the server's refreshed state, never the local response.
+      await loadData();
     } catch (err) {
       if (err instanceof ApiClientError) {
         setSubmitError({ code: err.code, message: err.message });
       } else {
         setSubmitError({
           code: 'CLIENT_ERROR',
-          message: 'An unexpected error occurred while validating the answer.',
+          message: 'An unexpected error occurred while validating the flag.',
         });
       }
       setTimeout(() => {
@@ -100,63 +137,65 @@ export function MiniCtfView() {
   };
 
   if (isLoading) {
-    return <LoadingState message="Checking Mini-CTF gate status..." />;
+    return <LoadingState message="Loading the LOUAGE 404 investigation..." />;
   }
 
-  if (!stageData) {
+  if (!chain) {
     return (
       <ErrorState
-        title="CTF Gate Inaccessible"
-        message={submitError?.message ?? 'Could not connect to the challenge gate.'}
+        title="Mini-CTF unavailable"
+        message={submitError?.message ?? 'Could not reach the investigation server.'}
         onRetry={() => {
-          loadData();
+          setIsLoading(true);
+          void loadData();
         }}
       />
     );
   }
 
-  const { stage, progress, hints } = stageData;
-  const nextHintPosition = hints.length + 1;
+  const chainComplete = chain.current === null && chain.summary.solved === chain.summary.total;
+  const stageUnavailable = current !== null && current.stage.status !== 'live';
+  const driveUrl = current?.stage.assetDriveUrl ?? null;
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.headerTitles}>
-          <span className={styles.subHeading}>Gatekeeper Challenge · Stage {stage.position}</span>
-          <h1 className={styles.title}>{stage.title}</h1>
-          {stage.description && <p className={styles.description}>{stage.description}</p>}
+          <span className={styles.subHeading}>LOUAGE 404 · The Missing Passenger</span>
+          <h1 className={styles.title}>Mini-CTF Investigation</h1>
+          <p className={styles.description}>
+            Seven stages stand between your team and the main challenge. Each solved flag unlocks
+            the next piece of the investigation.
+          </p>
         </div>
 
         <div className={styles.badgeGroup}>
-          <Badge
-            tone={progress.isSolved ? 'success' : progress.isOpen ? 'info' : 'warning'}
-            showDot
-          >
-            {progress.isSolved
-              ? 'Gate Cleared · Challenge Unlocked'
-              : progress.isOpen
-                ? 'Gate Open'
-                : 'Gate Locked'}
+          <Badge tone={chainComplete ? 'success' : chain.eligible ? 'info' : 'warning'} showDot>
+            {chainComplete
+              ? 'Investigation complete'
+              : chain.eligible
+                ? 'In progress'
+                : 'Not checked in'}
           </Badge>
-          <Badge tone="neutral">Attempts: {progress.attempts}</Badge>
           <Badge tone="neutral">
-            Hints: {progress.hintsUsed}/{stage.hintCount}
+            {chain.summary.solved}/{chain.summary.total} solved
           </Badge>
+          <Badge tone="neutral">{chain.team.name}</Badge>
         </div>
       </header>
 
-      {progress.isSolved && (
+      <StageTracker stages={chain.stages} />
+
+      {chainComplete && (
         <Card surface="raised" className={styles.solvedCard}>
           <CardHeader>
-            <CardTitle as="h2">Mini-CTF Solved!</CardTitle>
-            <CardDescription>
-              Your answer was verified. Your main challenge track is ready for review.
-            </CardDescription>
+            <CardTitle as="h2">Investigation completed</CardTitle>
+            <CardDescription>You were the missing passenger all along.</CardDescription>
           </CardHeader>
           <CardContent className={styles.solvedContent}>
-            <Alert tone="success" title="Track Workspace Unlocked">
-              You have full access to your track challenge brief, dataset resources, and submission
-              portal.
+            <Alert tone="success" title="Main challenge unlocked">
+              Every required stage has been solved. The investigation is over — your main challenge
+              is now available.
             </Alert>
             <div className={styles.actionRow}>
               <Link
@@ -170,7 +209,7 @@ export function MiniCtfView() {
         </Card>
       )}
 
-      {!progress.isOpen && !progress.isSolved && (
+      {!chain.eligible && (
         <Card surface="default" className={styles.lockedCard}>
           <CardHeader>
             <div className={styles.lockedTitle}>
@@ -178,50 +217,68 @@ export function MiniCtfView() {
               <CardTitle as="h2">The Mini-CTF is locked</CardTitle>
             </div>
             <CardDescription>
-              Unlock condition: your team must be checked in and the event must enter the live
-              phase.
+              Your team must be checked in at the entrance before the investigation opens.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Alert tone="info" title="Awaiting Event Launch">
-              Please ensure your entire team has checked in with entrance staff. Once the event goes
-              live, you can open the stage material here.
+            <Alert tone="info" title="Awaiting check-in">
+              Ask an organizer to scan your entrance badges. The stages unlock as soon as your team
+              is checked in.
             </Alert>
           </CardContent>
         </Card>
       )}
 
-      {progress.isOpen && !progress.isSolved && (
+      {chain.eligible && current && (
         <>
           <Card surface="raised" className={styles.formCard}>
             <CardHeader>
-              <CardTitle as="h2">Stage Material</CardTitle>
+              <div className={styles.stageHeading}>
+                <span className={styles.stageNumber}>
+                  Stage {String(current.stage.position).padStart(2, '0')} /{' '}
+                  {String(current.stage.totalStages).padStart(2, '0')}
+                </span>
+                <CardTitle as="h2">{current.stage.title}</CardTitle>
+              </div>
               <CardDescription>
-                Inspect the photograph, then open the archive with the password you derive from it.
+                {current.stage.description ?? 'No briefing published for this stage yet.'}
               </CardDescription>
             </CardHeader>
-            <CardContent className={styles.materialContent}>
-              {stage.assetImageUrl && (
-                <Image
-                  src={stage.assetImageUrl}
-                  alt="Louage photograph supplied for this stage"
-                  width={1200}
-                  height={900}
-                  className={styles.assetImage}
-                  priority
-                />
-              )}
-              {stage.assetZipUrl && (
-                <div className={styles.assetActions}>
+            <CardContent className={styles.stageContent}>
+              <div className={styles.stageMeta}>
+                <Badge tone="neutral">Attempts: {current.progress.attempts}</Badge>
+                <Badge tone="neutral">
+                  Hints: {current.progress.hintsUsed}/{current.stage.hintCount}
+                </Badge>
+                <Badge tone={stageUnavailable ? 'warning' : 'info'}>
+                  {stageUnavailable ? 'Not published yet' : 'Open'}
+                </Badge>
+              </div>
+
+              <section className={styles.resources} aria-label="Challenge resources">
+                <h2 className={styles.resourcesTitle}>Challenge resources</h2>
+                {driveUrl ? (
                   <a
-                    href={stage.assetZipUrl}
-                    download
+                    href={driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
                     className={buttonClassName({ variant: 'secondary', size: 'md' })}
                   >
-                    Download CTF.zip
+                    Open Google Drive
+                    <span aria-hidden="true"> ↗</span>
                   </a>
-                </div>
-              )}
+                ) : (
+                  <p className={styles.resourceNote}>
+                    {stageUnavailable
+                      ? 'Resources are not available yet. Keep an eye on the announcements.'
+                      : 'Resources for this stage have not been published yet.'}
+                  </p>
+                )}
+                <p className={styles.resourceNote}>
+                  Resources are hosted outside the platform. If your system cannot open the archive,
+                  use 7-Zip (Windows) or Keka (macOS).
+                </p>
+              </section>
             </CardContent>
           </Card>
 
@@ -229,29 +286,34 @@ export function MiniCtfView() {
             <CardHeader>
               <CardTitle as="h2">Hints</CardTitle>
               <CardDescription>
-                Hints are revealed one at a time and are recorded against your team.
+                Hints are revealed one at a time and recorded for your team.
               </CardDescription>
             </CardHeader>
             <CardContent className={styles.hintContent}>
-              {hints.length === 0 && <p className={styles.description}>No hints revealed yet.</p>}
-              <ol className={styles.hintList}>
-                {hints.map((hint) => (
-                  <li key={hint.position} className={styles.hintItem}>
-                    <span className={styles.hintPosition}>Hint {hint.position}</span>
-                    <span>{hint.body}</span>
-                  </li>
-                ))}
-              </ol>
-              {hints.length < stage.hintCount && (
+              {current.hints.length === 0 ? (
+                <p className={styles.description}>No hints revealed yet.</p>
+              ) : (
+                <ol className={styles.hintList}>
+                  {current.hints.map((hint) => (
+                    <li key={hint.position} className={styles.hintItem}>
+                      <span className={styles.hintPosition}>Hint {hint.position}</span>
+                      <span>{hint.body}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {current.hints.length < current.stage.hintCount && !current.progress.solved && (
                 <div className={styles.submitRow}>
                   <Button
                     type="button"
                     variant="ghost"
                     size="md"
                     loading={isRevealingHint}
+                    disabled={stageUnavailable}
                     onClick={handleRevealHint}
                   >
-                    Reveal hint {nextHintPosition} of {stage.hintCount}
+                    Reveal hint {current.hints.length + 1} of {current.stage.hintCount}
                   </Button>
                 </div>
               )}
@@ -260,9 +322,9 @@ export function MiniCtfView() {
 
           <Card surface="raised" className={styles.formCard}>
             <CardHeader>
-              <CardTitle as="h2">Submit the Registration</CardTitle>
+              <CardTitle as="h2">Submit your flag</CardTitle>
               <CardDescription>
-                Enter the registration written inside the archive to unlock your main challenge.
+                The server verifies your flag. A correct flag unlocks the next stage immediately.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -277,10 +339,14 @@ export function MiniCtfView() {
                     tone="error"
                     title={
                       submitError.code === 'RATE_LIMITED'
-                        ? 'Too Many Attempts'
+                        ? 'Too many attempts'
                         : submitError.code === 'CTF_NOT_SOLVED'
-                          ? 'Incorrect Answer'
-                          : 'Validation Error'
+                          ? 'Incorrect flag'
+                          : submitError.code === 'STAGE_LOCKED'
+                            ? 'Stage locked'
+                            : submitError.code === 'STAGE_NOT_PUBLISHED'
+                              ? 'Stage unavailable'
+                              : 'Validation error'
                     }
                   >
                     {submitError.message}
@@ -289,15 +355,15 @@ export function MiniCtfView() {
               )}
 
               {successMessage && (
-                <Alert tone="success" title="Success!">
+                <Alert tone="success" title="Correct flag">
                   {successMessage}
                 </Alert>
               )}
 
               <form onSubmit={handleSubmit} className={styles.form}>
                 <FormField
-                  label="Registration"
-                  hint="Spacing, dashes and letter case are ignored."
+                  label="Flag"
+                  hint="Format L404{...}. Spacing, dashes and letter case are ignored."
                   required
                 >
                   {({ id, describedBy }) => (
@@ -305,11 +371,11 @@ export function MiniCtfView() {
                       id={id}
                       value={answerInput}
                       onChange={(e) => setAnswerInput(e.target.value)}
-                      placeholder="000 TUN 0000"
-                      disabled={isSubmitting}
+                      placeholder="Enter your flag..."
+                      disabled={isSubmitting || stageUnavailable || current.progress.solved}
                       aria-describedby={describedBy}
                       autoComplete="off"
-                      autoCapitalize="characters"
+                      autoCapitalize="none"
                       spellCheck={false}
                     />
                   )}
@@ -320,9 +386,9 @@ export function MiniCtfView() {
                     type="submit"
                     variant="primary"
                     loading={isSubmitting}
-                    disabled={!answerInput.trim()}
+                    disabled={!answerInput.trim() || stageUnavailable || current.progress.solved}
                   >
-                    {isSubmitting ? 'Validating…' : 'Submit Answer'}
+                    Submit flag
                   </Button>
                 </div>
               </form>
