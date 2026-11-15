@@ -1,5 +1,26 @@
 import { TEAM_MEMBERS_TOTAL_MAX, TEAM_MEMBERS_TOTAL_MIN } from 'api-contracts';
 
+const errorResponse = (description: string) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+});
+
+const json = (schema: object, description: string) => ({
+  description,
+  content: { 'application/json': { schema } },
+});
+
+const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+
+const uuidPathParam = (name: string) => ({
+  name,
+  in: 'path',
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+});
+
+const badgeColor = { type: 'string', enum: ['blue', 'red', 'yellow', 'green'], nullable: true };
+
 export const swaggerSpec = {
   openapi: '3.0.3',
   info: {
@@ -309,6 +330,25 @@ export const swaggerSpec = {
           },
         },
       },
+      JuryAccount: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', nullable: true, description: 'Readable by admins only' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      ResendBadgeEmailResponse: {
+        type: 'object',
+        properties: {
+          participantId: { type: 'string', format: 'uuid' },
+          emailStatus: { type: 'string', enum: ['pending', 'sent', 'failed'] },
+          emailLastSentAt: { type: 'string', format: 'date-time' },
+          emailResendAvailableAt: { type: 'string', format: 'date-time' },
+        },
+      },
       AuditLogEntry: {
         type: 'object',
         required: ['id', 'action', 'createdAt'],
@@ -331,7 +371,9 @@ export const swaggerSpec = {
     { name: 'Registration', description: 'Team and participant roster management' },
     { name: 'Check-In', description: 'Entrance gate QR badge verification and badge revocation' },
     { name: 'Announcements', description: 'Live announcements stream and admin broadcaster' },
-    { name: 'Admin', description: 'Security audit logs, team rosters, and jury overview' },
+    { name: 'Admin', description: 'Audit log, team roster, jury accounts and badge emails' },
+    { name: 'Challenges', description: 'Two sequential challenges with Mini-CTF early access' },
+    { name: 'Team Portal', description: 'The signed-in team members, QR badges and badge emails' },
   ],
   paths: {
     '/health': {
@@ -871,46 +913,380 @@ export const swaggerSpec = {
     '/admin/jury': {
       get: {
         tags: ['Admin'],
-        summary: 'List jury accounts (Admin only)',
+        summary: 'List jury accounts with their passwords (Admin only)',
         security: [{ bearerAuth: [] }],
         responses: {
-          200: {
-            description: 'Jury accounts roster',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    items: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string', format: 'uuid' },
-                          name: { type: 'string' },
-                          email: { type: 'string', format: 'email' },
-                          createdAt: { type: 'string', format: 'date-time' },
-                        },
-                      },
-                    },
-                    total: { type: 'number' },
-                  },
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                items: { type: 'array', items: ref('JuryAccount') },
+                total: { type: 'number' },
+              },
+            },
+            'Jury accounts roster',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Create a jury account (Admin only, audited)',
+        description: 'Omit password to let the server generate a 16-character password.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email'],
+                additionalProperties: false,
+                properties: {
+                  name: { type: 'string', maxLength: 100 },
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', minLength: 12, maxLength: 256 },
                 },
               },
             },
           },
-          401: {
-            description: 'Unauthenticated',
-            content: {
-              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+        },
+        responses: {
+          201: json(ref('JuryAccount'), 'Created jury account, including its password'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          409: errorResponse('Email already used by another account'),
+        },
+      },
+    },
+    '/admin/jury/{id}': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Update a jury account (Admin only, audited)',
+        description: 'A new password ends every existing session of that juror.',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                minProperties: 1,
+                additionalProperties: false,
+                properties: {
+                  name: { type: 'string', maxLength: 100 },
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', minLength: 12, maxLength: 256 },
+                },
+              },
             },
           },
-          403: {
-            description: 'Requires admin role',
-            content: {
-              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+        },
+        responses: {
+          200: json(ref('JuryAccount'), 'Updated jury account'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('No jury account with this id'),
+          409: errorResponse('Email already used by another account'),
+        },
+      },
+      delete: {
+        tags: ['Admin'],
+        summary: 'Delete a jury account and its sessions (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        responses: {
+          204: { description: 'Deleted' },
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('No jury account with this id'),
+        },
+      },
+    },
+    '/admin/participants/{participantId}/resend-badge-email': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Resend a badge email without the hourly limit (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(ref('ResendBadgeEmailResponse'), 'Delivery attempted'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+          409: errorResponse('Badge revoked or no email on file'),
+        },
+      },
+    },
+    '/participants/team': {
+      get: {
+        tags: ['Team Portal'],
+        summary: 'The signed-in team, its members and their badge colors (Team only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                progress: { type: 'string', example: 'registered' },
+                isCheckedIn: { type: 'boolean' },
+                members: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string', format: 'uuid' },
+                      teamId: { type: 'string', format: 'uuid' },
+                      fullName: { type: 'string' },
+                      email: { type: 'string', nullable: true },
+                      roleInTeam: { type: 'string', enum: ['leader', 'member'] },
+                      color: badgeColor,
+                      isCheckedIn: { type: 'boolean' },
+                    },
+                  },
+                },
+              },
+            },
+            'Team summary',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/participants/badge': {
+      get: {
+        tags: ['Team Portal'],
+        summary: 'Every member QR badge of the signed-in team (Team only)',
+        description:
+          'Tokens are decrypted only for the caller team. Revoked badges and badges issued before retrievable storage have a null token.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                teamId: { type: 'string', format: 'uuid' },
+                teamName: { type: 'string' },
+                badges: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      participantId: { type: 'string', format: 'uuid' },
+                      participantName: { type: 'string' },
+                      roleInTeam: { type: 'string', enum: ['leader', 'member'] },
+                      color: badgeColor,
+                      qrToken: { type: 'string', nullable: true },
+                      qrImageDataUrl: { type: 'string', nullable: true },
+                      isRevoked: { type: 'boolean' },
+                      isCheckedIn: { type: 'boolean' },
+                      email: { type: 'string', nullable: true },
+                      emailStatus: {
+                        type: 'string',
+                        enum: ['pending', 'sent', 'failed'],
+                        nullable: true,
+                      },
+                      emailLastSentAt: { type: 'string', format: 'date-time', nullable: true },
+                      emailResendAvailableAt: {
+                        type: 'string',
+                        format: 'date-time',
+                        nullable: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            'Team badges',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/participants/badge/{participantId}/resend-email': {
+      post: {
+        tags: ['Team Portal'],
+        summary: 'Resend one member badge email, at most once per hour (Team only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        responses: {
+          200: json(ref('ResendBadgeEmailResponse'), 'Delivery attempted'),
+          400: errorResponse('Invalid participant id'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+          404: errorResponse('Not a participant of the caller team'),
+          409: errorResponse('Badge revoked or no email on file'),
+          429: errorResponse(
+            'Sent less than an hour ago; details.emailResendAvailableAt says when',
+          ),
+        },
+      },
+    },
+    '/challenges': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'Both challenges with the caller team access state (Team only)',
+        description:
+          'Before the event: { available: false, reason: "EVENT_NOT_STARTED" }. Each item: { challenge, access: locked|early|public, ctfSolved, content|null }.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Challenge list or unavailable state'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/challenges/current': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'The running (or last ended) challenge for the caller team (Team only)',
+        description:
+          'Content is returned before publicAt only to teams that solved this challenge Mini-CTF. Unavailable reasons: EVENT_NOT_STARTED, NO_CHALLENGE_STARTED.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Current challenge or unavailable state'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires team role'),
+        },
+      },
+    },
+    '/admin/challenges': {
+      get: {
+        tags: ['Challenges'],
+        summary: 'List challenges with content, status and Mini-CTF solves (Admin only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object' }, 'Challenges'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+      post: {
+        tags: ['Challenges'],
+        summary: 'Create a challenge (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['position', 'title', 'description'],
+                additionalProperties: false,
+                properties: {
+                  position: { type: 'integer', minimum: 1, example: 1 },
+                  title: { type: 'string', maxLength: 150 },
+                  summary: { type: 'string', maxLength: 500 },
+                  description: { type: 'string' },
+                  problemStatement: { type: 'string' },
+                  deliverables: { type: 'array', items: { type: 'string' } },
+                  resources: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        url: { type: 'string', format: 'uri' },
+                      },
+                    },
+                  },
+                  publicDelayMinutes: { type: 'integer', minimum: 0, example: 60 },
+                },
+              },
             },
           },
+        },
+        responses: {
+          201: json({ type: 'object' }, 'Created challenge'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          409: errorResponse('Position already taken'),
+        },
+      },
+    },
+    '/admin/challenges/{id}': {
+      patch: {
+        tags: ['Challenges'],
+        summary: 'Update challenge content or public delay (Admin only, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                minProperties: 1,
+                additionalProperties: false,
+                properties: {
+                  title: { type: 'string', maxLength: 150 },
+                  summary: { type: 'string', maxLength: 500 },
+                  description: { type: 'string' },
+                  problemStatement: { type: 'string' },
+                  deliverables: { type: 'array', items: { type: 'string' } },
+                  resources: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        url: { type: 'string', format: 'uri' },
+                      },
+                    },
+                  },
+                  publicDelayMinutes: { type: 'integer', minimum: 0, example: 60 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+        },
+      },
+    },
+    '/admin/challenges/{id}/start': {
+      post: {
+        tags: ['Challenges'],
+        summary: 'Start a challenge (Admin only, audited; event must be live)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+          409: errorResponse(
+            'Event not live, another challenge running, an earlier challenge not ended, or already started',
+          ),
+        },
+      },
+    },
+    '/admin/challenges/{id}/end': {
+      post: {
+        tags: ['Challenges'],
+        summary: 'End a challenge (Admin only, audited; event must be live)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('id')],
+        responses: {
+          200: json({ type: 'object' }, 'Updated challenge'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown challenge'),
+          409: errorResponse('Event not live, or challenge not running'),
         },
       },
     },

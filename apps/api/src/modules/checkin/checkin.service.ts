@@ -1,66 +1,13 @@
 import { Prisma } from '@prisma/client';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
-import type { BadgeSummary, CheckInResponse, IssueBadgeResponse } from 'api-contracts';
-import { generateQrToken, hashQrToken } from './qr-token';
+import type { BadgeSummary, CheckInResponse } from 'api-contracts';
+import { hashQrToken } from './qr-token';
 
 /**
- * Check-in logic: QR badge issuance, verification, single check-in, and
- * revocation. Scan and revocation are audited transactionally.
+ * Check-in logic: QR badge verification, single check-in, and revocation
+ * (issuance and email delivery live in the badges module). Scan and revocation are audited transactionally.
  */
-
-export async function issueBadgeForParticipant(participantId: string): Promise<IssueBadgeResponse> {
-  const prisma = getPrismaClient();
-
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
-    include: { badge: true },
-  });
-
-  if (!participant) {
-    throw ApiError.notFound('Participant not found.');
-  }
-
-  if (participant.badge && !participant.badge.revokedAt) {
-    throw ApiError.conflict('This participant already has an active badge.');
-  }
-
-  const { token, tokenHash } = generateQrToken();
-
-  await prisma.qrToken.upsert({
-    where: { participantId },
-    update: { tokenHash, issuedAt: new Date(), revokedAt: null },
-    create: { participantId, tokenHash },
-  });
-
-  return {
-    participantId: participant.id,
-    participantName: participant.name,
-    token,
-    issuedAt: new Date().toISOString(),
-  };
-}
-
-/** Issue a QR badge within an already-open transaction (atomic with registration). */
-export async function issueBadgeForParticipantInTx(
-  tx: Prisma.TransactionClient,
-  participantId: string,
-  participantName: string,
-): Promise<IssueBadgeResponse> {
-  const { token, tokenHash } = generateQrToken();
-
-  const created = await tx.qrToken.create({
-    data: { participantId, tokenHash },
-    select: { issuedAt: true },
-  });
-
-  return {
-    participantId,
-    participantName,
-    token,
-    issuedAt: created.issuedAt.toISOString(),
-  };
-}
 
 export async function listBadges(): Promise<BadgeSummary[]> {
   const prisma = getPrismaClient();
@@ -73,6 +20,7 @@ export async function listBadges(): Promise<BadgeSummary[]> {
       participant: {
         select: {
           name: true,
+          color: true,
           team: { select: { name: true } },
           checkIn: { select: { checkedInAt: true } },
         },
@@ -84,6 +32,7 @@ export async function listBadges(): Promise<BadgeSummary[]> {
     participantId: badge.participantId,
     participantName: badge.participant.name,
     teamName: badge.participant.team.name,
+    color: badge.participant.color,
     issuedAt: badge.issuedAt.toISOString(),
     ...(badge.revokedAt ? { revokedAt: badge.revokedAt.toISOString() } : {}),
     ...(badge.participant.checkIn
@@ -144,6 +93,7 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         participant: {
           id: badge.participant.id,
           name: badge.participant.name,
+          color: badge.participant.color,
         },
         team: {
           id: badge.participant.team.id,

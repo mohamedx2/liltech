@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoTimestampSchema } from './common.js';
 import { participantNameSchema } from './registration-contracts.js';
+import { badgeColorSchema } from './participants-contracts.js';
 
 /**
  * Contract for the check-in module:
@@ -35,6 +36,8 @@ export const checkInResponseSchema = z.strictObject({
   participant: z.strictObject({
     id: z.uuid(),
     name: participantNameSchema,
+    /** Badge color group, so staff can direct the participant. */
+    color: badgeColorSchema.nullable(),
   }),
   team: z.strictObject({
     id: z.uuid(),
@@ -60,6 +63,7 @@ export const badgeSummarySchema = z.strictObject({
   participantId: z.uuid(),
   participantName: participantNameSchema,
   teamName: z.string(),
+  color: badgeColorSchema.nullable(),
   issuedAt: isoTimestampSchema,
   revokedAt: isoTimestampSchema.optional(),
   checkedInAt: isoTimestampSchema.optional(),

@@ -30,6 +30,10 @@ Secrets (`Settings → Secrets and variables → Actions`):
 | `DEPLOY_SSH_USER` | `root` |
 | `DEPLOY_SSH_PORT` | `22` |
 | `DB_PASSWORD` | random 32-char password, generated locally with a crypto RNG, never printed |
+| `QR_TOKEN_KEY` | **required** — 32 random bytes, base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`); encrypts stored QR badge tokens. Never rotate during the event: existing badges become unreadable |
+| `SMTP_USER` | Gmail address that sends the QR badge emails (optional — no emails without it) |
+| `SMTP_PASS` | Gmail **app password** for `SMTP_USER` (optional) |
+| `MAIL_FROM` | optional sender, e.g. `LilTech 2026 <liltech@gmail.com>` |
 
 Variables: `DEPLOY_ENABLED=true` (the deploy job refuses to run while this is
 not `true` — it is the "don't touch the VPS yet" switch). Optional overrides:

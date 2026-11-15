@@ -50,9 +50,13 @@ describe('createTeamRequestSchema', () => {
     expect(createTeamRequestSchema.safeParse(teamRequest(members)).success).toBe(false);
   });
 
-  it('allows several members without an email', () => {
-    const members = [{ name: 'No Mail One' }, { name: 'No Mail Two' }, { name: 'No Mail Three' }];
+  it('requires every member to have an email (badges are delivered by email)', () => {
+    const members: Array<{ name: string; email?: string }> = membersOf(3);
+    members[1] = { name: 'No Mail' };
 
-    expect(createTeamRequestSchema.safeParse(teamRequest(members)).success).toBe(true);
+    const result = createTeamRequestSchema.safeParse(teamRequest(members));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['members', 1, 'email']);
   });
 });

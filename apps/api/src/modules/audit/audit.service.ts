@@ -16,6 +16,14 @@ export const AuditAction = {
   BadgeRevoked: 'checkin.badge_revoked',
   AnnouncementPublished: 'announcement.published',
   TeamCreated: 'registration.team_created',
+  BadgeEmailResent: 'badge.email_resent',
+  JuryCreated: 'jury.created',
+  JuryUpdated: 'jury.updated',
+  JuryDeleted: 'jury.deleted',
+  ChallengeCreated: 'challenge.created',
+  ChallengeUpdated: 'challenge.updated',
+  ChallengeStarted: 'challenge.started',
+  ChallengeEnded: 'challenge.ended',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

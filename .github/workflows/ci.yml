@@ -175,7 +175,17 @@ jobs:
           SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
           SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
           SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
+          QR_TOKEN_KEY: ${{ secrets.QR_TOKEN_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL || 'https://liltechsousse.com' }}
         run: |
+          # The API refuses to start without QR_TOKEN_KEY: fail the deploy early instead.
+          if [ -z "$QR_TOKEN_KEY" ]; then
+            echo '::error::The QR_TOKEN_KEY repository secret is required.'
+            exit 1
+          fi
           cat > /tmp/liltech.env <<EOF
           NODE_ENV=production
           POSTGRES_USER=liltech
@@ -188,6 +198,13 @@ jobs:
           LOG_LEVEL=info
           API_IMAGE=${{ env.IMAGE_API }}:latest
           WEB_IMAGE=${{ env.IMAGE_WEB }}:latest
+          QR_TOKEN_KEY=${QR_TOKEN_KEY}
+          SMTP_HOST=smtp.gmail.com
+          SMTP_PORT=465
+          SMTP_USER=${SMTP_USER}
+          SMTP_PASS=${SMTP_PASS}
+          MAIL_FROM=${MAIL_FROM}
+          PUBLIC_APP_URL=${PUBLIC_APP_URL}
           EOF
           # Optional administrator provisioning for the seed one-shot service:
           # only written when the secrets exist, so deploys without them no-op.

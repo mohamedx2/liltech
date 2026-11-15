@@ -11,3 +11,6 @@ export * from './lib/announcements-contracts.js';
 export * from './lib/event-state-contracts.js';
 export * from './lib/audit-contracts.js';
 export * from './lib/admin-contracts.js';
+export * from './lib/participants-contracts.js';
+export * from './lib/jury-admin-contracts.js';
+export * from './lib/challenges-contracts.js';

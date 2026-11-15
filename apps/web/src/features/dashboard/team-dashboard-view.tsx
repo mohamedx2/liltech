@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { TeamProgressState } from 'api-contracts';
 import { api, ApiClientError } from '@/lib/api';
 import type {
-  BadgePassResponse,
   EventStateResponse,
+  TeamBadgesResponse,
   TeamSummary,
 } from '@/lib/api/contracts/pending';
-import { getTrackLabel } from '@/lib/format';
 import { Stepper } from './stepper';
 import { QrPassCard } from './qr-pass-card';
 import { TeamRoster } from './team-roster';
@@ -23,7 +22,7 @@ import styles from './team-dashboard-view.module.css';
 
 export function TeamDashboardView() {
   const [team, setTeam] = useState<TeamSummary | null>(null);
-  const [badge, setBadge] = useState<BadgePassResponse | null>(null);
+  const [badge, setBadge] = useState<TeamBadgesResponse | null>(null);
   const [eventState, setEventState] = useState<EventStateResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,7 +34,7 @@ export function TeamDashboardView() {
     try {
       const [teamData, badgeData, eventData] = await Promise.all([
         api.participants.getMyTeam(),
-        api.participants.getMyBadge(),
+        api.participants.getMyBadges(),
         api.events.getEventState(),
       ]);
       setTeam(teamData);
@@ -99,10 +98,6 @@ export function TeamDashboardView() {
             <Badge tone="info" showDot>
               Phase: {eventState.phaseLabel ?? eventState.phase.replace('_', ' ')}
             </Badge>
-
-            {team.track && (
-              <Badge tone="success">Assigned Track: {getTrackLabel(team.track)}</Badge>
-            )}
 
             <Badge tone={team.isCheckedIn ? 'success' : 'warning'}>
               {team.isCheckedIn ? 'Checked In' : 'Pending Entrance Check-In'}
@@ -217,7 +212,7 @@ export function TeamDashboardView() {
 
       {/* Dual Panel: Personal QR Pass & Team Roster */}
       <div className={styles.bottomGrid}>
-        <QrPassCard badge={badge} />
+        <QrPassCard badges={badge} />
         <TeamRoster members={team.members} />
       </div>
     </div>

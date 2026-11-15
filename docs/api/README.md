@@ -128,7 +128,17 @@ Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
 #### `POST /api/registration/teams`
 
-Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Participant emails that are provided must be unique within the team (case-insensitive) → otherwise `VALIDATION_ERROR` (400). Duplicate team name or leader email → `CONFLICT` (409).
+Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the shared team account (leader email + password ≥ 12 chars, bcrypt) plus participant records. Every participant needs an email, unique within the team (case-insensitive) → otherwise `VALIDATION_ERROR` (400).
+
+Each participant gets one of four badge colors (`blue`, `red`, `yellow`, `green`): always the least used color so far, chosen inside a serializable transaction, so the four groups never differ by more than one. Each participant also gets one revocable QR badge; the token is stored as a SHA-256 hash (scan lookup) and AES-256-GCM encrypted under `QR_TOKEN_KEY` (so the team can display it again). After the transaction commits, each participant is emailed their own QR badge (Gmail SMTP); a delivery failure never fails the registration and is recorded per badge.
+
+Conflicts → `CONFLICT` (409) with field-level `details` (`path` is the request field, e.g. `members.1.email`):
+
+- a participant email already registered on **another team** (a person can only be on one team): message names the email(s);
+- a leader email already used by an account;
+- a team name already taken.
+
+Malformed JSON → `VALIDATION_ERROR` (400), never a 500.
 
 **Request body:**
 
@@ -136,13 +146,13 @@ Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the 
 {
   "teamName": "string (3–60)",
   "leader": { "name": "string", "email": "string", "password": "string (≥12)" },
-  "members": [ { "name": "string", "email?": "string" } ]
+  "members": [ { "name": "string", "email": "string" } ]
 }
 ```
 
 **Response `201`:** `teamResponseSchema` (id, name, progressState `registered`, leader, participants) plus a `badges` array of `issueBadgeResponseSchema` (participantId, participantName, raw token, issuedAt).
 
-Schema: `createTeamRequestSchema` / `teamRegistrationResponseSchema` (`teamResponseSchema` + `badges: issueBadgeResponseSchema[]`). The web registration page shows each raw badge token once so the leader can hand them out; email delivery is pending (open question 8).
+Schema: `createTeamRequestSchema` / `teamRegistrationResponseSchema` (`teamResponseSchema` + `badges: issueBadgeResponseSchema[]`). The raw tokens are also returned once here; the team can read them again later through `GET /api/participants/badge`.
 
 #### `GET /api/registration/teams/me`
 
@@ -150,9 +160,42 @@ Authenticated as `team`. Returns the authenticated team's own registration: part
 
 Schema: `participantSummarySchema` list wrapped in `teamResponseSchema`.
 
+### Team portal
+
+Team role only. The team is always the authenticated account's own team (`Team.leaderId`); no team id is ever accepted. The team account is shared: the leader gives its credentials to the members.
+
+#### `GET /api/participants/team`
+
+The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). Schema: `teamPortalSummarySchema`.
+
+#### `GET /api/participants/badge`
+
+Every member's QR badge, so any member can show it on a phone at the entrance even if the email failed: `qrToken`, a PNG `qrImageDataUrl`, `color`, `isRevoked`, `isCheckedIn`, and the email state (`emailStatus` `pending|sent|failed`, `emailLastSentAt`, `emailResendAvailableAt`). Revoked badges, and badges issued before encrypted storage existed, have `qrToken: null`. Schema: `teamBadgesResponseSchema`.
+
+#### `POST /api/participants/badge/:participantId/resend-email`
+
+Resends one member's badge email, **at most once per hour per participant**. The limit is claimed atomically from the stored `emailLastSentAt`, so parallel clicks or a server restart cannot bypass it. Too soon → `RATE_LIMITED` (429) with `details.emailResendAvailableAt`. A participant of another team → `NOT_FOUND` (404). Revoked badge or no email → `CONFLICT` (409). A badge without a readable stored token is reissued (the old QR code stops working). Schema: `resendBadgeEmailResponseSchema`.
+
+### Challenges
+
+The event runs two challenges one after the other. An administrator starts and ends each one; both actions are refused (`CONFLICT`, 409) unless the event phase is `live`. Only one challenge can be live at a time (service check plus a partial unique index), challenges start in `position` order, and an ended challenge cannot start again. Starting sets `publicAt = startedAt + publicDelayMinutes` (60 by default).
+
+A team reads a running challenge's description before `publicAt` only if it solved **that challenge's** Mini-CTF (`access: "early"`); from `publicAt`, or once the challenge has ended, every team can (`access: "public"`). Otherwise `access` is `"locked"` and `content` is `null` (title, teaser and `publicAt` stay visible). The Mini-CTF module records a solve with `recordMiniCtfSolve(teamId, challengeId)` (challenges service); that is the only integration point.
+
+#### `GET /api/challenges` · `GET /api/challenges/current` (team)
+
+Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
+
+#### Admin (audited)
+
+- `GET /api/admin/challenges` — full content, status, timing, Mini-CTF solve count.
+- `POST /api/admin/challenges` — `{ position, title, summary?, description, problemStatement?, deliverables?, resources?: [{ name, url }], publicDelayMinutes? }`; duplicate position → 409.
+- `PATCH /api/admin/challenges/:id` — content and delay (a delay change moves `publicAt` of a running challenge).
+- `POST /api/admin/challenges/:id/start`, `POST /api/admin/challenges/:id/end` — event must be `live`.
+
 ### Check-in (staff)
 
-Admin-only endpoints. QR tokens are verified against their stored SHA-256 hash; raw token material is never echoed back for validation.
+Admin-only endpoints. QR tokens are verified against their stored SHA-256 hash; raw token material is never echoed back for validation. Scan responses and the badge roster include the participant's badge `color`.
 
 #### `POST /api/checkin/scan`
 
@@ -212,15 +255,29 @@ Admin only. Full team roster, newest first: every team with its progress state, 
 
 Schema: `adminTeamListResponseSchema` (reuses `teamResponseSchema`).
 
-### Admin jury roster
+### Admin jury accounts
+
+Admin only; every route is pinned to `role: 'jury'`, so a team or admin account id answers 404. Mutations are audited (`jury.created`, `jury.updated`, `jury.deleted`). By organizer decision, jury passwords are readable by administrators (see AGENTS.md §9); no other endpoint ever returns them.
 
 #### `GET /api/admin/jury`
 
-Admin only, read-only. Lists jury accounts (id, name, email, createdAt), newest first. Credentials are never exposed. Jury account creation and challenge-track assignment are pending OPEN_QUESTIONS #1/#8.
+`{ items: [{ id, name, email, password, createdAt }], total }`, newest first. `password` is `null` for accounts created before readable passwords existed. Schema: `adminJuryListResponseSchema`.
 
-**Response `200`:** `{ items: [{ id, name, email, createdAt }], total }`.
+#### `POST /api/admin/jury`
 
-Schema: `adminJuryListResponseSchema`.
+`{ name, email, password? }` (strict; password ≥ 12). Without `password` the server generates a 16-character one. `201` returns the account with its password. Email already used → `CONFLICT` (409). Schema: `createJuryAccountRequestSchema`.
+
+#### `PATCH /api/admin/jury/:id`
+
+Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`.
+
+#### `DELETE /api/admin/jury/:id`
+
+`204`. Deletes the account; its sessions go with it.
+
+#### `POST /api/admin/participants/:participantId/resend-badge-email`
+
+Resends a participant's badge email without the hourly limit (audited as `badge.email_resent`).
 
 ## Planned Endpoint Groups
 

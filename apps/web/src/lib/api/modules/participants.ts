@@ -1,7 +1,9 @@
 import {
-  badgePassResponseSchema,
+  resendBadgeEmailResponseSchema,
+  teamBadgesResponseSchema,
   teamSummarySchema,
-  type BadgePassResponse,
+  type ResendBadgeEmailResponse,
+  type TeamBadgesResponse,
   type TeamSummary,
 } from '../contracts/pending';
 import { PLANNED_ENDPOINTS } from '../endpoints';
@@ -10,7 +12,17 @@ import type { ApiRequestConfig, ApiTransport } from '../transport';
 
 export interface ParticipantsApi {
   getMyTeam: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<TeamSummary>;
-  getMyBadge: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<BadgePassResponse>;
+  /** Every member's QR badge for the signed-in team. */
+  getMyBadges: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<TeamBadgesResponse>;
+  /** Resends one member's badge email (the server allows one per hour). */
+  resendBadgeEmail: (
+    participantId: string,
+    config?: Pick<ApiRequestConfig, 'signal'>,
+  ) => Promise<ResendBadgeEmailResponse>;
+}
+
+function invalidResponse(message: string, details: unknown): ApiClientError {
+  return new ApiClientError({ message, status: null, code: 'INVALID_RESPONSE', details });
 }
 
 export function createParticipantsApi(transport: ApiTransport): ParticipantsApi {
@@ -21,28 +33,39 @@ export function createParticipantsApi(transport: ApiTransport): ParticipantsApi 
       });
       const parsed = teamSummarySchema.safeParse(data);
       if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Team summary response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
+        throw invalidResponse(
+          'Team summary response did not match the expected contract.',
+          parsed.error.issues,
+        );
       }
       return parsed.data;
     },
 
-    async getMyBadge(config) {
+    async getMyBadges(config) {
       const data = await transport.request<unknown>(PLANNED_ENDPOINTS.PARTICIPANTS_BADGE, {
         signal: config?.signal,
       });
-      const parsed = badgePassResponseSchema.safeParse(data);
+      const parsed = teamBadgesResponseSchema.safeParse(data);
       if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Badge pass response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
+        throw invalidResponse(
+          'Badge response did not match the expected contract.',
+          parsed.error.issues,
+        );
+      }
+      return parsed.data;
+    },
+
+    async resendBadgeEmail(participantId, config) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.PARTICIPANTS_BADGE}/${encodeURIComponent(participantId)}/resend-email`,
+        { method: 'POST', signal: config?.signal },
+      );
+      const parsed = resendBadgeEmailResponseSchema.safeParse(data);
+      if (!parsed.success) {
+        throw invalidResponse(
+          'Resend response did not match the expected contract.',
+          parsed.error.issues,
+        );
       }
       return parsed.data;
     },

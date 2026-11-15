@@ -175,7 +175,7 @@ describe('TeamRegistrationForm', () => {
     submit();
 
     await waitFor(() => {
-      expect(screen.getByText(/shown only once/i)).toBeTruthy();
+      expect(screen.getByText(/emailed their own QR badge/i)).toBeTruthy();
     });
     for (const badge of badges) {
       expect(screen.getByText(badge.token)).toBeTruthy();

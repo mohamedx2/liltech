@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import { isoTimestampSchema } from './common.js';
 import { teamResponseSchema } from './registration-contracts.js';
+import { adminJuryAccountDetailSchema } from './jury-admin-contracts.js';
 
 /**
  * Contract for admin operational listing endpoints (read-only):
  * - `GET /api/admin/teams` — full team roster with participant check-in state
- * - `GET /api/admin/jury`  — jury accounts (no credentials, no scoring data)
+ * - `GET /api/admin/jury`  — jury accounts with their admin-readable password
+ *   (management endpoints: `jury-admin-contracts`)
  *
  * Challenge track and results administration are intentionally absent — they
  * are blocked on `docs/decisions/OPEN_QUESTIONS.md` questions 1 and 3–5 and
@@ -19,12 +20,7 @@ export const adminTeamListResponseSchema = z.object({
 
 export type AdminTeamListResponse = z.infer<typeof adminTeamListResponseSchema>;
 
-export const adminJuryAccountSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  email: z.email(),
-  createdAt: isoTimestampSchema,
-});
+export const adminJuryAccountSchema = adminJuryAccountDetailSchema;
 
 export type AdminJuryAccount = z.infer<typeof adminJuryAccountSchema>;
 

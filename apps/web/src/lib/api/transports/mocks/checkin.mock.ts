@@ -30,9 +30,10 @@ export function handleScanCheckIn(token: string): CheckInResponse {
   }
 
   // Check if scanning the primary mock badge
-  if (token === devMockState.badge.qrToken) {
+  const teamBadge = devMockState.badge.badges.find((b) => b.qrToken === token);
+  if (teamBadge) {
     const leaderBadge = devMockState.badges.find(
-      (b) => b.participantName === devMockState.badge.participantName,
+      (b) => b.participantName === teamBadge.participantName,
     );
 
     if (leaderBadge?.checkedInAt) {
@@ -59,8 +60,9 @@ export function handleScanCheckIn(token: string): CheckInResponse {
 
     return {
       participant: {
-        id: '00000000-0000-4000-8000-000000000001',
-        name: devMockState.badge.participantName,
+        id: teamBadge.participantId,
+        name: teamBadge.participantName,
+        color: teamBadge.color,
       },
       team: {
         id: '00000000-0000-4000-8000-000000000010',
@@ -87,6 +89,7 @@ export function handleScanCheckIn(token: string): CheckInResponse {
       participant: {
         id: pendingBadge.participantId,
         name: pendingBadge.participantName,
+        color: pendingBadge.color,
       },
       team: {
         id: '00000000-0000-4000-8000-000000000010',
@@ -109,6 +112,7 @@ export function handleScanCheckIn(token: string): CheckInResponse {
     participant: {
       id: '00000000-0000-4000-8000-000000000099',
       name: 'Verified Participant',
+      color: null,
     },
     team: {
       id: '00000000-0000-4000-8000-000000000099',

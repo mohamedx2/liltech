@@ -9,11 +9,11 @@ import {
 import type {
   AnnouncementItem,
   AuthUser,
-  BadgePassResponse,
   ChallengeDetailResponse,
   JuryTeamItem,
   MiniCtfStatusResponse,
   SubmissionItem,
+  TeamBadgesResponse,
   TeamSummary,
 } from '../../contracts/pending';
 
@@ -63,7 +63,7 @@ export interface DevMockState {
 
   /** Participant portal mock domain (provisional contracts, see `pending.ts`). */
   team: TeamSummary;
-  badge: BadgePassResponse;
+  badge: TeamBadgesResponse;
   ctf: Omit<MiniCtfStatusResponse, 'isOpen'> & { mockAcceptableFlag: string };
   challenge: ChallengeDetailResponse;
   submissions: SubmissionItem[];
@@ -91,50 +91,114 @@ const SUBMISSION_DEADLINE = '2026-11-22T08:00:00.000Z';
 function createPortalState() {
   return {
     team: {
-      id: 'dev-team-01',
+      id: '7d1c2f3e-0000-4000-8000-000000000001',
       name: 'Sample Builders (Dev Mock)',
-      track: ChallengeTrack.TrackA,
       progress: TeamProgressState.CheckedIn,
       isCheckedIn: true,
       members: [
         {
-          id: 'usr-part-01',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a1',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Team Leader',
           email: 'team@liltech.mock',
-          phone: '+216 20 123 456',
           roleInTeam: 'leader' as const,
+          color: 'blue' as const,
           isCheckedIn: true,
         },
         {
-          id: 'usr-part-02',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a2',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Teammate One',
           email: 'teammate1@liltech.mock',
-          phone: '+216 20 234 567',
           roleInTeam: 'member' as const,
+          color: 'red' as const,
           isCheckedIn: true,
         },
         {
-          id: 'usr-part-03',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a3',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Teammate Two',
           email: 'teammate2@liltech.mock',
-          phone: '+216 20 345 678',
           roleInTeam: 'member' as const,
+          color: 'yellow' as const,
+          isCheckedIn: false,
+        },
+        {
+          id: '7d1c2f3e-0000-4000-8000-0000000000a4',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
+          fullName: 'Mock Teammate Three',
+          email: 'teammate3@liltech.mock',
+          roleInTeam: 'member' as const,
+          color: 'green' as const,
           isCheckedIn: false,
         },
       ],
     },
     badge: {
-      participantId: 'usr-part-01',
-      participantName: 'Mock Team Leader',
-      teamId: 'dev-team-01',
+      teamId: '7d1c2f3e-0000-4000-8000-000000000001',
       teamName: 'Sample Builders (Dev Mock)',
-      track: ChallengeTrack.TrackA,
-      // Accessible SVG placeholder for the emailed QR badge
-      qrData: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/><rect x="90" y="30" width="20" height="20"/><rect x="30" y="90" width="20" height="20"/><rect x="150" y="90" width="20" height="20"/><rect x="90" y="150" width="20" height="20"/></svg>`,
-      qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-TOKEN',
+      badges: [
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a1',
+          participantName: 'Mock Team Leader',
+          roleInTeam: 'leader' as const,
+          color: 'blue' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-1',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: true,
+          email: 'team@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a2',
+          participantName: 'Mock Teammate One',
+          roleInTeam: 'member' as const,
+          color: 'red' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-2',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: true,
+          email: 'teammate1@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a3',
+          participantName: 'Mock Teammate Two',
+          roleInTeam: 'member' as const,
+          color: 'yellow' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-3',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'teammate2@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a4',
+          participantName: 'Mock Teammate Three',
+          roleInTeam: 'member' as const,
+          color: 'green' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-4',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'teammate3@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+      ],
     },
     ctf: {
       isSolved: false,
@@ -160,9 +224,21 @@ function createPortalState() {
         'Demonstration video or live deployment URL',
       ],
       resources: [
-        { name: 'Urban Telemetry Dataset (GeoJSON/CSV)', url: '#', size: '2.4 MB' },
-        { name: 'API Protocol Specification (.pdf)', url: '#', size: '420 KB' },
-        { name: 'Benchmark Evaluation Script (.py)', url: '#', size: '18 KB' },
+        {
+          name: 'Urban Telemetry Dataset (GeoJSON/CSV)',
+          url: 'https://liltechsousse.com/resources',
+          size: '2.4 MB',
+        },
+        {
+          name: 'API Protocol Specification (.pdf)',
+          url: 'https://liltechsousse.com/resources',
+          size: '420 KB',
+        },
+        {
+          name: 'Benchmark Evaluation Script (.py)',
+          url: 'https://liltechsousse.com/resources',
+          size: '18 KB',
+        },
       ],
     },
     submissions: [
@@ -330,6 +406,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000001',
         participantName: 'Mock Team Leader',
         teamName: 'Sample Builders (Dev Mock)',
+        color: 'blue' as const,
         issuedAt: '2026-11-20T10:00:00.000Z',
         checkedInAt: '2026-11-21T18:30:00.000Z',
       },
@@ -337,6 +414,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000002',
         participantName: 'Mock Teammate One',
         teamName: 'Sample Builders (Dev Mock)',
+        color: 'red' as const,
         issuedAt: '2026-11-20T10:00:00.000Z',
         checkedInAt: '2026-11-21T18:45:00.000Z',
       },
@@ -344,6 +422,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000003',
         participantName: 'Mock Teammate Two',
         teamName: 'Sample Builders (Dev Mock)',
+        color: 'yellow' as const,
         issuedAt: '2026-11-20T10:00:00.000Z',
         checkedInAt: undefined,
       },
@@ -351,6 +430,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000004',
         participantName: 'Kais Ben Ali',
         teamName: 'Quantum Coders',
+        color: 'green' as const,
         issuedAt: '2026-11-20T11:00:00.000Z',
         checkedInAt: '2026-11-21T19:00:00.000Z',
       },
@@ -358,6 +438,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000005',
         participantName: 'Nour Trabelsi',
         teamName: 'Quantum Coders',
+        color: 'blue' as const,
         issuedAt: '2026-11-20T11:00:00.000Z',
         checkedInAt: undefined,
       },
@@ -365,6 +446,7 @@ function createPortalState() {
         participantId: '00000000-0000-4000-8000-000000000006',
         participantName: 'Yassine Gharbi',
         teamName: 'Algorithmic Titans',
+        color: 'red' as const,
         issuedAt: '2026-11-20T12:00:00.000Z',
         checkedInAt: undefined,
       },

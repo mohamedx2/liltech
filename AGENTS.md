@@ -136,7 +136,7 @@ Before implementing any complex screen, establish a deliberate design system: co
 
 ## 9. Security Rules
 
-- **Passwords:** hashed with a modern, salted, deliberately slow algorithm (argon2id or bcrypt). Never stored or logged in plaintext.
+- **Passwords:** hashed with a modern, salted, deliberately slow algorithm (argon2id or bcrypt). Never stored or logged in plaintext. **Accepted exception (organizer decision, 2026-11-15):** jury account passwords are also stored readable (`User.juryPlainPassword`) so administrators can hand them to jury members; they are returned only by admin-only endpoints and never logged. Do not extend this to any other role.
 - **Authentication:** server-side sessions or short-lived signed tokens; no security logic in the frontend.
 - **RBAC:** every protected endpoint declares and checks its role server-side; jury access is challenge-scoped.
 - **Input validation** on every endpoint (body, params, query). Reject unknown fields where it matters.

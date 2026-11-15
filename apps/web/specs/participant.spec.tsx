@@ -13,7 +13,7 @@ import { RoleGuard } from '@/components/auth/role-guard';
 import { AuthProvider } from '@/lib/auth/session';
 import { api, ApiClientError } from '@/lib/api';
 import type {
-  BadgePassResponse,
+  TeamBadgesResponse,
   EventStateResponse,
   ParticipantProfile,
 } from '@/lib/api/contracts/pending';
@@ -48,24 +48,58 @@ describe('Participant / Team Features', () => {
   });
 
   describe('QrPassCard', () => {
-    const mockBadge: BadgePassResponse = {
-      participantId: 'p-1',
-      participantName: 'Alice Developer',
-      teamId: 't-1',
+    const badges: TeamBadgesResponse = {
+      teamId: '00000000-0000-4000-8000-000000000001',
       teamName: 'Hackers United',
-      track: ChallengeTrack.TrackA,
-      qrData: 'data:image/svg+xml;utf8,<svg></svg>',
-      qrToken: 'TOKEN-12345',
+      badges: [
+        {
+          participantId: '00000000-0000-4000-8000-0000000000a1',
+          participantName: 'Alice Developer',
+          roleInTeam: 'leader',
+          color: 'blue',
+          qrToken: 'TOKEN-12345',
+          qrImageDataUrl: 'data:image/png;base64,AAAA',
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'alice@example.com',
+          emailStatus: 'sent',
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: '2999-01-01T00:00:00.000Z',
+        },
+        {
+          participantId: '00000000-0000-4000-8000-0000000000a2',
+          participantName: 'Bob Builder',
+          roleInTeam: 'member',
+          color: 'yellow',
+          qrToken: null,
+          qrImageDataUrl: null,
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'bob@example.com',
+          emailStatus: 'failed',
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+      ],
     };
 
-    it('renders participant details and badge QR image', () => {
-      render(<QrPassCard badge={mockBadge} />);
+    it('shows every member badge with its color, QR code and email state', () => {
+      render(<QrPassCard badges={badges} />);
 
       expect(screen.getByText('Alice Developer')).toBeTruthy();
-      expect(screen.getByText('Hackers United')).toBeTruthy();
-      expect(screen.getByText('Track A')).toBeTruthy();
-      expect(screen.getByAltText(/Personal entrance QR code for Alice Developer/)).toBeTruthy();
-      expect(screen.getByText(/Save Badge to Device/)).toBeTruthy();
+      expect(screen.getByText('Blue group')).toBeTruthy();
+      expect(screen.getByText('Yellow group')).toBeTruthy();
+      expect(screen.getByAltText(/Entrance QR code for Alice Developer/)).toBeTruthy();
+      expect(screen.getByText(/Email to bob@example.com failed/)).toBeTruthy();
+      expect(screen.getByText(/Resend the email to get a new one/)).toBeTruthy();
+    });
+
+    it('disables resend until the hourly limit has passed', () => {
+      render(<QrPassCard badges={badges} />);
+
+      const [aliceResend, bobResend] = screen.getAllByRole('button', { name: /Resend email/ });
+      expect((aliceResend as HTMLButtonElement).disabled).toBe(true);
+      expect((bobResend as HTMLButtonElement).disabled).toBe(false);
     });
   });
 
@@ -182,42 +216,74 @@ describe('Participant / Team Features', () => {
   });
 
   describe('ChallengeView', () => {
-    const mockChallenge = {
-      id: 'chal-1',
-      track: ChallengeTrack.TrackA,
+    const schedule = {
+      id: '00000000-0000-4000-8000-0000000000c1',
+      position: 1,
       title: 'Autonomous AI Logistics Dispatcher',
-      description: 'Build an intelligent dispatching engine.',
-      problemStatement: 'Routing delays hurt emergency response teams.',
-      deliverablesRequirements: ['Runnable repo', 'Architecture doc'],
-      resources: [{ name: 'Urban Telemetry Dataset', url: '#', size: '2.4 MB' }],
+      summary: 'Route emergency vehicles faster.',
+      status: 'live' as const,
+      startedAt: '2026-11-21T19:00:00.000Z',
+      endedAt: null,
+      publicAt: '2026-11-21T20:00:00.000Z',
+      publicDelayMinutes: 60,
     };
 
-    it('displays the challenge brief once the Mini-CTF is solved', async () => {
-      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue(mockChallenge);
+    it('displays the challenge brief when the team has access', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: true,
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T19:10:00.000Z',
+        current: {
+          challenge: schedule,
+          access: 'early',
+          ctfSolved: true,
+          content: {
+            description: 'Build an intelligent dispatching engine.',
+            problemStatement: 'Routing delays hurt emergency response teams.',
+            deliverables: ['Runnable repo', 'Architecture doc'],
+            resources: [{ name: 'Urban Telemetry Dataset', url: 'https://example.com/data' }],
+          },
+        },
+      });
 
       render(<ChallengeView />);
 
       await waitFor(() => {
         expect(screen.getByText(/Autonomous AI Logistics Dispatcher/i)).toBeTruthy();
         expect(screen.getByText(/Problem Statement/i)).toBeTruthy();
-        expect(screen.getByText(/Deliverable Requirements/i)).toBeTruthy();
+        expect(screen.getByText(/Early access/i)).toBeTruthy();
         expect(screen.getByText(/Urban Telemetry Dataset/i)).toBeTruthy();
       });
     });
 
-    it('shows the locked state while the Mini-CTF is unsolved', async () => {
-      vi.spyOn(api.challenges, 'getCurrentChallenge').mockRejectedValue(
-        new ApiClientError({
-          message: 'Challenge track locked. You must solve the Mini-CTF first.',
-          status: 403,
-          code: 'CTF_NOT_SOLVED',
-        }),
-      );
+    it('shows the locked state with the public reveal time', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: true,
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T19:10:00.000Z',
+        current: { challenge: schedule, access: 'locked', ctfSolved: false, content: null },
+      });
 
       render(<ChallengeView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Clearance Required/i)).toBeTruthy();
+        expect(screen.getByText(/Challenge Locked/i)).toBeTruthy();
+        expect(screen.getByText(/opens for every team at/i)).toBeTruthy();
+      });
+    });
+
+    it('explains that the hackathon has not started yet', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: false,
+        reason: 'EVENT_NOT_STARTED',
+        phase: EventPhase.Registration,
+        message: "The hackathon hasn't started yet.",
+      });
+
+      render(<ChallengeView />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /hasn't started yet/i })).toBeTruthy();
       });
     });
   });

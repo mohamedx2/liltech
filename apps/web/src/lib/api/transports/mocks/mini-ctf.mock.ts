@@ -26,7 +26,7 @@ export function handleSubmitMiniCtfFlag(payload: MiniCtfSubmitRequest): MiniCtfS
       success: true,
       message: 'Mini-CTF already solved. Main challenge is unlocked.',
       progress: devMockState.team.progress,
-      unlockedChallengeTrack: devMockState.team.track ?? null,
+      unlockedChallengeTrack: null,
     };
   }
 
@@ -55,7 +55,7 @@ export function handleSubmitMiniCtfFlag(payload: MiniCtfSubmitRequest): MiniCtfS
       success: true,
       message: 'Correct flag! Your main track challenge has been unlocked.',
       progress: TeamProgressState.ChallengeUnlocked,
-      unlockedChallengeTrack: devMockState.team.track ?? null,
+      unlockedChallengeTrack: null,
     };
   }
 

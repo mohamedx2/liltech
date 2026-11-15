@@ -22,9 +22,10 @@ const PASSWORD_MIN = 12;
 
 export const participantNameSchema = z.string().trim().min(1).max(PARTICIPANT_NAME_MAX);
 
+/** Every participant needs an email: their QR badge is delivered there. */
 export const teamMemberInputSchema = z.strictObject({
   name: participantNameSchema,
-  email: z.email().optional(),
+  email: z.email(),
 });
 
 export const createTeamRequestSchema = z
@@ -41,11 +42,9 @@ export const createTeamRequestSchema = z
       .max(TEAM_MEMBERS_TOTAL_MAX - 1),
   })
   .superRefine((request, context) => {
-    // Every participant email that is provided must be unique within the team
-    // (case-insensitive). Member emails are optional; absent ones never collide.
+    // Every participant email must be unique within the team (case-insensitive).
     const seen = new Set([request.leader.email.toLowerCase()]);
     request.members.forEach((member, index) => {
-      if (!member.email) return;
       const email = member.email.toLowerCase();
       if (seen.has(email)) {
         context.addIssue({

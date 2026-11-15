@@ -1,5 +1,5 @@
 import { getPrismaClient } from '../../config/database';
-import type { AdminJuryListResponse, AdminTeamListResponse, TeamResponse } from 'api-contracts';
+import type { AdminTeamListResponse, TeamResponse } from 'api-contracts';
 
 /**
  * Admin operational listings (read-only). Backed by existing models only —
@@ -38,26 +38,6 @@ export async function listTeams(): Promise<AdminTeamListResponse> {
         ? { checkedInAt: participant.checkIn.checkedInAt.toISOString() }
         : {}),
     })),
-  }));
-
-  return { items, total: items.length };
-}
-
-/** Jury accounts, newest first. Never exposes credentials. */
-export async function listJuryAccounts(): Promise<AdminJuryListResponse> {
-  const prisma = getPrismaClient();
-
-  const juryUsers = await prisma.user.findMany({
-    where: { role: 'jury' },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true, name: true, email: true, createdAt: true },
-  });
-
-  const items = juryUsers.map((user) => ({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    createdAt: user.createdAt.toISOString(),
   }));
 
   return { items, total: items.length };
