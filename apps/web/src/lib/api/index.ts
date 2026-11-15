@@ -3,6 +3,7 @@ import { env } from '../../config/env';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
+import { createCtfApi, type CtfApi } from './modules/ctf';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
 import { createMiniCtfApi, type MiniCtfApi } from './modules/mini-ctf';
@@ -31,6 +32,7 @@ export interface ApiClient {
   registrations: RegistrationsApi;
   participants: ParticipantsApi;
   miniCtf: MiniCtfApi;
+  ctf: CtfApi;
   challenges: ChallengesApi;
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
@@ -47,6 +49,7 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     registrations: createRegistrationsApi(transport),
     participants: createParticipantsApi(transport),
     miniCtf: createMiniCtfApi(transport),
+    ctf: createCtfApi(transport),
     challenges: createChallengesApi(transport),
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),

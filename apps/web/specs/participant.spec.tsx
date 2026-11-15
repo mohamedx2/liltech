@@ -17,6 +17,7 @@ import type {
   EventStateResponse,
   ParticipantProfile,
 } from '@/lib/api/contracts/pending';
+import type { CtfStageResponse } from 'api-contracts';
 
 const LIVE_EVENT_STATE: EventStateResponse = {
   phase: EventPhase.Live,
@@ -101,61 +102,77 @@ describe('Participant / Team Features', () => {
   });
 
   describe('MiniCtfView', () => {
-    it('renders the flag form and validates flag submission', async () => {
-      vi.spyOn(api.events, 'getEventState').mockResolvedValue(LIVE_EVENT_STATE);
-      vi.spyOn(api.miniCtf, 'getStatus')
-        .mockResolvedValueOnce({
-          isOpen: true,
-          isSolved: false,
-          attemptsCount: 0,
-          cooldownUntil: null,
-          hint: 'Inspect the platform challenge hints.',
-        })
-        .mockResolvedValueOnce({
-          isOpen: true,
-          isSolved: true,
-          solvedAt: '2026-11-21T20:05:00.000Z',
-          attemptsCount: 1,
-          cooldownUntil: null,
-          hint: 'Inspect the platform challenge hints.',
-        });
-      vi.spyOn(api.miniCtf, 'submitFlag')
+    const openStage: CtfStageResponse = {
+      stage: {
+        id: '00000000-0000-4000-8000-000000000001',
+        slug: 'louage-404',
+        position: 1,
+        title: 'Louage 404',
+        description: null,
+        assetImageUrl: null,
+        assetZipUrl: '/ctf/step-1/CTF.zip',
+        hintCount: 3,
+      },
+      progress: {
+        isOpen: true,
+        isSolved: false,
+        solvedAt: null,
+        attempts: 0,
+        hintsUsed: 0,
+        mainChallengeUnlocked: false,
+      },
+      hints: [],
+    };
+
+    const solvedStage: CtfStageResponse = {
+      ...openStage,
+      progress: {
+        ...openStage.progress,
+        isSolved: true,
+        solvedAt: '2026-11-21T20:05:00.000Z',
+        attempts: 1,
+        mainChallengeUnlocked: true,
+      },
+    };
+
+    it('validates the answer and shows the solved state', async () => {
+      vi.spyOn(api.ctf, 'getStage')
+        .mockResolvedValueOnce(openStage)
+        .mockResolvedValueOnce(solvedStage);
+      vi.spyOn(api.ctf, 'submitAnswer')
         .mockRejectedValueOnce(
           new ApiClientError({
-            message: 'Incorrect flag. Please check the challenge hints and try again.',
+            message: 'That answer is not right. Re-read the archive contents and try again.',
             status: 400,
             code: 'CTF_NOT_SOLVED',
           }),
         )
         .mockResolvedValueOnce({
           success: true,
-          message: 'Correct flag! Your main track challenge has been unlocked.',
-          progress: TeamProgressState.ChallengeUnlocked,
-          unlockedChallengeTrack: ChallengeTrack.TrackA,
+          message: 'El série t2akkdet. Your main challenge is now unlocked.',
+          isSolved: true,
+          solvedAt: '2026-11-21T20:05:00.000Z',
+          mainChallengeUnlocked: true,
         });
 
       render(<MiniCtfView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Track Gate/i)).toBeTruthy();
+        expect(screen.getByText(/Louage 404/i)).toBeTruthy();
       });
 
-      const input = screen.getByLabelText(/Mini-CTF Flag/i) as HTMLInputElement;
+      const input = screen.getByLabelText(/Registration/i) as HTMLInputElement;
       expect(input).toBeTruthy();
 
-      // Enter invalid flag
-      fireEvent.change(input, { target: { value: 'WRONG_FLAG' } });
-      const submitBtn = screen.getByRole('button', { name: /Submit Flag/i });
-      fireEvent.click(submitBtn);
+      fireEvent.change(input, { target: { value: '000 TUN 0000' } });
+      fireEvent.click(screen.getByRole('button', { name: /Submit Answer/i }));
 
       await waitFor(() => {
-        const matches = screen.getAllByText(/Incorrect Flag/i);
-        expect(matches.length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/Incorrect Answer/i).length).toBeGreaterThan(0);
       });
 
-      // Enter correct mock flag
-      fireEvent.change(input, { target: { value: 'LILTECH{mock_flag_demo}' } });
-      fireEvent.click(submitBtn);
+      fireEvent.change(input, { target: { value: '187 TUN 4253' } });
+      fireEvent.click(screen.getByRole('button', { name: /Submit Answer/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/Mini-CTF Solved!/i)).toBeTruthy();
@@ -163,21 +180,17 @@ describe('Participant / Team Features', () => {
     });
 
     it('shows the locked state while the gate is closed', async () => {
-      vi.spyOn(api.events, 'getEventState').mockResolvedValue(LIVE_EVENT_STATE);
-      vi.spyOn(api.miniCtf, 'getStatus').mockResolvedValue({
-        isOpen: false,
-        isSolved: false,
-        attemptsCount: 0,
-        cooldownUntil: null,
-        hint: undefined,
+      vi.spyOn(api.ctf, 'getStage').mockResolvedValue({
+        ...openStage,
+        progress: { ...openStage.progress, isOpen: false },
       });
 
       render(<MiniCtfView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/The Mini-CTF is Locked/i)).toBeTruthy();
+        expect(screen.getByText(/The Mini-CTF is locked/i)).toBeTruthy();
       });
-      expect(screen.queryByLabelText(/Mini-CTF Flag/i)).toBeNull();
+      expect(screen.queryByLabelText(/Registration/i)).toBeNull();
     });
   });
 

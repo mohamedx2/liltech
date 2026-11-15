@@ -101,3 +101,57 @@
   display: flex;
   justify-content: flex-start;
 }
+
+.materialContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.assetImage {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 0.75rem);
+  display: block;
+}
+
+.assetActions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.hintContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.hintList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hintItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-left: 2px solid var(--palette-gold);
+  background: var(--color-surface-sunken, transparent);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.hintPosition {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--color-accent);
+}
