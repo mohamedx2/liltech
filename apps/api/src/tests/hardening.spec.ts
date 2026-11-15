@@ -9,6 +9,7 @@ import { waitForScheduledBadgeEmails } from '../modules/badges/badges.service';
 import {
   backfillReadableBadges,
   retryInterruptedBadgeEmails,
+  runBadgeMaintenance,
 } from '../modules/badges/badge-maintenance.service';
 import {
   setBadgeMailTransport,
@@ -218,7 +219,8 @@ describeDb('event hardening', () => {
         where: { participantId: legacy.participantId },
       });
       expect(fixed.tokenCiphertext).not.toBeNull();
-      expect(fixed.emailStatus).toBeNull();
+      // Queued, so the startup retry emails the new QR code.
+      expect(fixed.emailStatus).toBe('pending');
       const stillRevoked = await prisma.qrToken.findUniqueOrThrow({
         where: { participantId: revoked.participantId },
       });
@@ -229,6 +231,26 @@ describeDb('event hardening', () => {
         token: legacy.token,
       });
       expect(oldScan.status).toBe(404);
+    });
+
+    it('emails the reissued badge during the same startup repair', async () => {
+      const team = await registerTeam('reissue-mail');
+      const legacy = team.badges[0];
+      await waitForScheduledBadgeEmails();
+      await prisma.qrToken.update({
+        where: { participantId: legacy.participantId },
+        data: { tokenCiphertext: null, emailStatus: 'sent' },
+      });
+      const before = mail.sent.length;
+
+      await runBadgeMaintenance();
+      await waitForScheduledBadgeEmails();
+
+      expect(mail.sent.length).toBe(before + 1);
+      const badge = await prisma.qrToken.findUniqueOrThrow({
+        where: { participantId: legacy.participantId },
+      });
+      expect(badge.emailStatus).toBe('sent');
     });
 
     it('creates a badge for a participant that has none', async () => {

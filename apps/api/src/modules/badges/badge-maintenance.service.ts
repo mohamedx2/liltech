@@ -27,8 +27,11 @@ const participantForDelivery = {
  * - a participant with no badge at all gets one;
  * - an active badge issued before encrypted storage existed (hash only, so
  *   its QR code cannot be shown again) is reissued. Its old code stops
- *   working; the new one shows on the team portal and can be emailed.
- * Revoked badges are left alone. Returns how many badges were written.
+ *   working; the new one shows on the team portal.
+ * Every new badge of a participant with an email is marked `pending`, so the
+ * startup retry emails it: nobody arrives at the entrance holding only a QR
+ * code that silently stopped working. Revoked badges are left alone.
+ * Returns how many badges were written.
  */
 export async function backfillReadableBadges(): Promise<{ created: number; reissued: number }> {
   const prisma = getPrismaClient();
@@ -36,7 +39,7 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
 
   const withoutBadge = await prisma.participant.findMany({
     where: { badge: null },
-    select: { id: true },
+    select: { id: true, email: true },
   });
   for (const participant of withoutBadge) {
     const { token, tokenHash } = generateQrToken();
@@ -45,13 +48,14 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
         participantId: participant.id,
         tokenHash,
         tokenCiphertext: encryptQrToken(token, key),
+        emailStatus: participant.email ? 'pending' : null,
       },
     });
   }
 
   const unreadable = await prisma.qrToken.findMany({
     where: { tokenCiphertext: null, revokedAt: null },
-    select: { id: true },
+    select: { id: true, participant: { select: { email: true } } },
   });
   for (const badge of unreadable) {
     const { token, tokenHash } = generateQrToken();
@@ -63,7 +67,7 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
         tokenHash,
         tokenCiphertext: encryptQrToken(token, key),
         issuedAt: new Date(),
-        emailStatus: null,
+        emailStatus: badge.participant.email ? 'pending' : null,
         emailLastSentAt: null,
       },
     });

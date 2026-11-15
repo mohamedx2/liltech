@@ -310,11 +310,7 @@ Any of `{ name, email, password }` (at least one). A new password ends every exi
 
 `204`. Deletes the account; its sessions go with it.
 
-At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and emails left `pending` by a restart are sent again. Badges that were never emailed are sent one by one from the admin Teams page (`GET /api/admin/teams` returns each participant's `email` and `badgeEmailStatus`).
-
-#### `POST /api/admin/teams/:teamId/reset-password`
-
-Admin only, audited (`team.password_reset`). For a team that forgot its shared login: `{ password? }` (12+ characters; omit to generate 16). Team passwords are stored only as bcrypt hashes, so the current one can never be shown. Returns `{ teamId, teamName, email, password }` once; every session of the team account ends. Unknown team: 404.
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and both are queued as `pending` and emailed in the same run (participants with an email), together with any email left `pending` by a restart. Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 
