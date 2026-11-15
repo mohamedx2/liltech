@@ -2,27 +2,27 @@ import { getPrismaClient } from '../../config/database';
 import { ApiError, ApiErrorCode } from '../../utils/api-error';
 import { createRateLimiter } from '../../utils/rate-limiter';
 import type {
+  CtfChainResponse,
+  CtfCurrentStage,
   CtfHintResponse,
-  CtfStageResponse,
+  CtfStageDetail,
+  CtfStageProgress,
+  CtfStageState,
   CtfSubmitResponse,
-  CtfTeamProgress,
+  CtfTrackItem,
 } from 'api-contracts';
 import { matchesAnswerHash } from './ctf-answer';
 
 /**
- * Mini-CTF gate service.
+ * LOUAGE 404 chain service.
  *
- * Rules that must hold on the server (never on the client):
- * - Only a *live* stage accepts answers, and only for a team that has checked in.
- * - A correct answer unlocks the main challenge exactly once, idempotently.
- * - Repeated submissions are rate limited per team.
- * - The answer is compared by hash; the plaintext is never stored or returned.
+ * The stage chain is strictly sequential and every decision is made here:
+ * eligibility, which stage a team may view, whether a submission is accepted,
+ * and when the main challenge unlocks. The client only renders the answer.
  *
- * Progress is tracked per team, because only a team's leader has an account
- * (participants authenticate via their QR badge at the desk, not online).
+ * Progress is per team (only a team's leader has an account).
  */
 
-/** Canonical team progress order from the specification. */
 const PROGRESS_ORDER = [
   'registered',
   'checked_in',
@@ -34,97 +34,170 @@ const PROGRESS_ORDER = [
 
 type ProgressState = (typeof PROGRESS_ORDER)[number];
 
-/** Five submissions per minute per team; enough for typos, hostile to guessing. */
+/**
+ * Five submissions per minute per team **per stage**. Per-stage windows keep
+ * guessing hostile while still letting a fast team solve several stages in a
+ * row — a shared budget would reject a legitimately correct sixth answer.
+ */
 const submitLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 
 interface TeamContext {
   id: string;
+  name: string;
   progressState: ProgressState;
+}
+
+interface StageRow {
+  id: string;
+  slug: string;
+  position: number;
+  title: string;
+  description: string | null;
+  status: 'draft' | 'live' | 'closed';
+  answerHash: string | null;
+  assetDriveUrl: string | null;
+  requiredForUnlock: boolean;
+  hints: { position: number; body: string }[];
+}
+
+interface ProgressRow {
+  stageId: string;
+  state: CtfStageState;
+  attempts: number;
+  hintsUsed: number;
+  solvedAt: Date | null;
 }
 
 async function requireTeamForUser(userId: string): Promise<TeamContext> {
   const prisma = getPrismaClient();
   const team = await prisma.team.findUnique({
     where: { leaderId: userId },
-    select: { id: true, progressState: true },
+    select: { id: true, name: true, progressState: true },
   });
 
   if (!team) {
     throw ApiError.notFound('This account is not linked to a team.');
   }
 
-  return { id: team.id, progressState: team.progressState as ProgressState };
-}
-
-async function loadCurrentStage() {
-  const prisma = getPrismaClient();
-  const stage = await prisma.ctfStage.findFirst({
-    where: { status: 'live' },
-    orderBy: { position: 'asc' },
-    include: { hints: { orderBy: { position: 'asc' }, select: { position: true, body: true } } },
-  });
-
-  if (!stage) {
-    throw ApiError.notFound('No Mini-CTF stage is open right now.');
-  }
-
-  return stage;
-}
-
-function hasCheckedIn(state: ProgressState): boolean {
-  return PROGRESS_ORDER.indexOf(state) >= PROGRESS_ORDER.indexOf('checked_in');
-}
-
-function buildProgress(
-  team: TeamContext,
-  isOpen: boolean,
-  solvedAt: Date | null,
-  attempts: number,
-  hintsUsed: number,
-): CtfTeamProgress {
   return {
-    isOpen,
-    isSolved: solvedAt !== null,
-    solvedAt: solvedAt?.toISOString() ?? null,
-    attempts,
-    hintsUsed,
-    mainChallengeUnlocked:
-      solvedAt !== null ||
-      PROGRESS_ORDER.indexOf(team.progressState) >= PROGRESS_ORDER.indexOf('challenge_unlocked'),
+    id: team.id,
+    name: team.name,
+    progressState: team.progressState as ProgressState,
   };
 }
 
-export async function getStageForTeam(userId: string): Promise<CtfStageResponse> {
-  const prisma = getPrismaClient();
-  const team = await requireTeamForUser(userId);
-  const stage = await loadCurrentStage();
+function teamIsEligible(state: ProgressState): boolean {
+  return PROGRESS_ORDER.indexOf(state) >= PROGRESS_ORDER.indexOf('checked_in');
+}
 
-  const progress = await prisma.ctfProgress.findUnique({
-    where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
+async function loadChain(): Promise<StageRow[]> {
+  const prisma = getPrismaClient();
+
+  return prisma.ctfStage.findMany({
+    orderBy: { position: 'asc' },
+    select: {
+      id: true,
+      slug: true,
+      position: true,
+      title: true,
+      description: true,
+      status: true,
+      answerHash: true,
+      assetDriveUrl: true,
+      requiredForUnlock: true,
+      hints: { orderBy: { position: 'asc' }, select: { position: true, body: true } },
+    },
+  });
+}
+
+async function loadProgress(teamId: string): Promise<Map<string, ProgressRow>> {
+  const prisma = getPrismaClient();
+  const rows = await prisma.ctfProgress.findMany({
+    where: { teamId },
+    select: {
+      stageId: true,
+      state: true,
+      attempts: true,
+      hintsUsed: true,
+      solvedAt: true,
+    },
   });
 
-  const isOpen = stage.status === 'live' && hasCheckedIn(team.progressState);
-  const hintsUsed = progress?.hintsUsed ?? 0;
+  return new Map(rows.map((row) => [row.stageId, row]));
+}
+
+/**
+ * Resolves a stage's state for one team. Stage 1 is unlocked implicitly for a
+ * checked-in team; every other stage is unlocked only by solving its predecessor.
+ */
+function resolveState(
+  stage: StageRow,
+  index: number,
+  progress: Map<string, ProgressRow>,
+  eligible: boolean,
+): CtfStageState {
+  const row = progress.get(stage.id);
+
+  if (row?.solvedAt) {
+    return 'solved';
+  }
+
+  if (row && row.state === 'unlocked') {
+    return 'unlocked';
+  }
+
+  if (index === 0 && eligible && (!row || row.state === 'locked')) {
+    return 'unlocked';
+  }
+
+  return 'locked';
+}
+
+/** Persists the implicit Stage 1 unlock so the row exists for later updates. */
+async function persistImplicitUnlock(teamId: string, stageId: string): Promise<void> {
+  const prisma = getPrismaClient();
+
+  await prisma.ctfProgress.upsert({
+    where: { teamId_stageId: { teamId, stageId } },
+    update: {},
+    create: { teamId, stageId, state: 'unlocked' },
+  });
+}
+
+function toDetail(stage: StageRow, state: CtfStageState, totalStages: number): CtfStageDetail {
+  return {
+    slug: stage.slug,
+    position: stage.position,
+    totalStages,
+    title: stage.title,
+    description: stage.description,
+    status: stage.status,
+    state,
+    assetDriveUrl: stage.assetDriveUrl,
+    hintCount: stage.hints.length,
+  };
+}
+
+function toProgress(row: ProgressRow | undefined): CtfStageProgress {
+  return {
+    attempts: row?.attempts ?? 0,
+    hintsUsed: row?.hintsUsed ?? 0,
+    solved: Boolean(row?.solvedAt),
+    solvedAt: row?.solvedAt?.toISOString() ?? null,
+  };
+}
+
+function stageView(
+  stage: StageRow,
+  state: CtfStageState,
+  row: ProgressRow | undefined,
+  totalStages: number,
+): CtfCurrentStage {
+  const hintsUsed = row?.hintsUsed ?? 0;
 
   return {
-    stage: {
-      id: stage.id,
-      slug: stage.slug,
-      position: stage.position,
-      title: stage.title,
-      description: stage.description,
-      assetImageUrl: stage.assetImageUrl,
-      assetZipUrl: stage.assetZipUrl,
-      hintCount: stage.hints.length,
-    },
-    progress: buildProgress(
-      team,
-      isOpen,
-      progress?.solvedAt ?? null,
-      progress?.attempts ?? 0,
-      hintsUsed,
-    ),
-    // Only hints the team has already paid for are ever serialized.
+    stage: toDetail(stage, state, totalStages),
+    progress: toProgress(row),
     hints: stage.hints.slice(0, hintsUsed).map((hint) => ({
       position: hint.position,
       body: hint.body,
@@ -132,18 +205,124 @@ export async function getStageForTeam(userId: string): Promise<CtfStageResponse>
   };
 }
 
-export async function revealNextHint(userId: string): Promise<CtfHintResponse> {
-  const prisma = getPrismaClient();
-  const team = await requireTeamForUser(userId);
-  const stage = await loadCurrentStage();
+/** Index of the stage the team should work on: first unsolved *unlocked* one. */
+function findCurrentIndex(
+  chain: StageRow[],
+  progress: Map<string, ProgressRow>,
+  eligible: boolean,
+): number {
+  return chain.findIndex(
+    (stage, index) => resolveState(stage, index, progress, eligible) === 'unlocked',
+  );
+}
 
-  if (!hasCheckedIn(team.progressState)) {
-    throw ApiError.forbidden('Check in at the desk before opening the Mini-CTF.');
+function buildTrack(
+  chain: StageRow[],
+  progress: Map<string, ProgressRow>,
+  eligible: boolean,
+): CtfTrackItem[] {
+  return chain.map((stage, index) => ({
+    slug: stage.slug,
+    position: stage.position,
+    title: stage.title,
+    state: resolveState(stage, index, progress, eligible),
+    status: stage.status,
+    requiredForUnlock: stage.requiredForUnlock,
+  }));
+}
+
+export async function getChain(userId: string): Promise<CtfChainResponse> {
+  const team = await requireTeamForUser(userId);
+  const eligible = teamIsEligible(team.progressState);
+  const chain = await loadChain();
+  const progress = await loadProgress(team.id);
+
+  const currentIndex = findCurrentIndex(chain, progress, eligible);
+  const currentStage = currentIndex >= 0 ? chain[currentIndex] : undefined;
+
+  if (currentStage && !progress.has(currentStage.id)) {
+    await persistImplicitUnlock(team.id, currentStage.id);
+    progress.set(currentStage.id, {
+      stageId: currentStage.id,
+      state: 'unlocked',
+      attempts: 0,
+      hintsUsed: 0,
+      solvedAt: null,
+    });
   }
 
-  const progress = await prisma.ctfProgress.findUnique({
-    where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-  });
+  const stages = buildTrack(chain, progress, eligible);
+  const solvedCount = stages.filter((stage) => stage.state === 'solved').length;
+
+  return {
+    team: { name: team.name },
+    stages,
+    current:
+      currentStage && currentIndex >= 0
+        ? stageView(currentStage, 'unlocked', progress.get(currentStage.id), chain.length)
+        : null,
+    summary: { solved: solvedCount, total: stages.length },
+    eligible,
+  };
+}
+
+async function loadStageForTeam(
+  userId: string,
+  slug: string,
+): Promise<{
+  team: TeamContext;
+  chain: StageRow[];
+  index: number;
+  stage: StageRow;
+  state: CtfStageState;
+  progress: ProgressRow | undefined;
+  eligible: boolean;
+}> {
+  const team = await requireTeamForUser(userId);
+  const chain = await loadChain();
+  const index = chain.findIndex((stage) => stage.slug === slug);
+
+  if (index < 0) {
+    throw ApiError.notFound('Unknown Mini-CTF stage.');
+  }
+
+  const stage = chain[index];
+  const progressRows = await loadProgress(team.id);
+  const eligible = teamIsEligible(team.progressState);
+  const state = resolveState(stage, index, progressRows, eligible);
+
+  if (state === 'locked') {
+    throw ApiError.forbidden('This stage is locked. Solve the previous stage first.');
+  }
+
+  return {
+    team,
+    chain,
+    index,
+    stage,
+    state,
+    progress: progressRows.get(stage.id),
+    eligible,
+  };
+}
+
+export async function getStage(userId: string, slug: string): Promise<CtfCurrentStage> {
+  const { stage, chain, state, progress } = await loadStageForTeam(userId, slug);
+
+  return stageView(stage, state, progress, chain.length);
+}
+
+export async function revealNextHint(userId: string, slug: string): Promise<CtfHintResponse> {
+  const prisma = getPrismaClient();
+  const { stage, team, progress } = await loadStageForTeam(userId, slug);
+
+  if (stage.status !== 'live') {
+    throw new ApiError(
+      ApiErrorCode.STAGE_NOT_PUBLISHED,
+      'This stage is not published yet. Hints are unavailable.',
+      403,
+    );
+  }
 
   if (progress?.solvedAt) {
     throw ApiError.conflict('This stage is already solved.');
@@ -158,8 +337,8 @@ export async function revealNextHint(userId: string): Promise<CtfHintResponse> {
 
   const updated = await prisma.ctfProgress.upsert({
     where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-    update: { hintsUsed: next.position },
-    create: { teamId: team.id, stageId: stage.id, hintsUsed: next.position },
+    update: { hintsUsed: next.position, state: 'unlocked' },
+    create: { teamId: team.id, stageId: stage.id, state: 'unlocked', hintsUsed: next.position },
   });
 
   return {
@@ -169,32 +348,69 @@ export async function revealNextHint(userId: string): Promise<CtfHintResponse> {
   };
 }
 
-export async function submitAnswer(userId: string, answer: string): Promise<CtfSubmitResponse> {
+async function chainCompleted(teamId: string): Promise<boolean> {
   const prisma = getPrismaClient();
-  const team = await requireTeamForUser(userId);
-  const stage = await loadCurrentStage();
 
-  const existing = await prisma.ctfProgress.findUnique({
-    where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
+  const required = await prisma.ctfStage.findMany({
+    where: { requiredForUnlock: true },
+    select: { id: true },
   });
 
-  // Idempotent replay: a solved team gets the same answer, without burning
-  // an attempt or a rate-limit slot.
-  if (existing?.solvedAt) {
+  if (required.length === 0) {
+    return false;
+  }
+
+  const solved = await prisma.ctfProgress.count({
+    where: {
+      teamId,
+      solvedAt: { not: null },
+      stageId: { in: required.map((stage) => stage.id) },
+    },
+  });
+
+  return solved === required.length;
+}
+
+export async function submitAnswer(
+  userId: string,
+  slug: string,
+  answer: string,
+): Promise<CtfSubmitResponse> {
+  const prisma = getPrismaClient();
+  const { stage, team, chain, index, progress } = await loadStageForTeam(userId, slug);
+
+  if (stage.status !== 'live') {
+    throw new ApiError(
+      ApiErrorCode.STAGE_NOT_PUBLISHED,
+      'This stage is not published yet. Submissions are closed.',
+      403,
+    );
+  }
+
+  if (!stage.answerHash) {
+    throw new ApiError(
+      ApiErrorCode.STAGE_NOT_CONFIGURED,
+      'This stage has no answer configured. Tell an organizer.',
+      409,
+    );
+  }
+
+  const nextStage = chain[index + 1];
+
+  // Replay of an already-solved stage: same result, no new solve, no unlock row.
+  if (progress?.solvedAt) {
     return {
-      success: true,
-      message: 'This stage is already solved. Your main challenge is unlocked.',
-      isSolved: true,
-      solvedAt: existing.solvedAt.toISOString(),
-      mainChallengeUnlocked: true,
+      correct: true,
+      stageSolved: true,
+      stageSlug: stage.slug,
+      nextStageUnlocked: Boolean(nextStage),
+      nextStagePosition: nextStage?.position ?? null,
+      completedChain: await chainCompleted(team.id),
+      message: `Stage ${stage.position} is already solved.`,
     };
   }
 
-  if (!hasCheckedIn(team.progressState)) {
-    throw ApiError.forbidden('Check in at the desk before submitting a Mini-CTF answer.');
-  }
-
-  const limit = submitLimiter.check(`ctf-submit:${team.id}`);
+  const limit = submitLimiter.check(`ctf-submit:${team.id}:${stage.id}`);
 
   if (!limit.ok) {
     await prisma.ctfAttempt.create({
@@ -205,48 +421,53 @@ export async function submitAnswer(userId: string, answer: string): Promise<CtfS
 
     throw new ApiError(
       ApiErrorCode.RATE_LIMITED,
-      `Too many submissions. Try again in ${retryAfterSeconds}s.`,
+      `Too many attempts. Try again in ${retryAfterSeconds}s.`,
       429,
       { retryAfterSeconds },
     );
   }
 
+  // Ensure the row exists so the solve below is a single atomic update.
+  await prisma.ctfProgress.upsert({
+    where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
+    update: {},
+    create: { teamId: team.id, stageId: stage.id, state: 'unlocked' },
+  });
+
   if (!matchesAnswerHash(answer, stage.answerHash)) {
     await prisma.$transaction([
-      prisma.ctfProgress.upsert({
+      prisma.ctfProgress.update({
         where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-        update: { attempts: { increment: 1 } },
-        create: { teamId: team.id, stageId: stage.id, attempts: 1 },
+        data: { attempts: { increment: 1 } },
       }),
       prisma.ctfAttempt.create({
         data: { teamId: team.id, stageId: stage.id, outcome: 'incorrect' },
       }),
     ]);
 
-    throw new ApiError(
-      ApiErrorCode.CTF_NOT_SOLVED,
-      'That answer is not right. Re-read the archive contents and try again.',
-      400,
-    );
+    throw new ApiError(ApiErrorCode.CTF_NOT_SOLVED, 'Incorrect flag. Try again.', 400);
   }
 
-  const solvedAt = await prisma.$transaction(async (tx) => {
+  const solvedNow = await prisma.$transaction(async (tx) => {
     const now = new Date();
 
-    const progress = await tx.ctfProgress.upsert({
-      where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-      update: { solvedAt: now, attempts: { increment: 1 } },
-      create: { teamId: team.id, stageId: stage.id, solvedAt: now, attempts: 1 },
+    // Atomic guard: only one concurrent submission can flip solvedAt.
+    const claimed = await tx.ctfProgress.updateMany({
+      where: { teamId: team.id, stageId: stage.id, solvedAt: null },
+      data: { state: 'solved', solvedAt: now, attempts: { increment: 1 } },
     });
 
-    // Unlock the main challenge, but never move a team's progress backwards.
-    await tx.team.updateMany({
-      where: {
-        id: team.id,
-        progressState: { in: ['registered', 'checked_in', 'ctf_unlocked', 'ctf_solved'] },
-      },
-      data: { progressState: 'challenge_unlocked' },
-    });
+    if (claimed.count === 0) {
+      return false;
+    }
+
+    if (nextStage) {
+      await tx.ctfProgress.upsert({
+        where: { teamId_stageId: { teamId: team.id, stageId: nextStage.id } },
+        update: { state: 'unlocked' },
+        create: { teamId: team.id, stageId: nextStage.id, state: 'unlocked' },
+      });
+    }
 
     await tx.ctfAttempt.create({
       data: { teamId: team.id, stageId: stage.id, outcome: 'correct' },
@@ -261,34 +482,63 @@ export async function submitAnswer(userId: string, answer: string): Promise<CtfS
       },
     });
 
-    return progress.solvedAt ?? now;
+    const required = await tx.ctfStage.findMany({
+      where: { requiredForUnlock: true },
+      select: { id: true },
+    });
+
+    const solvedCount = await tx.ctfProgress.count({
+      where: {
+        teamId: team.id,
+        solvedAt: { not: null },
+        stageId: { in: required.map((item) => item.id) },
+      },
+    });
+
+    if (required.length > 0 && solvedCount === required.length) {
+      await tx.team.updateMany({
+        where: { id: team.id, progressState: { notIn: ['challenge_unlocked', 'submitted'] } },
+        data: { progressState: 'challenge_unlocked' },
+      });
+    }
+
+    return true;
   });
 
+  if (!solvedNow) {
+    return {
+      correct: true,
+      stageSolved: true,
+      stageSlug: stage.slug,
+      nextStageUnlocked: Boolean(nextStage),
+      nextStagePosition: nextStage?.position ?? null,
+      completedChain: await chainCompleted(team.id),
+      message: `Stage ${stage.position} is already solved.`,
+    };
+  }
+
+  const completed = await chainCompleted(team.id);
+
   return {
-    success: true,
-    message: 'El série t2akkdet. Your main challenge is now unlocked.',
-    isSolved: true,
-    solvedAt: solvedAt.toISOString(),
-    mainChallengeUnlocked: true,
+    correct: true,
+    stageSolved: true,
+    stageSlug: stage.slug,
+    nextStageUnlocked: Boolean(nextStage),
+    nextStagePosition: nextStage?.position ?? null,
+    completedChain: completed,
+    message: completed
+      ? 'Investigation complete. You were the missing passenger all along.'
+      : 'Correct flag. The next stage is unlocked.',
   };
 }
 
-/**
- * Gate check for downstream challenge material: the main challenge is only
- * readable once this team has solved the live gate stage.
- */
+/** The main challenge opens only when every required stage is solved. */
 export async function hasUnlockedMainChallenge(userId: string): Promise<boolean> {
-  const prisma = getPrismaClient();
   const team = await requireTeamForUser(userId);
 
   if (PROGRESS_ORDER.indexOf(team.progressState) >= PROGRESS_ORDER.indexOf('challenge_unlocked')) {
     return true;
   }
 
-  const solved = await prisma.ctfProgress.findFirst({
-    where: { teamId: team.id, solvedAt: { not: null } },
-    select: { id: true },
-  });
-
-  return solved !== null;
+  return chainCompleted(team.id);
 }

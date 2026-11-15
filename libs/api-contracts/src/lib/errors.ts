@@ -27,6 +27,9 @@ export const apiErrorCodeSchema = z.enum([
   'CONFLICT',
   'RATE_LIMITED',
   'CTF_NOT_SOLVED',
+  'STAGE_LOCKED',
+  'STAGE_NOT_PUBLISHED',
+  'STAGE_NOT_CONFIGURED',
 ]);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;

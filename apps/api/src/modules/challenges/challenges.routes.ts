@@ -7,10 +7,10 @@ import { hasUnlockedMainChallenge } from '../ctf/ctf.service';
 /**
  * Main challenge endpoints.
  *
- * Only the gate exists so far: `GET /api/challenges/current` refuses access
- * with `403 CTF_NOT_SOLVED` until the team solves the live Mini-CTF stage.
- * The main challenge brief itself is not published yet, so an unlocked team
- * gets an explicit "not published" payload rather than invented content.
+ * `GET /api/challenges/current` refuses access with `403 CTF_NOT_SOLVED` until
+ * the team has solved every required Mini-CTF stage. The main brief itself is
+ * not published yet, so an unlocked team gets that fact explicitly rather than
+ * invented content.
  */
 
 export const challengesRouter: Router = Router();

@@ -16,6 +16,9 @@ export const ApiErrorCode = {
   CONFLICT: 'CONFLICT',
   RATE_LIMITED: 'RATE_LIMITED',
   CTF_NOT_SOLVED: 'CTF_NOT_SOLVED',
+  STAGE_LOCKED: 'STAGE_LOCKED',
+  STAGE_NOT_PUBLISHED: 'STAGE_NOT_PUBLISHED',
+  STAGE_NOT_CONFIGURED: 'STAGE_NOT_CONFIGURED',
 } as const;
 
 export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];

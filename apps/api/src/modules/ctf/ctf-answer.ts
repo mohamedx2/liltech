@@ -1,53 +1,90 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
- * Answer handling for Mini-CTF stages.
+ * Answer handling for the LOUAGE 404 Mini-CTF.
  *
- * The plaintext answer never leaves the organizer's material: the database
- * stores `sha256(normalizeAnswer(answer))` and comparison happens here with a
- * constant-time check. Normalization is deliberately forgiving so a player who
- * solved the challenge is not failed by formatting:
+ * Answers are never stored or compared in plaintext. The database holds
+ * `HMAC-SHA256(normalizeAnswer(answer), CTF_ANSWER_PEPPER)`; the pepper is a
+ * server-only secret, so a database dump alone cannot be brute-forced offline
+ * against the low-entropy flags this event uses.
  *
- * - surrounding whitespace is ignored
- * - case is ignored
- * - spaces, dashes, dots and other separators are ignored
+ * Normalization is deliberately forgiving so a team that solved the challenge
+ * is not failed by formatting:
+ *
+ * - Unicode NFC, so composed and decomposed Arabic forms compare equal
+ * - surrounding whitespace ignored, inner whitespace and separators ignored
+ * - case ignored
  * - a flag wrapper such as `L404{...}` or `LILTECH{...}` is unwrapped
- *
- * `187 TUN 4253`, `187tun4253`, `187-tun-4253` and `L404{187TUN4253}` all
- * normalize to `187TUN4253`.
+ * - apostrophes are preserved (`you're` != `youre`) and normalized to `'`
  */
 
-/** `PREFIX{payload}` — the wrapper convention used by the event flags. */
-const WRAPPED_FLAG = /^[A-Z][A-Z0-9_]{1,15}\{([^}]*)\}$/;
+const WRAPPED_FLAG = /^([A-Za-z0-9_]{2,16})\{([\s\S]*)\}$/;
+
+/** Everything that is not a letter (any script), a digit, or an apostrophe. */
+const NON_ANSWER_CHARACTER = /[^\p{L}\p{N}']/gu;
+
+const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u2032]/g;
+
+export const CTF_PEPPER_ENV = 'CTF_ANSWER_PEPPER';
+
+/** Minimum pepper length: short peppers add little over a plain hash. */
+export const CTF_PEPPER_MIN_LENGTH = 16;
+
+export class CtfPepperMissingError extends Error {
+  constructor() {
+    super(
+      `${CTF_PEPPER_ENV} is not configured (at least ${CTF_PEPPER_MIN_LENGTH} characters required).`,
+    );
+    this.name = 'CtfPepperMissingError';
+  }
+}
+
+/** Reads the server-only pepper, failing loudly instead of hashing unkeyed. */
+export function getAnswerPepper(): string {
+  const pepper = process.env[CTF_PEPPER_ENV]?.trim();
+
+  if (!pepper || pepper.length < CTF_PEPPER_MIN_LENGTH) {
+    throw new CtfPepperMissingError();
+  }
+
+  return pepper;
+}
 
 export function normalizeAnswer(input: string): string {
-  const upper = input.trim().toUpperCase();
-  const wrapped = WRAPPED_FLAG.exec(upper);
-  const body = wrapped?.[1] ?? upper;
-  return body.replace(/[^A-Z0-9]/g, '');
-}
+  const normalized = input.normalize('NFC').trim();
+  const wrapped = WRAPPED_FLAG.exec(normalized);
+  const body = wrapped ? wrapped[2] : normalized;
 
-export function hashAnswer(input: string): string {
-  return createHash('sha256').update(normalizeAnswer(input), 'utf8').digest('hex');
+  return body.replace(CURLY_APOSTROPHE, "'").toLowerCase().replace(NON_ANSWER_CHARACTER, '');
 }
 
 /**
- * Compares an answer against a stored SHA-256 hex hash in constant time.
- * An empty answer or a malformed stored hash never matches.
+ * Keyed digest of the normalized answer. `pepper` is injectable for tests and
+ * provisioning; request paths must rely on the environment value.
  */
-export function matchesAnswerHash(input: string, expectedHash: string): boolean {
-  const candidate = hashAnswer(input);
+export function hashAnswer(input: string, pepper: string = getAnswerPepper()): string {
+  return createHmac('sha256', pepper).update(normalizeAnswer(input), 'utf8').digest('hex');
+}
 
-  if (!/^[0-9a-f]{64}$/.test(expectedHash)) {
+/**
+ * Constant-time comparison against a stored digest. An empty answer, a missing
+ * digest (unconfigured stage) or a malformed digest never matches.
+ */
+export function matchesAnswerHash(
+  input: string,
+  expectedHash: string | null,
+  pepper: string = getAnswerPepper(),
+): boolean {
+  if (!expectedHash || !/^[0-9a-f]{64}$/.test(expectedHash)) {
     return false;
   }
 
-  const candidateBuffer = Buffer.from(candidate, 'hex');
-  const expectedBuffer = Buffer.from(expectedHash, 'hex');
+  const candidate = Buffer.from(hashAnswer(input, pepper), 'hex');
+  const expected = Buffer.from(expectedHash, 'hex');
 
-  if (candidateBuffer.length !== expectedBuffer.length) {
+  if (candidate.length !== expected.length) {
     return false;
   }
 
-  return timingSafeEqual(candidateBuffer, expectedBuffer);
+  return timingSafeEqual(candidate, expected);
 }
