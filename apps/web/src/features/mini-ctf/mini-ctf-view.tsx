@@ -120,6 +120,10 @@ export function MiniCtfView() {
       // Always trust the server's refreshed state, never the local response.
       await loadData();
     } catch (err) {
+      // A rejected flag still counts as an attempt, so re-read the chain first
+      // to show the server's counter. `loadData` clears `submitError`, hence the
+      // message is set afterwards.
+      await loadData();
       if (err instanceof ApiClientError) {
         setSubmitError({ code: err.code, message: err.message });
       } else {
