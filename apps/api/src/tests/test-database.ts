@@ -23,6 +23,8 @@ export async function resetIntegrationDatabase(): Promise<void> {
     throw new Error('Integration test database not initialized.');
   }
   await prisma.$transaction([
+    prisma.challengeCtfSolve.deleteMany(),
+    prisma.challenge.deleteMany(),
     prisma.checkInRecord.deleteMany(),
     prisma.qrToken.deleteMany(),
     prisma.participant.deleteMany(),

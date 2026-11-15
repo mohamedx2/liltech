@@ -1,22 +1,37 @@
-import { TeamProgressState } from 'api-contracts';
+import { EventPhase, type CurrentChallengeResponse } from 'api-contracts';
 import { devMockState } from './dev-state';
-import { ApiClientError } from '../../errors';
-import type { ChallengeDetailResponse } from '../../contracts/pending';
 
-export function handleGetCurrentChallenge(): ChallengeDetailResponse {
-  const isUnlocked =
-    devMockState.ctf.isSolved ||
-    devMockState.team.progress === TeamProgressState.CtfSolved ||
-    devMockState.team.progress === TeamProgressState.ChallengeUnlocked ||
-    devMockState.team.progress === TeamProgressState.Submitted;
+/** Mock of `GET /challenges/current`: early access once the mock Mini-CTF is solved. */
+export function handleGetCurrentChallenge(): CurrentChallengeResponse {
+  const mock = devMockState.challenge;
+  const solved = devMockState.ctf.isSolved;
 
-  if (!isUnlocked) {
-    throw new ApiClientError({
-      message: 'Challenge track locked. You must solve the Mini-CTF first.',
-      status: 403,
-      code: 'CTF_NOT_SOLVED',
-    });
-  }
-
-  return devMockState.challenge;
+  return {
+    available: true,
+    phase: EventPhase.Live,
+    serverTime: new Date().toISOString(),
+    current: {
+      challenge: {
+        id: '7d1c2f3e-0000-4000-8000-0000000000c1',
+        position: 1,
+        title: mock.title,
+        summary: mock.description.slice(0, 120),
+        status: 'live',
+        startedAt: '2026-11-21T19:00:00.000Z',
+        endedAt: null,
+        publicAt: '2026-11-21T20:00:00.000Z',
+        publicDelayMinutes: 60,
+      },
+      access: solved ? 'early' : 'locked',
+      ctfSolved: solved,
+      content: solved
+        ? {
+            description: mock.description,
+            problemStatement: mock.problemStatement,
+            deliverables: mock.deliverablesRequirements,
+            resources: mock.resources.map(({ name, url }) => ({ name, url })),
+          }
+        : null,
+    },
+  };
 }

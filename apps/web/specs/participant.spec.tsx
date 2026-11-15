@@ -216,42 +216,74 @@ describe('Participant / Team Features', () => {
   });
 
   describe('ChallengeView', () => {
-    const mockChallenge = {
-      id: 'chal-1',
-      track: ChallengeTrack.TrackA,
+    const schedule = {
+      id: '00000000-0000-4000-8000-0000000000c1',
+      position: 1,
       title: 'Autonomous AI Logistics Dispatcher',
-      description: 'Build an intelligent dispatching engine.',
-      problemStatement: 'Routing delays hurt emergency response teams.',
-      deliverablesRequirements: ['Runnable repo', 'Architecture doc'],
-      resources: [{ name: 'Urban Telemetry Dataset', url: '#', size: '2.4 MB' }],
+      summary: 'Route emergency vehicles faster.',
+      status: 'live' as const,
+      startedAt: '2026-11-21T19:00:00.000Z',
+      endedAt: null,
+      publicAt: '2026-11-21T20:00:00.000Z',
+      publicDelayMinutes: 60,
     };
 
-    it('displays the challenge brief once the Mini-CTF is solved', async () => {
-      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue(mockChallenge);
+    it('displays the challenge brief when the team has access', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: true,
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T19:10:00.000Z',
+        current: {
+          challenge: schedule,
+          access: 'early',
+          ctfSolved: true,
+          content: {
+            description: 'Build an intelligent dispatching engine.',
+            problemStatement: 'Routing delays hurt emergency response teams.',
+            deliverables: ['Runnable repo', 'Architecture doc'],
+            resources: [{ name: 'Urban Telemetry Dataset', url: 'https://example.com/data' }],
+          },
+        },
+      });
 
       render(<ChallengeView />);
 
       await waitFor(() => {
         expect(screen.getByText(/Autonomous AI Logistics Dispatcher/i)).toBeTruthy();
         expect(screen.getByText(/Problem Statement/i)).toBeTruthy();
-        expect(screen.getByText(/Deliverable Requirements/i)).toBeTruthy();
+        expect(screen.getByText(/Early access/i)).toBeTruthy();
         expect(screen.getByText(/Urban Telemetry Dataset/i)).toBeTruthy();
       });
     });
 
-    it('shows the locked state while the Mini-CTF is unsolved', async () => {
-      vi.spyOn(api.challenges, 'getCurrentChallenge').mockRejectedValue(
-        new ApiClientError({
-          message: 'Challenge track locked. You must solve the Mini-CTF first.',
-          status: 403,
-          code: 'CTF_NOT_SOLVED',
-        }),
-      );
+    it('shows the locked state with the public reveal time', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: true,
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T19:10:00.000Z',
+        current: { challenge: schedule, access: 'locked', ctfSolved: false, content: null },
+      });
 
       render(<ChallengeView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Clearance Required/i)).toBeTruthy();
+        expect(screen.getByText(/Challenge Locked/i)).toBeTruthy();
+        expect(screen.getByText(/opens for every team at/i)).toBeTruthy();
+      });
+    });
+
+    it('explains that the hackathon has not started yet', async () => {
+      vi.spyOn(api.challenges, 'getCurrentChallenge').mockResolvedValue({
+        available: false,
+        reason: 'EVENT_NOT_STARTED',
+        phase: EventPhase.Registration,
+        message: "The hackathon hasn't started yet.",
+      });
+
+      render(<ChallengeView />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /hasn't started yet/i })).toBeTruthy();
       });
     });
   });

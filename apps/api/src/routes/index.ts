@@ -8,6 +8,7 @@ import { checkinRouter } from '../modules/checkin/checkin.routes';
 import { announcementsRouter } from '../modules/announcements/announcements.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { participantsRouter } from '../modules/participants/participants.routes';
+import { challengesRouter } from '../modules/challenges/challenges.routes';
 
 /**
  * Mounts all feature routes under `/api`.
@@ -25,3 +26,4 @@ apiRouter.use(checkinRouter);
 apiRouter.use(announcementsRouter);
 apiRouter.use(adminRouter);
 apiRouter.use(participantsRouter);
+apiRouter.use(challengesRouter);

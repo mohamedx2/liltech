@@ -224,9 +224,21 @@ function createPortalState() {
         'Demonstration video or live deployment URL',
       ],
       resources: [
-        { name: 'Urban Telemetry Dataset (GeoJSON/CSV)', url: '#', size: '2.4 MB' },
-        { name: 'API Protocol Specification (.pdf)', url: '#', size: '420 KB' },
-        { name: 'Benchmark Evaluation Script (.py)', url: '#', size: '18 KB' },
+        {
+          name: 'Urban Telemetry Dataset (GeoJSON/CSV)',
+          url: 'https://liltechsousse.com/resources',
+          size: '2.4 MB',
+        },
+        {
+          name: 'API Protocol Specification (.pdf)',
+          url: 'https://liltechsousse.com/resources',
+          size: '420 KB',
+        },
+        {
+          name: 'Benchmark Evaluation Script (.py)',
+          url: 'https://liltechsousse.com/resources',
+          size: '18 KB',
+        },
       ],
     },
     submissions: [

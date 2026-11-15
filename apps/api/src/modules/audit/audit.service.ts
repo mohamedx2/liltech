@@ -20,6 +20,10 @@ export const AuditAction = {
   JuryCreated: 'jury.created',
   JuryUpdated: 'jury.updated',
   JuryDeleted: 'jury.deleted',
+  ChallengeCreated: 'challenge.created',
+  ChallengeUpdated: 'challenge.updated',
+  ChallengeStarted: 'challenge.started',
+  ChallengeEnded: 'challenge.ended',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

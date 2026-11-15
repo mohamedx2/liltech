@@ -79,14 +79,15 @@ model Session {
 
 /// Team registered by its leader. 4–7 members (leader included).
 model Team {
-  id            String        @id @default(uuid()) @db.Uuid
-  name          String        @unique @db.VarChar(60)
-  leader        User          @relation(fields: [leaderId], references: [id])
-  leaderId      String        @unique @db.Uuid
-  progressState TeamProgress  @default(registered)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id            String              @id @default(uuid()) @db.Uuid
+  name          String              @unique @db.VarChar(60)
+  leader        User                @relation(fields: [leaderId], references: [id])
+  leaderId      String              @unique @db.Uuid
+  progressState TeamProgress        @default(registered)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   participants  Participant[]
+  ctfSolves     ChallengeCtfSolve[]
 
   @@index([progressState])
   @@map("teams")
@@ -216,6 +217,59 @@ model AuditLog {
 
   @@index([createdAt])
   @@map("audit_log")
+}
+
+/// Lifecycle of one main challenge, driven by administrators while the
+/// event phase is `live`.
+enum ChallengeStatus {
+  upcoming
+  live
+  ended
+
+  @@map("challenge_status")
+}
+
+/// One main challenge. Challenges run one after the other (`position`). When
+/// a challenge starts, teams that solved its Mini-CTF can read it at once;
+/// everyone else from `publicAt` (start + `publicDelayMinutes`).
+model Challenge {
+  id                 String              @id @default(uuid()) @db.Uuid
+  position           Int                 @unique
+  title              String              @db.VarChar(150)
+  /// Teaser shown to every team before the description unlocks.
+  summary            String              @default("") @db.VarChar(500)
+  description        String
+  problemStatement   String              @default("")
+  deliverables       String[]            @default([])
+  /// `[{ name, url }]`, validated by the API contract.
+  resources          Json                @default("[]")
+  publicDelayMinutes Int                 @default(60)
+  status             ChallengeStatus     @default(upcoming)
+  startedAt          DateTime?
+  endedAt            DateTime?
+  publicAt           DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ctfSolves          ChallengeCtfSolve[]
+
+  @@index([status])
+  @@map("challenges")
+}
+
+/// A team solved the Mini-CTF of a challenge, which gives it early access to
+/// that challenge's description. Written by the Mini-CTF module through
+/// `recordMiniCtfSolve`; one row per team and challenge.
+model ChallengeCtfSolve {
+  id          String    @id @default(uuid()) @db.Uuid
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId String    @db.Uuid
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String    @db.Uuid
+  solvedAt    DateTime  @default(now())
+
+  @@unique([challengeId, teamId])
+  @@index([teamId])
+  @@map("challenge_ctf_solves")
 }
 
 /// Live announcement feed.

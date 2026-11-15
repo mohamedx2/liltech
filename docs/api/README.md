@@ -176,6 +176,23 @@ Every member's QR badge, so any member can show it on a phone at the entrance ev
 
 Resends one member's badge email, **at most once per hour per participant**. The limit is claimed atomically from the stored `emailLastSentAt`, so parallel clicks or a server restart cannot bypass it. Too soon → `RATE_LIMITED` (429) with `details.emailResendAvailableAt`. A participant of another team → `NOT_FOUND` (404). Revoked badge or no email → `CONFLICT` (409). A badge without a readable stored token is reissued (the old QR code stops working). Schema: `resendBadgeEmailResponseSchema`.
 
+### Challenges
+
+The event runs two challenges one after the other. An administrator starts and ends each one; both actions are refused (`CONFLICT`, 409) unless the event phase is `live`. Only one challenge can be live at a time (service check plus a partial unique index), challenges start in `position` order, and an ended challenge cannot start again. Starting sets `publicAt = startedAt + publicDelayMinutes` (60 by default).
+
+A team reads a running challenge's description before `publicAt` only if it solved **that challenge's** Mini-CTF (`access: "early"`); from `publicAt`, or once the challenge has ended, every team can (`access: "public"`). Otherwise `access` is `"locked"` and `content` is `null` (title, teaser and `publicAt` stay visible). The Mini-CTF module records a solve with `recordMiniCtfSolve(teamId, challengeId)` (challenges service); that is the only integration point.
+
+#### `GET /api/challenges` · `GET /api/challenges/current` (team)
+
+Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
+
+#### Admin (audited)
+
+- `GET /api/admin/challenges` — full content, status, timing, Mini-CTF solve count.
+- `POST /api/admin/challenges` — `{ position, title, summary?, description, problemStatement?, deliverables?, resources?: [{ name, url }], publicDelayMinutes? }`; duplicate position → 409.
+- `PATCH /api/admin/challenges/:id` — content and delay (a delay change moves `publicAt` of a running challenge).
+- `POST /api/admin/challenges/:id/start`, `POST /api/admin/challenges/:id/end` — event must be `live`.
+
 ### Check-in (staff)
 
 Admin-only endpoints. QR tokens are verified against their stored SHA-256 hash; raw token material is never echoed back for validation. Scan responses and the badge roster include the participant's badge `color`.
