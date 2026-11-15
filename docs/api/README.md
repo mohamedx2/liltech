@@ -142,7 +142,7 @@ Conflicts → `CONFLICT` (409) with field-level `details` (`path` is the request
 
 Malformed JSON → `VALIDATION_ERROR` (400), never a 500.
 
-Registration is accepted only while the event phase is `registration` (otherwise `CONFLICT` 409 "Registration is closed.") and is rate limited per client IP (`REGISTRATION_RATE_LIMIT_PER_HOUR`, 10 by default → `RATE_LIMITED` 429).
+Registration is accepted while the event phase is `registration` or `checkin` (otherwise `CONFLICT` 409 "Registration is closed.") and is rate limited per client IP (`REGISTRATION_RATE_LIMIT_PER_HOUR`, 10 by default → `RATE_LIMITED` 429).
 
 **Request body:**
 

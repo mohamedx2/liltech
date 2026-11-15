@@ -71,9 +71,9 @@ export async function registerTeamWithBadges(
     );
   }
 
-  // Registration closes once the organizers move the event to check-in.
+  // Registration stays open through check-in and closes when the event goes live.
   const { phase } = await getEventState();
-  if (phase !== 'registration') {
+  if (phase !== 'registration' && phase !== 'checkin') {
     throw ApiError.conflict('Registration is closed.');
   }
 

@@ -151,8 +151,13 @@ describeDb('event hardening', () => {
   });
 
   describe('registration closing', () => {
-    it('refuses new teams once the event has left the registration phase', async () => {
+    it('stays open during check-in', async () => {
       await asAdmin(request(app).post('/api/event-state')).send({ phase: 'checkin' });
+      await registerTeam('checkin');
+    });
+
+    it('refuses new teams once the event is live', async () => {
+      await asAdmin(request(app).post('/api/event-state')).send({ phase: 'live', force: true });
 
       const response = await request(app)
         .post('/api/registration/teams')

@@ -327,6 +327,17 @@ export async function endChallenge(
 // ── Mini-CTF integration ─────────────────────────────────────────────────────
 
 /**
+ * Whether at least one member of the team has been checked in at the
+ * entrance. Organizer rule: a team with nobody checked in sees neither the
+ * challenges nor the Mini-CTF; the Mini-CTF module must apply it too.
+ */
+export async function isTeamCheckedIn(teamId: string): Promise<boolean> {
+  const prisma = getPrismaClient();
+  const count = await prisma.checkInRecord.count({ where: { participant: { teamId } } });
+  return count > 0;
+}
+
+/**
  * Called by the Mini-CTF module once it has validated a team's flag for a
  * challenge. Idempotent: a second solve keeps the first `solvedAt`. Returns
  * `false` when the challenge does not exist.
