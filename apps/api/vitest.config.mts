@@ -32,6 +32,12 @@ export default defineConfig(() => ({
     // Integration suites share one test database and reset it between tests,
     // so test files must not run concurrently.
     fileParallelism: false,
+    // CI runs every project's lint/typecheck/test/build in parallel on a small
+    // runner; bcrypt hashing and database round-trips then exceed Vitest's 5 s
+    // default. A timed-out test keeps running while the next one resets the
+    // shared database, so a too-short timeout also causes cascading failures.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     reporters: ['default'],
     coverage: {
       reportsDirectory: './test-output/vitest/coverage',

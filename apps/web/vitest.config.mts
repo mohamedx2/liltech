@@ -18,6 +18,9 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'jsdom',
+    // CI runs every project's tasks in parallel (including the Next.js build)
+    // on a small runner; jsdom form tests then exceed Vitest's 5 s default.
+    testTimeout: 30_000,
     include: ['{src,app,pages,specs}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {
