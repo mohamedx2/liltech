@@ -6,6 +6,8 @@ import { registrationRouter } from '../modules/registration/registration.routes'
 import { checkinRouter } from '../modules/checkin/checkin.routes';
 import { announcementsRouter } from '../modules/announcements/announcements.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
+import { ctfRouter } from '../modules/ctf/ctf.routes';
+import { challengesRouter } from '../modules/challenges/challenges.routes';
 
 /**
  * Mounts all feature routes under `/api`.
@@ -21,3 +23,5 @@ apiRouter.use(registrationRouter);
 apiRouter.use(checkinRouter);
 apiRouter.use(announcementsRouter);
 apiRouter.use(adminRouter);
+apiRouter.use(ctfRouter);
+apiRouter.use(challengesRouter);
