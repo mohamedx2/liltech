@@ -84,7 +84,9 @@ export function AdminDashboardView() {
       ];
       const isNext =
         eventState !== null && order.indexOf(targetPhase) === order.indexOf(eventState.phase) + 1;
-      const updated = await api.events.updatePhase(targetPhase, { force: !isNext });
+      const updated = isNext
+        ? await api.events.updatePhase(targetPhase)
+        : await api.events.updatePhase(targetPhase, { force: true });
       setEventState(updated);
       setPhaseSuccessMessage(
         `Event phase transitioned to ${targetPhase.toUpperCase()} successfully.`,

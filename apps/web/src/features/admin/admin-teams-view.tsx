@@ -83,7 +83,7 @@ function ResendBadgeEmail({
       <Badge tone={display.tone}>{display.label}</Badge>
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={send}
         loading={isSending}
@@ -154,10 +154,11 @@ function ResetTeamPassword({ team }: { team: TeamResponse }) {
     <>
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
         aria-label={`Reset the password of ${team.name}`}
+        title="Set a new password for this team's login"
       >
         Reset password
       </Button>
@@ -348,7 +349,7 @@ export function AdminTeamsView() {
                 <ul className={styles.participantList}>
                   {team.participants.map((participant) => (
                     <li key={participant.id} className={styles.participantItem}>
-                      <span>
+                      <span className={styles.participantName}>
                         {participant.isLeader ? (
                           <span title="Team Leader">
                             <Icon name="star" className={styles.leaderIcon} />
