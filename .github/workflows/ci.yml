@@ -33,6 +33,11 @@ jobs:
     env:
       # Used by apps/api integration tests (see docs/backend/DEVELOPMENT.md).
       TEST_DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
+      # The API validates configuration at startup and services use DATABASE_URL,
+      # so the integration tests run against the same provisioned test database.
+      DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
+      # Test-only pepper: Mini-CTF answer digests are HMAC'd, never unkeyed.
+      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789abcdef
 
     steps:
       - name: Checkout
