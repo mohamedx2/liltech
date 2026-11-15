@@ -1,5 +1,6 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
+import { getAuthToken } from './auth-token';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
@@ -38,7 +39,22 @@ export interface ApiClient {
   announcements: AnnouncementsApi;
 }
 
-export function createApiClient(transport: ApiTransport): ApiClient {
+/**
+ * Attaches the stored session token to every request that does not set its own.
+ * Centralising it here keeps components and modules free of token plumbing.
+ */
+function withSessionToken(transport: ApiTransport): ApiTransport {
+  return {
+    request: <TResponse>(path: string, config: ApiRequestConfig = {}) => {
+      const token = config.authToken ?? getAuthToken();
+
+      return transport.request<TResponse>(path, token ? { ...config, authToken: token } : config);
+    },
+  };
+}
+
+export function createApiClient(baseTransport: ApiTransport): ApiClient {
+  const transport = withSessionToken(baseTransport);
   const health = createHealthApi(transport);
 
   return {
