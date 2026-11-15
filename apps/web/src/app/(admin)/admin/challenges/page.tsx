@@ -3,7 +3,7 @@ import { AdminChallengesView } from '@/features/admin/admin-challenges-view';
 
 export const metadata: Metadata = {
   title: 'Challenges · LilTech 2026 Admin',
-  description: 'Challenge content, start and end controls.',
+  description: 'Write, start, end and reveal the main challenges.',
 };
 
 export default function AdminChallengesPage() {

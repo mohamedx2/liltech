@@ -1,5 +1,16 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { auditLogListRequestSchema, type AuditLogEntry } from 'api-contracts';
+import {
+  addParticipantRequestSchema,
+  auditLogListRequestSchema,
+  grantCtfSolveRequestSchema,
+  renameTeamRequestSchema,
+  setTeamStatusRequestSchema,
+  teamCtfSolveParamsSchema,
+  teamIdParamsSchema,
+  updateParticipantRequestSchema,
+  type AdminTeamListResponse,
+  type AuditLogEntry,
+} from 'api-contracts';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -7,14 +18,27 @@ import {
   createJuryAccountRequestSchema,
   juryIdParamsSchema,
   participantIdParamsSchema,
-  resetTeamPasswordRequestSchema,
-  teamIdParamsSchema,
   updateJuryAccountRequestSchema,
   type AdminJuryListResponse,
 } from 'api-contracts';
 import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
-import { resendBadgeEmail } from '../badges/badges.service';
-import { listTeams, resetTeamPassword } from './admin.service';
+import { reissueBadge, resendBadgeEmail, resendFailedBadgeEmails } from '../badges/badges.service';
+import { getAdminOverview } from './admin.service';
+import {
+  addParticipant,
+  deleteTeam,
+  getAdminTeam,
+  grantCtfSolve,
+  listAdminTeams,
+  manualCheckIn,
+  removeParticipant,
+  renameTeam,
+  resetTeamPassword,
+  revokeCtfSolve,
+  setTeamStatus,
+  undoCheckIn,
+  updateParticipant,
+} from './team-operations.service';
 import {
   createJuryAccount,
   deleteJuryAccount,
@@ -24,8 +48,12 @@ import {
 
 /**
  * Admin operational endpoints.
- * - `GET /api/admin/audit-log` — audited administrative actions, newest first.
- * - `GET /api/admin/teams`     — full team roster with check-in state.
+ * - `GET /api/admin/overview`  — live situation board (aggregates).
+ * - `GET /api/admin/audit-log` — audited administrative actions, newest first,
+ *   optionally filtered by action prefix.
+ * - `GET /api/admin/teams[/:teamId]` — roster with contact, badge, check-in and
+ *   Mini-CTF state; team and participant tools below (all audited, see
+ *   `admin-operations-contracts`).
  * - `GET /api/admin/jury`      — jury accounts, including their passwords.
  * - `POST /api/admin/jury`, `PATCH|DELETE /api/admin/jury/:id` — jury management (audited).
  * - `POST /api/admin/participants/:participantId/resend-badge-email` — no hourly limit (audited).
@@ -55,7 +83,7 @@ adminRouter.get(
       return;
     }
 
-    listAuditLog(input.data.limit, input.data.offset)
+    listAuditLog(input.data.limit, input.data.offset, input.data.action)
       .then((result) => {
         res.status(200).json(result);
       })
@@ -63,21 +91,109 @@ adminRouter.get(
   },
 );
 
-adminRouter.get('/admin/teams', requireAuth, requireRole('admin'), (_req, res, next) => {
-  listTeams()
-    .then((result) => {
-      res.status(200).json(result);
-    })
-    .catch(next);
+const adminOnly = [requireAuth, requireRole('admin')] as const;
+
+adminRouter.get('/admin/overview', ...adminOnly, async (_req, res) => {
+  res.status(200).json(await getAdminOverview());
 });
 
-const adminOnly = [requireAuth, requireRole('admin')] as const;
+// ── Teams ────────────────────────────────────────────────────────────────────
+
+adminRouter.get('/admin/teams', ...adminOnly, async (_req, res) => {
+  const body: AdminTeamListResponse = await listAdminTeams();
+  res.status(200).json(body);
+});
+
+adminRouter.get('/admin/teams/:teamId', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  res.status(200).json(await getAdminTeam(teamId));
+});
+
+adminRouter.patch('/admin/teams/:teamId', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const input = parseOrThrow(renameTeamRequestSchema, req.body);
+  res.status(200).json(await renameTeam(teamId, input, authenticatedUserId(req)));
+});
+
+adminRouter.post('/admin/teams/:teamId/status', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const input = parseOrThrow(setTeamStatusRequestSchema, req.body);
+  res.status(200).json(await setTeamStatus(teamId, input, authenticatedUserId(req)));
+});
 
 adminRouter.post('/admin/teams/:teamId/reset-password', ...adminOnly, async (req, res) => {
   const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
-  const input = parseOrThrow(resetTeamPasswordRequestSchema, req.body ?? {});
-  res.status(200).json(await resetTeamPassword(teamId, input, authenticatedUserId(req)));
+  res.status(200).json(await resetTeamPassword(teamId, authenticatedUserId(req)));
 });
+
+adminRouter.delete('/admin/teams/:teamId', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  await deleteTeam(teamId, authenticatedUserId(req));
+  res.status(204).send();
+});
+
+adminRouter.post('/admin/teams/:teamId/participants', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const input = parseOrThrow(addParticipantRequestSchema, req.body);
+  res.status(201).json(await addParticipant(teamId, input, authenticatedUserId(req)));
+});
+
+adminRouter.post('/admin/teams/:teamId/ctf-solves', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const { challengeId } = parseOrThrow(grantCtfSolveRequestSchema, req.body);
+  res.status(201).json(await grantCtfSolve(teamId, challengeId, authenticatedUserId(req)));
+});
+
+adminRouter.delete(
+  '/admin/teams/:teamId/ctf-solves/:challengeId',
+  ...adminOnly,
+  async (req, res) => {
+    const { teamId, challengeId } = parseOrThrow(teamCtfSolveParamsSchema, req.params);
+    res.status(200).json(await revokeCtfSolve(teamId, challengeId, authenticatedUserId(req)));
+  },
+);
+
+// ── Participants ─────────────────────────────────────────────────────────────
+
+adminRouter.patch('/admin/participants/:participantId', ...adminOnly, async (req, res) => {
+  const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+  const input = parseOrThrow(updateParticipantRequestSchema, req.body);
+  res.status(200).json(await updateParticipant(participantId, input, authenticatedUserId(req)));
+});
+
+adminRouter.delete('/admin/participants/:participantId', ...adminOnly, async (req, res) => {
+  const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+  res.status(200).json(await removeParticipant(participantId, authenticatedUserId(req)));
+});
+
+adminRouter.post('/admin/participants/:participantId/check-in', ...adminOnly, async (req, res) => {
+  const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+  res.status(200).json(await manualCheckIn(participantId, authenticatedUserId(req)));
+});
+
+adminRouter.delete(
+  '/admin/participants/:participantId/check-in',
+  ...adminOnly,
+  async (req, res) => {
+    const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+    res.status(200).json(await undoCheckIn(participantId, authenticatedUserId(req)));
+  },
+);
+
+adminRouter.post(
+  '/admin/participants/:participantId/reissue-badge',
+  ...adminOnly,
+  async (req, res) => {
+    const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+    res.status(200).json(await reissueBadge(participantId, authenticatedUserId(req)));
+  },
+);
+
+adminRouter.post('/admin/badges/resend-failed', ...adminOnly, async (req, res) => {
+  res.status(200).json(await resendFailedBadgeEmails(authenticatedUserId(req)));
+});
+
+// ── Jury ─────────────────────────────────────────────────────────────────────
 
 adminRouter.get('/admin/jury', ...adminOnly, async (_req, res) => {
   const items = await listJuryAccountDetails();
@@ -119,12 +235,15 @@ adminRouter.post(
 async function listAuditLog(
   limit: number,
   offset: number,
+  actionPrefix?: string,
 ): Promise<{ items: AuditLogEntry[]; total: number }> {
   const prisma = getPrismaClient();
+  const where = actionPrefix ? { action: { startsWith: actionPrefix } } : {};
 
   const [total, entries] = await Promise.all([
-    prisma.auditLog.count(),
+    prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       skip: offset,
       take: limit,
@@ -136,6 +255,8 @@ async function listAuditLog(
     id: entry.id,
     action: entry.action,
     actorName: entry.actor?.name ?? null,
+    targetType: entry.targetType,
+    targetId: entry.targetId,
     summary: entry.summary,
     createdAt: entry.createdAt.toISOString(),
   }));

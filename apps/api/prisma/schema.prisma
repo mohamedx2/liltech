@@ -1,13 +1,13 @@
 // LilTech 2026 Platform — Prisma schema
 //
-// The foundation domain covers what the specification defines unambiguously:
-// authentication accounts and sessions, team/participant registration, QR
-// badge tokens, check-in, the event phase state (single writer), live
-// announcements, and the audit log.
+// The domain covers authentication accounts and sessions, team/participant
+// registration (with an administrative team standing), QR badge tokens,
+// check-in, the event phase state (single writer), the two sequential
+// challenges with Mini-CTF early access, live announcements, and the audit log.
 //
 // Still intentionally absent (blocked on `docs/decisions/OPEN_QUESTIONS.md`):
-// challenge tracks/assignment, Mini-CTF material and attempt log, challenge
-// unlocking, submissions, jury scoping, scores, leaderboards, results.
+// Mini-CTF flag material and attempt log, submissions, jury scoping, scores,
+// leaderboards, results.
 
 generator client {
   provider = "prisma-client-js"
@@ -79,18 +79,34 @@ model Session {
 
 /// Team registered by its leader. 4–7 members (leader included).
 model Team {
-  id            String              @id @default(uuid()) @db.Uuid
-  name          String              @unique @db.VarChar(60)
-  leader        User                @relation(fields: [leaderId], references: [id])
-  leaderId      String              @unique @db.Uuid
-  progressState TeamProgress        @default(registered)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  participants  Participant[]
-  ctfSolves     ChallengeCtfSolve[]
+  id              String              @id @default(uuid()) @db.Uuid
+  name            String              @unique @db.VarChar(60)
+  leader          User                @relation(fields: [leaderId], references: [id])
+  leaderId        String              @unique @db.Uuid
+  progressState   TeamProgress        @default(registered)
+  /// Administrative standing; a team that is not `active` cannot be checked
+  /// in and cannot read challenges.
+  status          TeamStatus          @default(active)
+  /// Why the team was withdrawn or disqualified (shown to administrators).
+  statusReason    String?             @db.VarChar(300)
+  statusChangedAt DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  participants    Participant[]
+  ctfSolves       ChallengeCtfSolve[]
 
   @@index([progressState])
+  @@index([status])
   @@map("teams")
+}
+
+/// Administrative standing of a team, set by administrators (audited).
+enum TeamStatus {
+  active
+  withdrawn
+  disqualified
+
+  @@map("team_status")
 }
 
 /// Team progress through the event (canonical states from the specification).

@@ -65,9 +65,6 @@ export const participantSummarySchema = z.object({
   isLeader: z.boolean(),
   /** Present once the participant has been checked in. */
   checkedInAt: isoTimestampSchema.optional(),
-  /** Admin roster only: contact email and badge email delivery state. */
-  email: z.string().nullable().optional(),
-  badgeEmailStatus: z.enum(['pending', 'sent', 'failed']).nullable().optional(),
 });
 
 export type ParticipantSummary = z.infer<typeof participantSummarySchema>;

@@ -53,7 +53,7 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
           participant: {
             include: {
               checkIn: true,
-              team: { select: { id: true, name: true } },
+              team: { select: { id: true, name: true, status: true } },
             },
           },
         },
@@ -67,6 +67,12 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         throw ApiError.forbidden('This badge has been revoked.');
       }
 
+      if (badge.participant.team.status !== 'active') {
+        throw ApiError.forbidden(
+          `This team is ${badge.participant.team.status} and cannot be checked in.`,
+        );
+      }
+
       if (badge.participant.checkIn) {
         throw ApiError.conflict('This participant is already checked in.');
       }
@@ -75,8 +81,8 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         data: { participantId: badge.participantId, checkedByUserId: adminUserId },
       });
 
-      // Only a team still at `registered` advances: a late member's check-in
-      // must never move a team that already progressed back to `checked_in`.
+      // A late member checking in must not move the team back from a later
+      // progress state.
       await tx.team.updateMany({
         where: { id: badge.participant.team.id, progressState: 'registered' },
         data: { progressState: 'checked_in' },

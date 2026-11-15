@@ -38,6 +38,8 @@ export const PLANNED_ENDPOINTS = {
   ADMIN_AUDIT_LOG: '/admin/audit-log',
   ADMIN_TEAMS: '/admin/teams',
   ADMIN_JURY: '/admin/jury',
-  ADMIN_CHALLENGES: '/admin/challenges',
+  ADMIN_OVERVIEW: '/admin/overview',
   ADMIN_PARTICIPANTS: '/admin/participants',
+  ADMIN_BADGES_RESEND_FAILED: '/admin/badges/resend-failed',
+  ADMIN_CHALLENGES: '/admin/challenges',
 } as const;

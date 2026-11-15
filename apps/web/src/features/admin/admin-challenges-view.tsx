@@ -1,26 +1,36 @@
 'use client';
 
-import React, { useCallback, useEffect, useState, type FormEvent } from 'react';
-import type { ChallengeAdminDetail, ChallengeStatus, EventPhase } from 'api-contracts';
-import { api, ApiClientError } from '@/lib/api';
-import { ErrorState, EmptyState, LoadingState } from '@/components/feedback/state-panel';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  DEFAULT_CHALLENGE_PUBLIC_DELAY_MINUTES,
+  type ChallengeAdminDetail,
+  type ChallengeResourceLink,
+} from 'api-contracts';
+import { api } from '@/lib/api';
 import { Alert } from '@/components/feedback/alert';
+import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
-import { FormField, Textarea, TextInput } from '@/components/ui/input';
-import styles from './admin-challenges-view.module.css';
+import { FormField, TextInput, Textarea } from '@/components/ui/input';
+import {
+  ConfirmActionDialog,
+  errorMessage,
+  FeedbackBanner,
+  formatTime,
+  type Feedback,
+} from './admin-ui';
+import styles from './admin-tools.module.css';
 
-const STATUS_TONE: Record<ChallengeStatus, BadgeTone> = {
+/**
+ * Challenge administration: write the two challenges, run them one after
+ * the other (start / end while the event is live), and control when every
+ * team can read the running challenge (public delay, or reveal now).
+ */
+
+const STATUS_TONE: Record<ChallengeAdminDetail['status'], BadgeTone> = {
   upcoming: 'neutral',
   live: 'success',
   ended: 'info',
-};
-
-const STATUS_LABEL: Record<ChallengeStatus, string> = {
-  upcoming: 'Upcoming',
-  live: 'Running',
-  ended: 'Ended',
 };
 
 interface ChallengeForm {
@@ -29,29 +39,23 @@ interface ChallengeForm {
   summary: string;
   description: string;
   problemStatement: string;
-  /** One deliverable per line. */
   deliverables: string;
-  /** One resource per line: `Name | https://url`. */
   resources: string;
   publicDelayMinutes: string;
 }
 
-type FieldErrors = Partial<Record<keyof ChallengeForm, string>>;
+const EMPTY_FORM: ChallengeForm = {
+  position: '1',
+  title: '',
+  summary: '',
+  description: '',
+  problemStatement: '',
+  deliverables: '',
+  resources: '',
+  publicDelayMinutes: String(DEFAULT_CHALLENGE_PUBLIC_DELAY_MINUTES),
+};
 
-function emptyForm(nextPosition: number): ChallengeForm {
-  return {
-    position: String(nextPosition),
-    title: '',
-    summary: '',
-    description: '',
-    problemStatement: '',
-    deliverables: '',
-    resources: '',
-    publicDelayMinutes: '60',
-  };
-}
-
-function formFrom(challenge: ChallengeAdminDetail): ChallengeForm {
+function toForm(challenge: ChallengeAdminDetail): ChallengeForm {
   return {
     position: String(challenge.position),
     title: challenge.title,
@@ -59,184 +63,149 @@ function formFrom(challenge: ChallengeAdminDetail): ChallengeForm {
     description: challenge.description,
     problemStatement: challenge.problemStatement,
     deliverables: challenge.deliverables.join('\n'),
-    resources: challenge.resources.map((r) => `${r.name} | ${r.url}`).join('\n'),
+    resources: challenge.resources.map((link) => `${link.name} | ${link.url}`).join('\n'),
     publicDelayMinutes: String(challenge.publicDelayMinutes),
   };
 }
 
-function lines(value: string): string[] {
-  return value
+/** One line per resource: `Name | https://url`. Invalid lines are reported. */
+export function parseResources(text: string): {
+  links: ChallengeResourceLink[];
+  invalid: string[];
+} {
+  const links: ChallengeResourceLink[] = [];
+  const invalid: string[] = [];
+  for (const line of text
     .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function parseResources(value: string): { name: string; url: string }[] | null {
-  const parsed = lines(value).map((line) => {
-    const [name, ...rest] = line.split('|');
-    return { name: name.trim(), url: rest.join('|').trim() };
-  });
-  return parsed.every((r) => r.name && /^https?:\/\/\S+$/.test(r.url)) ? parsed : null;
-}
-
-function formatTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-}
-
-/** API field paths (`deliverables.0`, `resources.1.url`) → form fields. */
-function serverFieldErrors(error: ApiClientError): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!Array.isArray(error.details)) return errors;
-  for (const detail of error.details) {
-    const { path, message } = (detail ?? {}) as { path?: unknown; message?: unknown };
-    if (typeof path !== 'string' || typeof message !== 'string') continue;
-    const root = path.split('.')[0] as keyof ChallengeForm;
-    if (root in emptyForm(1)) errors[root] ??= message;
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    const [name, url] = line.split('|').map((part) => part.trim());
+    if (name && url && /^https?:\/\//.test(url)) {
+      links.push({ name, url });
+    } else {
+      invalid.push(line);
+    }
   }
-  return errors;
+  return { links, invalid };
 }
 
-type PendingAction = { kind: 'start' | 'end'; challenge: ChallengeAdminDetail };
+type PendingAction =
+  | { kind: 'create' }
+  | { kind: 'edit'; challenge: ChallengeAdminDetail }
+  | { kind: 'start'; challenge: ChallengeAdminDetail }
+  | { kind: 'end'; challenge: ChallengeAdminDetail }
+  | { kind: 'reveal'; challenge: ChallengeAdminDetail };
 
-/**
- * Challenge administration: content for each of the two challenges, and the
- * start/end controls. The server only accepts start/end while the event is
- * `live`, one challenge at a time, in order; the buttons mirror those rules
- * but the server stays the authority.
- */
 export function AdminChallengesView() {
   const [challenges, setChallenges] = useState<ChallengeAdminDetail[] | null>(null);
-  const [phase, setPhase] = useState<EventPhase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const [editing, setEditing] = useState<ChallengeAdminDetail | 'new' | null>(null);
-  const [form, setForm] = useState<ChallengeForm>(emptyForm(1));
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
-  const [isActing, setIsActing] = useState(false);
+  const [form, setForm] = useState<ChallengeForm>(EMPTY_FORM);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    setErrorMessage(null);
+    setLoadError(null);
     try {
-      const [list, eventState] = await Promise.all([
-        api.admin.getChallenges(),
-        api.events.getEventState(),
-      ]);
-      setChallenges(list.items);
-      setPhase(eventState.phase);
-    } catch (err) {
-      setErrorMessage(err instanceof ApiClientError ? err.message : 'Failed to load challenges.');
+      setChallenges((await api.admin.getChallenges()).items);
+    } catch (error) {
+      setLoadError(errorMessage(error, 'Failed to load challenges.'));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
-  const nextPosition =
-    (challenges ?? []).reduce((max, challenge) => Math.max(max, challenge.position), 0) + 1;
+  const replace = (updated: ChallengeAdminDetail) =>
+    setChallenges((current) => {
+      const others = (current ?? []).filter((item) => item.id !== updated.id);
+      return [...others, updated].sort((a, b) => a.position - b.position);
+    });
 
-  const openCreate = () => {
-    setEditing('new');
-    setForm(emptyForm(nextPosition));
-    setFieldErrors({});
-    setFormError(null);
-  };
-
-  const openEdit = (challenge: ChallengeAdminDetail) => {
-    setEditing(challenge);
-    setForm(formFrom(challenge));
-    setFieldErrors({});
-    setFormError(null);
-  };
-
-  const closeForm = () => {
-    if (!isSaving) setEditing(null);
-  };
-
-  const handleSubmit = async (event?: FormEvent) => {
-    event?.preventDefault();
-    if (!editing) return;
-
-    const errors: FieldErrors = {};
-    const position = Number(form.position);
-    const delay = Number(form.publicDelayMinutes);
-    const resources = parseResources(form.resources);
-    if (editing === 'new' && (!Number.isInteger(position) || position < 1)) {
-      errors.position = 'Use 1 for the first challenge, 2 for the second.';
+  const openForm = (action: PendingAction) => {
+    setFeedback(null);
+    if (action.kind === 'create') {
+      const nextPosition = (challenges ?? []).reduce((max, c) => Math.max(max, c.position), 0) + 1;
+      setForm({ ...EMPTY_FORM, position: String(nextPosition) });
+    } else if (action.kind === 'edit') {
+      setForm(toForm(action.challenge));
     }
-    if (!form.title.trim()) errors.title = 'Enter a title.';
-    if (!form.description.trim()) errors.description = 'Enter the description teams will read.';
-    if (!Number.isInteger(delay) || delay < 0 || delay > 1440) {
-      errors.publicDelayMinutes = 'Enter a number of minutes between 0 and 1440.';
-    }
-    if (!resources) errors.resources = 'Write one resource per line as “Name | https://link”.';
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0 || !resources) return;
-
-    const content = {
-      title: form.title.trim(),
-      summary: form.summary.trim(),
-      description: form.description.trim(),
-      problemStatement: form.problemStatement.trim(),
-      deliverables: lines(form.deliverables),
-      resources,
-      publicDelayMinutes: delay,
-    };
-
-    setIsSaving(true);
-    setFormError(null);
-    try {
-      if (editing === 'new') {
-        await api.admin.createChallenge({ position, ...content });
-        setSuccessMessage(`Challenge ${position} created.`);
-      } else {
-        await api.admin.updateChallenge(editing.id, content);
-        setSuccessMessage(`“${content.title}” saved.`);
-      }
-      setEditing(null);
-      await loadData();
-    } catch (err) {
-      if (err instanceof ApiClientError) {
-        setFieldErrors(serverFieldErrors(err));
-        setFormError(err.message);
-      } else {
-        setFormError('Could not save the challenge.');
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    setPending(action);
   };
+
+  const resources = parseResources(form.resources);
+  const delay = Number(form.publicDelayMinutes);
+  const formValid =
+    form.title.trim().length > 0 &&
+    form.description.trim().length > 0 &&
+    resources.invalid.length === 0 &&
+    Number.isInteger(delay) &&
+    delay >= 0 &&
+    delay <= 1440 &&
+    Number.isInteger(Number(form.position)) &&
+    Number(form.position) >= 1;
+
+  const content = () => ({
+    title: form.title.trim(),
+    summary: form.summary.trim(),
+    description: form.description.trim(),
+    problemStatement: form.problemStatement.trim(),
+    deliverables: form.deliverables
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+    resources: resources.links,
+    publicDelayMinutes: delay,
+  });
 
   const runPending = async () => {
     if (!pending) return;
-    setIsActing(true);
-    setErrorMessage(null);
-    try {
-      const updated =
-        pending.kind === 'start'
-          ? await api.admin.startChallenge(pending.challenge.id)
-          : await api.admin.endChallenge(pending.challenge.id);
-      setSuccessMessage(
-        pending.kind === 'start'
-          ? `“${updated.title}” started. It opens for every team at ${formatTime(updated.publicAt)}.`
-          : `“${updated.title}” ended.`,
-      );
-      setPending(null);
-      await loadData();
-    } catch (err) {
-      setErrorMessage(err instanceof ApiClientError ? err.message : 'The action failed.');
-      setPending(null);
-    } finally {
-      setIsActing(false);
+    switch (pending.kind) {
+      case 'create': {
+        const created = await api.admin.createChallenge({
+          position: Number(form.position),
+          ...content(),
+        });
+        replace(created);
+        setFeedback({ tone: 'success', message: `“${created.title}” created.` });
+        return;
+      }
+      case 'edit': {
+        const updated = await api.admin.updateChallenge(pending.challenge.id, content());
+        replace(updated);
+        setFeedback({ tone: 'success', message: `“${updated.title}” saved.` });
+        return;
+      }
+      case 'start': {
+        const started = await api.admin.startChallenge(pending.challenge.id);
+        replace(started);
+        setFeedback({
+          tone: 'success',
+          message: `“${started.title}” started. Public to every team at ${formatTime(started.publicAt)}.`,
+        });
+        return;
+      }
+      case 'end': {
+        const ended = await api.admin.endChallenge(pending.challenge.id);
+        replace(ended);
+        setFeedback({ tone: 'success', message: `“${ended.title}” ended.` });
+        return;
+      }
+      case 'reveal': {
+        const revealed = await api.admin.updateChallenge(pending.challenge.id, {
+          publicDelayMinutes: 0,
+        });
+        replace(revealed);
+        setFeedback({
+          tone: 'success',
+          message: `“${revealed.title}” is now readable by every team.`,
+        });
+        return;
+      }
     }
   };
 
@@ -244,331 +213,322 @@ export function AdminChallengesView() {
     return <LoadingState message="Loading challenges..." />;
   }
 
-  if (errorMessage && challenges === null) {
-    return <ErrorState title="Challenges Unavailable" message={errorMessage} onRetry={loadData} />;
+  if (loadError && challenges === null) {
+    return <ErrorState title="Challenges unavailable" message={loadError} onRetry={loadData} />;
   }
 
-  const isLive = phase === 'live';
-  const running = (challenges ?? []).find((challenge) => challenge.status === 'live');
-  const canStart = (challenge: ChallengeAdminDetail) =>
-    isLive &&
-    challenge.status === 'upcoming' &&
-    !running &&
-    (challenges ?? []).every(
-      (other) => other.position >= challenge.position || other.status === 'ended',
-    );
-  const isNew = editing === 'new';
+  const list = challenges ?? [];
 
   return (
     <div className={styles.container}>
       <section className={styles.hero} aria-labelledby="challenges-title">
         <div className={styles.heroTop}>
           <span className={styles.eyebrow}>Challenges</span>
-          <Button type="button" variant="primary" size="sm" onClick={openCreate}>
-            Add challenge
+          <Button variant="primary" size="sm" onClick={() => openForm({ kind: 'create' })}>
+            New challenge
           </Button>
         </div>
         <h1 id="challenges-title" className={styles.title}>
           Challenges
         </h1>
         <p className={styles.description}>
-          Two challenges run one after the other. Start a challenge to open it to teams that solved
-          its Mini-CTF; every other team can read it after the public delay. Start and end are only
-          possible while the event is live.
+          Challenges run one after the other, in position order, and can only start or end while the
+          event phase is “live”. Teams that solved a challenge&apos;s Mini-CTF read it at once;
+          everyone else after the public delay.
         </p>
-        <div className={styles.phaseRow}>
-          <span className={styles.muted}>Event phase:</span>
-          <Badge tone={isLive ? 'success' : 'warning'} showDot>
-            {phase ? phase.replace('_', ' ') : 'unknown'}
-          </Badge>
-          {!isLive ? (
-            <span className={styles.muted}>Switch the event to “live” to start challenges.</span>
-          ) : null}
-        </div>
       </section>
 
-      {successMessage ? (
-        <Alert tone="success" title="Done">
-          {successMessage}
-        </Alert>
-      ) : null}
-      {errorMessage && challenges !== null ? (
-        <Alert tone="error" title="Action refused">
-          {errorMessage}
-        </Alert>
-      ) : null}
+      <FeedbackBanner feedback={feedback} />
 
-      {challenges && challenges.length > 0 ? (
-        <ul className={styles.list}>
-          {challenges.map((challenge) => (
-            <li key={challenge.id} className={styles.panel}>
-              <div className={styles.cardHeader}>
-                <div>
-                  <span className={styles.eyebrow}>Challenge {challenge.position}</span>
-                  <h2 className={styles.sectionTitle}>{challenge.title}</h2>
-                </div>
-                <Badge tone={STATUS_TONE[challenge.status]} showDot>
-                  {STATUS_LABEL[challenge.status]}
+      {list.length === 0 ? (
+        <EmptyState
+          title="No challenge yet"
+          message="Create the challenges before the event goes live."
+          action={
+            <Button variant="primary" size="sm" onClick={() => openForm({ kind: 'create' })}>
+              New challenge
+            </Button>
+          }
+        />
+      ) : (
+        list.map((challenge) => {
+          const isRevealed =
+            challenge.publicAt !== null && new Date(challenge.publicAt).getTime() <= Date.now();
+          return (
+            <section
+              key={challenge.id}
+              className={styles.panel}
+              aria-labelledby={`challenge-${challenge.id}`}
+            >
+              <div className={styles.panelHeader}>
+                <h2 id={`challenge-${challenge.id}`} className={styles.sectionTitle}>
+                  {challenge.position}. {challenge.title}
+                </h2>
+                <Badge tone={STATUS_TONE[challenge.status]} showDot={challenge.status === 'live'}>
+                  {challenge.status}
                 </Badge>
               </div>
-
               {challenge.summary ? <p className={styles.description}>{challenge.summary}</p> : null}
-
-              <dl className={styles.facts}>
-                <div>
+              <dl className={styles.statGrid}>
+                <div className={styles.stat}>
                   <dt>Started</dt>
-                  <dd>{formatTime(challenge.startedAt)}</dd>
+                  <dd className={styles.small}>{formatTime(challenge.startedAt)}</dd>
                 </div>
-                <div>
-                  <dt>Open to everyone</dt>
-                  <dd>
+                <div className={styles.stat}>
+                  <dt>Public at</dt>
+                  <dd className={styles.small}>
                     {challenge.publicAt
                       ? formatTime(challenge.publicAt)
-                      : `${challenge.publicDelayMinutes} min after start`}
+                      : `start + ${challenge.publicDelayMinutes} min`}
                   </dd>
                 </div>
-                <div>
+                <div className={styles.stat}>
                   <dt>Ended</dt>
-                  <dd>{formatTime(challenge.endedAt)}</dd>
+                  <dd className={styles.small}>{formatTime(challenge.endedAt)}</dd>
                 </div>
-                <div>
-                  <dt>Mini-CTF solved by</dt>
-                  <dd>
-                    {challenge.ctfSolvedTeams} team{challenge.ctfSolvedTeams === 1 ? '' : 's'}
-                  </dd>
+                <div className={styles.stat}>
+                  <dt>Mini-CTF solvers</dt>
+                  <dd>{challenge.ctfSolvedTeams}</dd>
                 </div>
               </dl>
-
               <div className={styles.actions}>
                 <Button
-                  type="button"
-                  variant="outline"
                   size="sm"
-                  onClick={() => openEdit(challenge)}
+                  variant="outline"
+                  onClick={() => openForm({ kind: 'edit', challenge })}
                 >
                   Edit content
                 </Button>
                 {challenge.status === 'upcoming' ? (
                   <Button
-                    type="button"
-                    variant="primary"
                     size="sm"
-                    disabled={!canStart(challenge)}
-                    onClick={() => setPending({ kind: 'start', challenge })}
+                    variant="primary"
+                    onClick={() => openForm({ kind: 'start', challenge })}
                   >
                     Start challenge
                   </Button>
                 ) : null}
+                {challenge.status === 'live' && !isRevealed ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => openForm({ kind: 'reveal', challenge })}
+                  >
+                    Reveal to all teams now
+                  </Button>
+                ) : null}
                 {challenge.status === 'live' ? (
                   <Button
-                    type="button"
-                    variant="danger"
                     size="sm"
-                    disabled={!isLive}
-                    onClick={() => setPending({ kind: 'end', challenge })}
+                    variant="danger"
+                    onClick={() => openForm({ kind: 'end', challenge })}
                   >
                     End challenge
                   </Button>
                 ) : null}
               </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState
-          title="No challenges yet"
-          message="Use “Add challenge” to create challenge 1, then challenge 2."
-        />
+            </section>
+          );
+        })
       )}
 
-      {editing ? (
-        <Dialog
-          open={editing !== null}
-          onClose={closeForm}
-          title={isNew ? 'Add challenge' : `Edit “${editing.title}”`}
-          footer={
-            <div className={styles.dialogFooter}>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={closeForm}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="challenge-form"
-                variant="primary"
-                size="sm"
-                loading={isSaving}
-                loadingLabel="Saving…"
-              >
-                {isNew ? 'Create challenge' : 'Save changes'}
-              </Button>
-            </div>
-          }
+      {pending?.kind === 'create' || pending?.kind === 'edit' ? (
+        <ConfirmActionDialog
+          open
+          title={pending.kind === 'create' ? 'New challenge' : `Edit “${pending.challenge.title}”`}
+          confirmLabel={pending.kind === 'create' ? 'Create challenge' : 'Save changes'}
+          confirmDisabled={!formValid}
+          onConfirm={runPending}
+          onClose={() => setPending(null)}
         >
-          <form id="challenge-form" className={styles.form} onSubmit={handleSubmit} noValidate>
-            {formError ? (
-              <Alert tone="error" title="Could not save">
-                {formError}
-              </Alert>
-            ) : null}
-            <div className={styles.formRow}>
-              {isNew ? (
-                <FormField label="Order" required hint="1 or 2" error={fieldErrors.position}>
-                  {({ id, describedBy, invalid }) => (
-                    <TextInput
-                      id={id}
-                      type="number"
-                      min={1}
-                      aria-describedby={describedBy}
-                      invalid={invalid}
-                      value={form.position}
-                      onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
-                    />
-                  )}
-                </FormField>
-              ) : null}
-              <FormField
-                label="Public delay (minutes)"
-                required
-                hint="Time after the start before every team can read it."
-                error={fieldErrors.publicDelayMinutes}
-              >
-                {({ id, describedBy, invalid }) => (
-                  <TextInput
-                    id={id}
-                    type="number"
-                    min={0}
-                    aria-describedby={describedBy}
-                    invalid={invalid}
-                    value={form.publicDelayMinutes}
-                    onChange={(e) => setForm((f) => ({ ...f, publicDelayMinutes: e.target.value }))}
-                  />
-                )}
-              </FormField>
-            </div>
-            <FormField label="Title" required error={fieldErrors.title}>
-              {({ id, describedBy, invalid }) => (
-                <TextInput
-                  id={id}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                />
-              )}
-            </FormField>
-            <FormField
-              label="Teaser"
-              hint="Shown to every team, even before the description unlocks."
-              error={fieldErrors.summary}
-            >
-              {({ id, describedBy, invalid }) => (
-                <TextInput
-                  id={id}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.summary}
-                  onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
-                />
-              )}
-            </FormField>
-            <FormField label="Description" required error={fieldErrors.description}>
-              {({ id, describedBy, invalid }) => (
-                <Textarea
-                  id={id}
-                  rows={5}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                />
-              )}
-            </FormField>
-            <FormField label="Problem statement" error={fieldErrors.problemStatement}>
-              {({ id, describedBy, invalid }) => (
-                <Textarea
-                  id={id}
-                  rows={4}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.problemStatement}
-                  onChange={(e) => setForm((f) => ({ ...f, problemStatement: e.target.value }))}
-                />
-              )}
-            </FormField>
-            <FormField label="Deliverables" hint="One per line." error={fieldErrors.deliverables}>
-              {({ id, describedBy, invalid }) => (
-                <Textarea
-                  id={id}
-                  rows={3}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.deliverables}
-                  onChange={(e) => setForm((f) => ({ ...f, deliverables: e.target.value }))}
-                />
-              )}
-            </FormField>
-            <FormField
-              label="Resources"
-              hint="One per line: Name | https://link"
-              error={fieldErrors.resources}
-            >
-              {({ id, describedBy, invalid }) => (
-                <Textarea
-                  id={id}
-                  rows={3}
-                  aria-describedby={describedBy}
-                  invalid={invalid}
-                  value={form.resources}
-                  onChange={(e) => setForm((f) => ({ ...f, resources: e.target.value }))}
-                />
-              )}
-            </FormField>
-          </form>
-        </Dialog>
+          <ChallengeFormFields
+            form={form}
+            onChange={setForm}
+            positionEditable={pending.kind === 'create'}
+            invalidResources={resources.invalid}
+          />
+          {pending.kind === 'edit' && pending.challenge.status === 'live' ? (
+            <Alert tone="warning" title="Challenge is running">
+              Teams with access see your changes immediately. Changing the delay moves the public
+              reveal time.
+            </Alert>
+          ) : null}
+        </ConfirmActionDialog>
       ) : null}
 
-      {pending ? (
-        <Dialog
-          open={pending !== null}
-          onClose={() => !isActing && setPending(null)}
-          title={pending.kind === 'start' ? 'Start challenge' : 'End challenge'}
-          footer={
-            <div className={styles.dialogFooter}>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPending(null)}
-                disabled={isActing}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant={pending.kind === 'start' ? 'primary' : 'danger'}
-                size="sm"
-                loading={isActing}
-                loadingLabel={pending.kind === 'start' ? 'Starting…' : 'Ending…'}
-                onClick={runPending}
-              >
-                {pending.kind === 'start' ? 'Start now' : 'End now'}
-              </Button>
-            </div>
-          }
+      {pending?.kind === 'start' ? (
+        <ConfirmActionDialog
+          open
+          title="Start challenge"
+          confirmLabel="Start now"
+          onConfirm={runPending}
+          onClose={() => setPending(null)}
         >
-          <Alert tone="warning" title={pending.challenge.title}>
-            {pending.kind === 'start'
-              ? `Teams that solved this challenge's Mini-CTF can read it immediately. Every other team can read it ${pending.challenge.publicDelayMinutes} minutes from now. A started challenge cannot be restarted.`
-              : 'Ending opens the description to every team and lets the next challenge start. An ended challenge cannot be restarted.'}
-          </Alert>
-        </Dialog>
+          <p style={{ margin: 0 }}>
+            Start “{pending.challenge.title}” now? Mini-CTF solvers (
+            {pending.challenge.ctfSolvedTeams} team(s)) can read it immediately; every team in{' '}
+            {pending.challenge.publicDelayMinutes} minutes. A started challenge cannot be restarted.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
+
+      {pending?.kind === 'end' ? (
+        <ConfirmActionDialog
+          open
+          title="End challenge"
+          tone="danger"
+          confirmLabel="End challenge"
+          onConfirm={runPending}
+          onClose={() => setPending(null)}
+        >
+          <p style={{ margin: 0 }}>
+            End “{pending.challenge.title}”? It cannot be started again; its content stays readable
+            to every team. The next challenge can then start.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
+
+      {pending?.kind === 'reveal' ? (
+        <ConfirmActionDialog
+          open
+          title="Reveal to all teams now"
+          confirmLabel="Reveal now"
+          onConfirm={runPending}
+          onClose={() => setPending(null)}
+        >
+          <p style={{ margin: 0 }}>
+            Every team can read “{pending.challenge.title}” immediately, without waiting for the
+            public delay. Mini-CTF solvers lose their head start.
+          </p>
+        </ConfirmActionDialog>
       ) : null}
     </div>
+  );
+}
+
+function ChallengeFormFields({
+  form,
+  onChange,
+  positionEditable,
+  invalidResources,
+}: {
+  form: ChallengeForm;
+  onChange: (form: ChallengeForm) => void;
+  positionEditable: boolean;
+  invalidResources: string[];
+}) {
+  const set =
+    (field: keyof ChallengeForm) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      onChange({ ...form, [field]: event.target.value });
+
+  return (
+    <>
+      <div className={styles.formRow}>
+        <FormField label="Position (running order)" required>
+          {({ id, describedBy }) => (
+            <TextInput
+              id={id}
+              aria-describedby={describedBy}
+              type="number"
+              min={1}
+              max={10}
+              value={form.position}
+              onChange={set('position')}
+              disabled={!positionEditable}
+            />
+          )}
+        </FormField>
+        <FormField label="Public delay (minutes)" required hint="0 = every team at the start">
+          {({ id, describedBy }) => (
+            <TextInput
+              id={id}
+              aria-describedby={describedBy}
+              type="number"
+              min={0}
+              max={1440}
+              value={form.publicDelayMinutes}
+              onChange={set('publicDelayMinutes')}
+            />
+          )}
+        </FormField>
+      </div>
+      <FormField label="Title" required>
+        {({ id, describedBy }) => (
+          <TextInput
+            id={id}
+            aria-describedby={describedBy}
+            value={form.title}
+            onChange={set('title')}
+            maxLength={150}
+          />
+        )}
+      </FormField>
+      <FormField label="Teaser" hint="Shown to every team before the description unlocks.">
+        {({ id, describedBy }) => (
+          <Textarea
+            id={id}
+            aria-describedby={describedBy}
+            value={form.summary}
+            onChange={set('summary')}
+            maxLength={500}
+            rows={2}
+          />
+        )}
+      </FormField>
+      <FormField label="Description" required>
+        {({ id, describedBy }) => (
+          <Textarea
+            id={id}
+            aria-describedby={describedBy}
+            value={form.description}
+            onChange={set('description')}
+            rows={5}
+          />
+        )}
+      </FormField>
+      <FormField label="Problem statement">
+        {({ id, describedBy }) => (
+          <Textarea
+            id={id}
+            aria-describedby={describedBy}
+            value={form.problemStatement}
+            onChange={set('problemStatement')}
+            rows={4}
+          />
+        )}
+      </FormField>
+      <FormField label="Deliverables" hint="One per line.">
+        {({ id, describedBy }) => (
+          <Textarea
+            id={id}
+            aria-describedby={describedBy}
+            value={form.deliverables}
+            onChange={set('deliverables')}
+            rows={3}
+          />
+        )}
+      </FormField>
+      <FormField
+        label="Resources"
+        hint="One per line: Name | https://link"
+        error={
+          invalidResources.length > 0
+            ? `Not a “Name | https://link” line: ${invalidResources[0]}`
+            : undefined
+        }
+      >
+        {({ id, describedBy, invalid }) => (
+          <Textarea
+            id={id}
+            aria-describedby={describedBy}
+            invalid={invalid}
+            value={form.resources}
+            onChange={set('resources')}
+            rows={3}
+          />
+        )}
+      </FormField>
+    </>
   );
 }

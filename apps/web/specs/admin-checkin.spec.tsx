@@ -337,8 +337,6 @@ describe('Admin & Check-In Portal Features', () => {
         phaseLabel: 'Event is live',
       });
 
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-
       render(<AdminDashboardView />);
 
       await waitFor(() => {
@@ -347,6 +345,8 @@ describe('Admin & Check-In Portal Features', () => {
 
       const advanceBtn = screen.getByRole('button', { name: /advance to live/i });
       fireEvent.click(advanceBtn);
+      expect(updateSpy).not.toHaveBeenCalled();
+      fireEvent.click(await screen.findByRole('button', { name: /confirm phase transition/i }));
 
       await waitFor(() => {
         expect(updateSpy).toHaveBeenCalledWith(EventPhase.Live);

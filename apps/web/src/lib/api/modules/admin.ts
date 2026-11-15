@@ -3,23 +3,37 @@ import {
   adminChallengeListResponseSchema,
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
+  adminOverviewResponseSchema,
+  adminTeamListResponseSchema,
+  adminTeamSchema,
+  announcementSchema,
+  auditLogEntrySchema,
+  bulkResendBadgeEmailsResponseSchema,
   challengeAdminDetailSchema,
+  reissueBadgeResponseSchema,
   resendBadgeEmailResponseSchema,
   resetTeamPasswordResponseSchema,
+  type AddParticipantRequest,
   type AdminChallengeListResponse,
   type AdminJuryAccountDetail,
+  type AdminJuryListResponse,
+  type AdminOverviewResponse,
+  type AdminTeam,
+  type AdminTeamListResponse,
+  type Announcement,
+  type AuditLogEntry,
+  type BulkResendBadgeEmailsResponse,
   type ChallengeAdminDetail,
   type CreateChallengeRequest,
   type CreateJuryAccountRequest,
+  type ReissueBadgeResponse,
+  type RenameTeamRequest,
   type ResendBadgeEmailResponse,
   type ResetTeamPasswordResponse,
+  type SetTeamStatusRequest,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
-  adminTeamListResponseSchema,
-  auditLogEntrySchema,
-  type AdminJuryListResponse,
-  type AdminTeamListResponse,
-  type AuditLogEntry,
+  type UpdateParticipantRequest,
 } from 'api-contracts';
 import { PLANNED_ENDPOINTS } from '../endpoints';
 import { ApiClientError } from '../errors';
@@ -35,49 +49,80 @@ export const auditLogResponseSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+const announcementListSchema = z.object({
+  items: z.array(announcementSchema),
+  total: z.number().int().nonnegative(),
+});
+
+type Signal = Pick<ApiRequestConfig, 'signal'>;
+
+/**
+ * Admin client: situation board, team/participant operations, challenges,
+ * jury accounts, announcements and the audit trail. Every response is
+ * validated against its contract; every write is audited server-side.
+ */
 export interface AdminApi {
+  getOverview: (config?: Signal) => Promise<AdminOverviewResponse>;
   getAuditLog: (
-    params?: { limit?: number; offset?: number },
-    config?: Pick<ApiRequestConfig, 'signal'>,
+    params?: { limit?: number; offset?: number; action?: string },
+    config?: Signal,
   ) => Promise<AuditLogResponse>;
-  publishAnnouncement: (
-    body: string,
-    config?: Pick<ApiRequestConfig, 'signal'>,
-  ) => Promise<{ id: string; body: string; publishedAt: string; authorName?: string }>;
-  getTeams: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminTeamListResponse>;
-  getJuryAccounts: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminJuryListResponse>;
-  createJuryAccount: (input: CreateJuryAccountRequest) => Promise<AdminJuryAccountDetail>;
-  updateJuryAccount: (
-    id: string,
-    input: UpdateJuryAccountRequest,
-  ) => Promise<AdminJuryAccountDetail>;
-  deleteJuryAccount: (id: string) => Promise<void>;
-  /** Resends one participant's badge email (admins are not rate limited). */
+
+  // Announcements
+  publishAnnouncement: (body: string, config?: Signal) => Promise<Announcement>;
+  getAnnouncements: (config?: Signal) => Promise<{ items: Announcement[]; total: number }>;
+  deleteAnnouncement: (announcementId: string) => Promise<void>;
+
+  // Teams
+  getTeams: (config?: Signal) => Promise<AdminTeamListResponse>;
+  getTeam: (teamId: string, config?: Signal) => Promise<AdminTeam>;
+  renameTeam: (teamId: string, body: RenameTeamRequest) => Promise<AdminTeam>;
+  setTeamStatus: (teamId: string, body: SetTeamStatusRequest) => Promise<AdminTeam>;
+  resetTeamPassword: (teamId: string) => Promise<ResetTeamPasswordResponse>;
+  deleteTeam: (teamId: string) => Promise<void>;
+  grantCtfSolve: (teamId: string, challengeId: string) => Promise<AdminTeam>;
+  revokeCtfSolve: (teamId: string, challengeId: string) => Promise<AdminTeam>;
+
+  // Participants
+  addParticipant: (teamId: string, body: AddParticipantRequest) => Promise<AdminTeam>;
+  updateParticipant: (participantId: string, body: UpdateParticipantRequest) => Promise<AdminTeam>;
+  removeParticipant: (participantId: string) => Promise<AdminTeam>;
+  checkInParticipant: (participantId: string) => Promise<AdminTeam>;
+  undoCheckIn: (participantId: string) => Promise<AdminTeam>;
+  reissueBadge: (participantId: string) => Promise<ReissueBadgeResponse>;
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
-  /** Sets a new team account password (generated when omitted); returned once. */
-  resetTeamPassword: (teamId: string, password?: string) => Promise<ResetTeamPasswordResponse>;
-  getChallenges: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminChallengeListResponse>;
-  createChallenge: (input: CreateChallengeRequest) => Promise<ChallengeAdminDetail>;
-  updateChallenge: (id: string, input: UpdateChallengeRequest) => Promise<ChallengeAdminDetail>;
-  /** Server refuses unless the event phase is `live`. */
-  startChallenge: (id: string) => Promise<ChallengeAdminDetail>;
-  /** Server refuses unless the event phase is `live`. */
-  endChallenge: (id: string) => Promise<ChallengeAdminDetail>;
+  revokeBadge: (participantId: string) => Promise<void>;
+  resendFailedBadgeEmails: () => Promise<BulkResendBadgeEmailsResponse>;
+
+  // Challenges
+  getChallenges: (config?: Signal) => Promise<AdminChallengeListResponse>;
+  createChallenge: (body: CreateChallengeRequest) => Promise<ChallengeAdminDetail>;
+  updateChallenge: (
+    challengeId: string,
+    body: UpdateChallengeRequest,
+  ) => Promise<ChallengeAdminDetail>;
+  startChallenge: (challengeId: string) => Promise<ChallengeAdminDetail>;
+  endChallenge: (challengeId: string) => Promise<ChallengeAdminDetail>;
+
+  // Jury
+  getJuryAccounts: (config?: Signal) => Promise<AdminJuryListResponse>;
+  createJuryAccount: (body: CreateJuryAccountRequest) => Promise<AdminJuryAccountDetail>;
+  updateJuryAccount: (
+    juryId: string,
+    body: UpdateJuryAccountRequest,
+  ) => Promise<AdminJuryAccountDetail>;
+  deleteJuryAccount: (juryId: string) => Promise<void>;
 }
 
-function parseOrThrow<T>(
-  schema: {
-    safeParse: (
-      data: unknown,
-    ) => { success: true; data: T } | { success: false; error: { issues: unknown } };
-  },
+function parseWith<Schema extends z.ZodType>(
+  schema: Schema,
   data: unknown,
-  what: string,
-): T {
+  label: string,
+): z.infer<Schema> {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     throw new ApiClientError({
-      message: `${what} response did not match the expected contract.`,
+      message: `${label} did not match the expected contract.`,
       status: null,
       code: 'INVALID_RESPONSE',
       details: parsed.error.issues,
@@ -86,153 +131,151 @@ function parseOrThrow<T>(
   return parsed.data;
 }
 
+const enc = encodeURIComponent;
+
 export function createAdminApi(transport: ApiTransport): AdminApi {
+  const get = async <Schema extends z.ZodType>(
+    path: string,
+    schema: Schema,
+    label: string,
+    config?: Signal,
+  ) => parseWith(schema, await transport.request<unknown>(path, { signal: config?.signal }), label);
+
+  const send = async <Schema extends z.ZodType>(
+    method: 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    schema: Schema,
+    label: string,
+    body?: unknown,
+  ) => parseWith(schema, await transport.request<unknown>(path, { method, body }), label);
+
+  const sendNoContent = async (method: 'POST' | 'DELETE', path: string) => {
+    await transport.request<unknown>(path, { method });
+  };
+
+  const teamPath = (teamId: string) => `${PLANNED_ENDPOINTS.ADMIN_TEAMS}/${enc(teamId)}`;
+  const participantPath = (participantId: string) =>
+    `${PLANNED_ENDPOINTS.ADMIN_PARTICIPANTS}/${enc(participantId)}`;
+  const challengePath = (challengeId: string) =>
+    `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${enc(challengeId)}`;
+  const juryPath = (juryId: string) => `${PLANNED_ENDPOINTS.ADMIN_JURY}/${enc(juryId)}`;
+
   return {
-    async getAuditLog(params, config) {
-      const limit = params?.limit ?? 50;
-      const offset = params?.offset ?? 0;
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_AUDIT_LOG}?limit=${limit}&offset=${offset}`,
-        {
-          signal: config?.signal,
-        },
+    getOverview: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_OVERVIEW, adminOverviewResponseSchema, 'Overview', config),
+
+    getAuditLog(params, config) {
+      const query = new URLSearchParams({
+        limit: String(params?.limit ?? 50),
+        offset: String(params?.offset ?? 0),
+        ...(params?.action ? { action: params.action } : {}),
+      });
+      return get(
+        `${PLANNED_ENDPOINTS.ADMIN_AUDIT_LOG}?${query.toString()}`,
+        auditLogResponseSchema,
+        'Audit log',
+        config,
       );
-      const parsed = auditLogResponseSchema.safeParse(data);
-      if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Audit log response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
-      }
-      return parsed.data;
     },
 
-    async publishAnnouncement(body, config) {
-      const data = await transport.request<{
-        id: string;
-        body: string;
-        publishedAt: string;
-        authorName?: string;
-      }>(PLANNED_ENDPOINTS.ANNOUNCEMENTS, {
+    publishAnnouncement: (body) =>
+      send('POST', PLANNED_ENDPOINTS.ANNOUNCEMENTS, announcementSchema, 'Announcement', { body }),
+    getAnnouncements: (config) =>
+      get(PLANNED_ENDPOINTS.ANNOUNCEMENTS, announcementListSchema, 'Announcements', config),
+    deleteAnnouncement: (announcementId) =>
+      sendNoContent('DELETE', `${PLANNED_ENDPOINTS.ANNOUNCEMENTS}/${enc(announcementId)}`),
+
+    getTeams: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_TEAMS, adminTeamListResponseSchema, 'Team roster', config),
+    getTeam: (teamId, config) => get(teamPath(teamId), adminTeamSchema, 'Team', config),
+    renameTeam: (teamId, body) => send('PATCH', teamPath(teamId), adminTeamSchema, 'Team', body),
+    setTeamStatus: (teamId, body) =>
+      send('POST', `${teamPath(teamId)}/status`, adminTeamSchema, 'Team', body),
+    resetTeamPassword: (teamId) =>
+      send(
+        'POST',
+        `${teamPath(teamId)}/reset-password`,
+        resetTeamPasswordResponseSchema,
+        'Password reset',
+      ),
+    deleteTeam: (teamId) => sendNoContent('DELETE', teamPath(teamId)),
+    grantCtfSolve: (teamId, challengeId) =>
+      send('POST', `${teamPath(teamId)}/ctf-solves`, adminTeamSchema, 'Team', { challengeId }),
+    revokeCtfSolve: (teamId, challengeId) =>
+      send('DELETE', `${teamPath(teamId)}/ctf-solves/${enc(challengeId)}`, adminTeamSchema, 'Team'),
+
+    addParticipant: (teamId, body) =>
+      send('POST', `${teamPath(teamId)}/participants`, adminTeamSchema, 'Team', body),
+    updateParticipant: (participantId, body) =>
+      send('PATCH', participantPath(participantId), adminTeamSchema, 'Team', body),
+    removeParticipant: (participantId) =>
+      send('DELETE', participantPath(participantId), adminTeamSchema, 'Team'),
+    checkInParticipant: (participantId) =>
+      send('POST', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
+    undoCheckIn: (participantId) =>
+      send('DELETE', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
+    reissueBadge: (participantId) =>
+      send(
+        'POST',
+        `${participantPath(participantId)}/reissue-badge`,
+        reissueBadgeResponseSchema,
+        'Badge reissue',
+      ),
+    resendBadgeEmail: (participantId) =>
+      send(
+        'POST',
+        `${participantPath(participantId)}/resend-badge-email`,
+        resendBadgeEmailResponseSchema,
+        'Badge email',
+      ),
+    async revokeBadge(participantId) {
+      await transport.request<unknown>(PLANNED_ENDPOINTS.CHECKIN_REVOKE, {
         method: 'POST',
-        body: { body },
-        signal: config?.signal,
+        body: { participantId },
       });
-      return data;
     },
+    resendFailedBadgeEmails: () =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_BADGES_RESEND_FAILED,
+        bulkResendBadgeEmailsResponseSchema,
+        'Bulk resend',
+      ),
 
-    async getTeams(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_TEAMS, {
-        signal: config?.signal,
-      });
-      const parsed = adminTeamListResponseSchema.safeParse(data);
-      if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Team roster response did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
-      }
-      return parsed.data;
-    },
+    getChallenges: (config) =>
+      get(
+        PLANNED_ENDPOINTS.ADMIN_CHALLENGES,
+        adminChallengeListResponseSchema,
+        'Challenges',
+        config,
+      ),
+    createChallenge: (body) =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_CHALLENGES,
+        challengeAdminDetailSchema,
+        'Challenge',
+        body,
+      ),
+    updateChallenge: (challengeId, body) =>
+      send('PATCH', challengePath(challengeId), challengeAdminDetailSchema, 'Challenge', body),
+    startChallenge: (challengeId) =>
+      send('POST', `${challengePath(challengeId)}/start`, challengeAdminDetailSchema, 'Challenge'),
+    endChallenge: (challengeId) =>
+      send('POST', `${challengePath(challengeId)}/end`, challengeAdminDetailSchema, 'Challenge'),
 
-    async getJuryAccounts(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_JURY, {
-        signal: config?.signal,
-      });
-      const parsed = adminJuryListResponseSchema.safeParse(data);
-      if (!parsed.success) {
-        throw new ApiClientError({
-          message: 'Jury account listing did not match the expected contract.',
-          status: null,
-          code: 'INVALID_RESPONSE',
-          details: parsed.error.issues,
-        });
-      }
-      return parsed.data;
-    },
-
-    async createJuryAccount(input) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_JURY, {
-        method: 'POST',
-        body: input,
-      });
-      return parseOrThrow(adminJuryAccountDetailSchema, data, 'Jury account');
-    },
-
-    async updateJuryAccount(id, input) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_JURY}/${encodeURIComponent(id)}`,
-        { method: 'PATCH', body: input },
-      );
-      return parseOrThrow(adminJuryAccountDetailSchema, data, 'Jury account');
-    },
-
-    async deleteJuryAccount(id) {
-      await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_JURY}/${encodeURIComponent(id)}`,
-        {
-          method: 'DELETE',
-        },
-      );
-    },
-
-    async resetTeamPassword(teamId, password) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_TEAMS}/${encodeURIComponent(teamId)}/reset-password`,
-        { method: 'POST', body: password ? { password } : {} },
-      );
-      return parseOrThrow(resetTeamPasswordResponseSchema, data, 'Password reset');
-    },
-
-    async resendBadgeEmail(participantId) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_PARTICIPANTS}/${encodeURIComponent(participantId)}/resend-badge-email`,
-        { method: 'POST' },
-      );
-      return parseOrThrow(resendBadgeEmailResponseSchema, data, 'Badge email');
-    },
-
-    async getChallenges(config) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_CHALLENGES, {
-        signal: config?.signal,
-      });
-      return parseOrThrow(adminChallengeListResponseSchema, data, 'Challenge list');
-    },
-
-    async createChallenge(input) {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_CHALLENGES, {
-        method: 'POST',
-        body: input,
-      });
-      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
-    },
-
-    async updateChallenge(id, input) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}`,
-        { method: 'PATCH', body: input },
-      );
-      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
-    },
-
-    async startChallenge(id) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}/start`,
-        { method: 'POST' },
-      );
-      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
-    },
-
-    async endChallenge(id) {
-      const data = await transport.request<unknown>(
-        `${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}/${encodeURIComponent(id)}/end`,
-        { method: 'POST' },
-      );
-      return parseOrThrow(challengeAdminDetailSchema, data, 'Challenge');
-    },
+    getJuryAccounts: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_JURY, adminJuryListResponseSchema, 'Jury accounts', config),
+    createJuryAccount: (body) =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_JURY,
+        adminJuryAccountDetailSchema,
+        'Jury account',
+        body,
+      ),
+    updateJuryAccount: (juryId, body) =>
+      send('PATCH', juryPath(juryId), adminJuryAccountDetailSchema, 'Jury account', body),
+    deleteJuryAccount: (juryId) => sendNoContent('DELETE', juryPath(juryId)),
   };
 }
