@@ -75,8 +75,10 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         data: { participantId: badge.participantId, checkedByUserId: adminUserId },
       });
 
-      await tx.team.update({
-        where: { id: badge.participant.team.id },
+      // Only a team still at `registered` advances: a late member's check-in
+      // must never move a team that already progressed back to `checked_in`.
+      await tx.team.updateMany({
+        where: { id: badge.participant.team.id, progressState: 'registered' },
         data: { progressState: 'checked_in' },
       });
 

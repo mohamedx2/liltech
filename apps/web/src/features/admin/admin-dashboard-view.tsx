@@ -72,7 +72,19 @@ export function AdminDashboardView() {
     setPhaseErrorMessage(null);
 
     try {
-      const updated = await api.events.updatePhase(targetPhase);
+      // Anything other than the next phase is an override the admin just
+      // confirmed; the server audits it as such.
+      const order: EventPhase[] = [
+        'registration',
+        'checkin',
+        'live',
+        'submissions_closed',
+        'pitching',
+        'results',
+      ];
+      const isNext =
+        eventState !== null && order.indexOf(targetPhase) === order.indexOf(eventState.phase) + 1;
+      const updated = await api.events.updatePhase(targetPhase, { force: !isNext });
       setEventState(updated);
       setPhaseSuccessMessage(
         `Event phase transitioned to ${targetPhase.toUpperCase()} successfully.`,

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { apiDocsEnabled } from '../config/env';
 import { healthRouter } from './health.routes';
 import { docsRouter } from '../modules/docs/docs.routes';
 import { authRouter } from '../modules/auth/auth.routes';
@@ -18,7 +19,9 @@ import { challengesRouter } from '../modules/challenges/challenges.routes';
 export const apiRouter: Router = Router();
 
 apiRouter.use(healthRouter);
-apiRouter.use(docsRouter);
+if (apiDocsEnabled) {
+  apiRouter.use(docsRouter);
+}
 apiRouter.use(authRouter);
 apiRouter.use(eventStateRouter);
 apiRouter.use(registrationRouter);

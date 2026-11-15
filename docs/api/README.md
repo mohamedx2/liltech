@@ -116,6 +116,8 @@ Schema: `eventStateResponseSchema`.
 
 #### `POST /api/event-state`
 
+Phases advance one step at a time (`registration → checkin → live → submissions_closed → pitching → results`). Skipping ahead or going back needs `{ "phase": "…", "force": true }`; the audit entry records `from -> to` and marks overrides. The admin dashboard sends `force` only after the admin confirms.
+
 Admin only. Atomically transitions the phase and records an audit entry (`event_phase_transition`).
 
 **Request body:** `{ "phase": "checkin|live|..." }`
@@ -139,6 +141,8 @@ Conflicts → `CONFLICT` (409) with field-level `details` (`path` is the request
 - a team name already taken.
 
 Malformed JSON → `VALIDATION_ERROR` (400), never a 500.
+
+Registration is accepted only while the event phase is `registration` (otherwise `CONFLICT` 409 "Registration is closed.") and is rate limited per client IP (`REGISTRATION_RATE_LIMIT_PER_HOUR`, 10 by default → `RATE_LIMITED` 429).
 
 **Request body:**
 
@@ -184,7 +188,7 @@ A team reads a running challenge's description before `publicAt` only if it solv
 
 #### `GET /api/challenges` · `GET /api/challenges/current` (team)
 
-Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
+Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. A team with no member checked in at the entrance: `reason: "NOT_CHECKED_IN"` (challenges are for teams present at the venue). Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
 
 #### Admin (audited)
 
@@ -274,6 +278,12 @@ Any of `{ name, email, password }` (at least one). A new password ends every exi
 #### `DELETE /api/admin/jury/:id`
 
 `204`. Deletes the account; its sessions go with it.
+
+#### `POST /api/admin/badges/send-unsent`
+
+`202 { queued }`. Emails, in the background, every active badge that was never sent or whose last attempt failed (audited with the count).
+
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and emails left `pending` by a restart are sent again.
 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 

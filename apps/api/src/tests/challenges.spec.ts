@@ -89,7 +89,10 @@ describeDb('challenges', () => {
   const asAdmin = (call: request.Test) => call.set('Authorization', `Bearer ${adminToken}`);
 
   async function setPhase(phase: string) {
-    const response = await asAdmin(request(app).post('/api/event-state')).send({ phase });
+    const response = await asAdmin(request(app).post('/api/event-state')).send({
+      phase,
+      force: true,
+    });
     expect(response.status).toBe(200);
   }
 
@@ -107,7 +110,7 @@ describeDb('challenges', () => {
     return response.body as { id: string };
   }
 
-  async function registerTeam(slug: string) {
+  async function registerTeam(slug: string, { checkedIn = true } = {}) {
     const response = await request(app)
       .post('/api/registration/teams')
       .send({
@@ -116,6 +119,12 @@ describeDb('challenges', () => {
         members: [1, 2, 3].map((n) => ({ name: `${slug} ${n}`, email: `m${n}@${slug}.test` })),
       });
     expect(response.status).toBe(201);
+    if (checkedIn) {
+      const scan = await asAdmin(request(app).post('/api/checkin/scan')).send({
+        token: (response.body.badges as Array<{ token: string }>)[0].token,
+      });
+      expect(scan.status).toBe(200);
+    }
     const leader = await prisma.user.findUniqueOrThrow({ where: { email: `leader@${slug}.test` } });
     return {
       teamId: response.body.id as string,
@@ -249,6 +258,23 @@ describeDb('challenges', () => {
         .get('/api/challenges')
         .set('Authorization', `Bearer ${team.token}`);
       expect(teamChallengeListResponseSchema.parse(list.body).available).toBe(false);
+    });
+
+    it('keeps challenges closed to a team with nobody checked in', async () => {
+      const first = await createChallenge(1);
+      const absent = await registerTeam('absent', { checkedIn: false });
+      await setPhase('live');
+      await asAdmin(request(app).post(`/api/admin/challenges/${first.id}/start`));
+      await prisma.challenge.update({
+        where: { id: first.id },
+        data: { publicAt: new Date(Date.now() - 1000) },
+      });
+
+      const current = await request(app)
+        .get('/api/challenges/current')
+        .set('Authorization', `Bearer ${absent.token}`);
+      expect(current.body).toMatchObject({ available: false, reason: 'NOT_CHECKED_IN' });
+      expect(JSON.stringify(current.body)).not.toContain('Full description 1');
     });
 
     it('says no challenge has started while the event is live but none runs', async () => {

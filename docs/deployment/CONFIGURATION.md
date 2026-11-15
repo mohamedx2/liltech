@@ -126,3 +126,9 @@ The domain resolves to the VPS. A **Caddy** reverse proxy service
   `CORS_ORIGIN=https://liltechsousse.com`.
 - Ports 3000/4000 remain published as a direct fallback; raw-IP links
   (`http://72.61.20.23:3000`) still work.
+
+## Runtime flags written by the deploy job
+
+- `TRUST_PROXY_HOPS=1`: the API trusts one proxy hop (Caddy) for the client IP, so per-IP rate limits (login, registration) apply per client instead of globally.
+- `API_DOCS_ENABLED`: Swagger UI at `/api/docs`. Defaults to `true` through the `API_DOCS_ENABLED` repository variable until the admin panel covers challenges and jury management; set the variable to `false` to hide it.
+- Caddy adds HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy` to every response; the API also sends helmet defaults (CSP included).

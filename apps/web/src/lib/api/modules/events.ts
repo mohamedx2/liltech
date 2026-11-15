@@ -6,9 +6,13 @@ import type { ApiRequestConfig, ApiTransport } from '../transport';
 
 export interface EventsApi {
   getEventState: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<EventStateResponse>;
+  /**
+   * Moves the event to `phase`. The server accepts only the next phase unless
+   * `force` is set (an audited override for skipping ahead or going back).
+   */
   updatePhase: (
     phase: EventPhase,
-    config?: Pick<ApiRequestConfig, 'signal'>,
+    config?: Pick<ApiRequestConfig, 'signal'> & { force?: boolean },
   ) => Promise<EventStateResponse>;
 }
 
@@ -33,7 +37,7 @@ export function createEventsApi(transport: ApiTransport): EventsApi {
     async updatePhase(phase, config) {
       const data = await transport.request<unknown>(PLANNED_ENDPOINTS.EVENT_STATE, {
         method: 'POST',
-        body: { phase },
+        body: config?.force ? { phase, force: true } : { phase },
         signal: config?.signal,
       });
       const parsed = eventStateResponseSchema.safeParse(data);

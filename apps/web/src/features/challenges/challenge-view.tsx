@@ -90,11 +90,19 @@ export function ChallengeView() {
   if (!response.available) {
     return (
       <NoticeCard
-        badge={response.reason === 'EVENT_NOT_STARTED' ? 'Not Started' : 'Waiting'}
+        badge={
+          response.reason === 'EVENT_NOT_STARTED'
+            ? 'Not Started'
+            : response.reason === 'NOT_CHECKED_IN'
+              ? 'Check-in Required'
+              : 'Waiting'
+        }
         title={
           response.reason === 'EVENT_NOT_STARTED'
             ? "The hackathon hasn't started yet"
-            : 'No challenge has started yet'
+            : response.reason === 'NOT_CHECKED_IN'
+              ? 'Your team is not checked in yet'
+              : 'No challenge has started yet'
         }
         description={response.message}
       />

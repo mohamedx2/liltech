@@ -53,7 +53,9 @@ eventStateRouter.post('/event-state', requireAuth, requireRole('admin'), async (
   }
 
   try {
-    const state = await setEventPhase(input.data.phase, adminUserId);
+    const state = await setEventPhase(input.data.phase, adminUserId, {
+      force: input.data.force,
+    });
     res.status(200).json(eventStateBody(state.phase, state.phaseChangedAt));
   } catch (error) {
     next(error);

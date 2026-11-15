@@ -18,7 +18,6 @@ docsRouter.use(
     customSiteTitle: 'LilTech 2026 API Documentation',
     customCss: '.swagger-ui .topbar { display: none }',
     swaggerOptions: {
-      persistAuthorization: true,
       displayRequestDuration: true,
       filter: true,
     },

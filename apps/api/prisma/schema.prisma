@@ -213,6 +213,9 @@ model AuditLog {
   /// Identifier of the audited target; semantics depend on `targetType`
   /// (e.g. the fixed `1` of the event phase state row).
   targetId   String?  @db.VarChar(50)
+  /// Short human-readable context, e.g. `registration -> checkin`. Never
+  /// holds secrets or personal data.
+  summary    String?  @db.VarChar(200)
   createdAt  DateTime @default(now())
 
   @@index([createdAt])

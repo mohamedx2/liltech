@@ -380,10 +380,27 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
 
   const team = await prisma.team.findUnique({
     where: { leaderId: leaderUserId },
-    select: { ctfSolves: { select: { challengeId: true } } },
+    select: {
+      ctfSolves: { select: { challengeId: true } },
+      participants: { where: { checkIn: { isNot: null } }, select: { id: true }, take: 1 },
+    },
   });
   if (!team) {
     throw ApiError.notFound('No registered team found for this account.');
+  }
+
+  // Only teams present at the venue (at least one member checked in) take part.
+  if (team.participants.length === 0) {
+    return {
+      available: false,
+      response: {
+        available: false,
+        reason: 'NOT_CHECKED_IN',
+        phase,
+        message:
+          'Your team has not been checked in yet. Show your QR codes at the entrance to take part in the challenges.',
+      },
+    };
   }
 
   const challenges = await prisma.challenge.findMany({ orderBy: { position: 'asc' } });

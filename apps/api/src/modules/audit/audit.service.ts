@@ -33,6 +33,8 @@ export interface AuditLogEntryInput {
   actorId?: string;
   targetType?: string;
   targetId?: string;
+  /** Short non-sensitive context, e.g. `registration -> checkin`. */
+  summary?: string;
 }
 
 export async function recordAuditLog(
@@ -47,6 +49,7 @@ export async function recordAuditLog(
       actorId: entry.actorId,
       targetType: entry.targetType,
       targetId: entry.targetId,
+      summary: entry.summary,
     },
   });
 }

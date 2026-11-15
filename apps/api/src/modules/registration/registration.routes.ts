@@ -1,6 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { createTeamRequestSchema, type TeamResponse } from 'api-contracts';
 import { ApiError } from '../../utils/api-error';
+import { createRateLimiter } from '../../utils/rate-limiter';
+import { env } from '../../config/env';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { getMyTeam, registerTeamWithBadges } from './registration.service';
 
@@ -14,9 +16,23 @@ import { getMyTeam, registerTeamWithBadges } from './registration.service';
 
 export const registrationRouter: Router = Router();
 
+/**
+ * Per client IP: registration is public and sends emails, so it must not be
+ * usable to spam. Generous enough for several teams behind one campus NAT.
+ */
+const registrationRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: env.REGISTRATION_RATE_LIMIT_PER_HOUR,
+});
+
 registrationRouter.post(
   '/registration/teams',
   (req: Request, res: Response, next: NextFunction) => {
+    if (!registrationRateLimiter.check(`registration|${req.ip ?? 'unknown'}`).ok) {
+      next(ApiError.rateLimited('Too many registrations from this network. Try again later.'));
+      return;
+    }
+
     const input = createTeamRequestSchema.safeParse(req.body);
 
     if (!input.success) {
