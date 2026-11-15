@@ -39,5 +39,5 @@ export const PLANNED_ENDPOINTS = {
   ADMIN_TEAMS: '/admin/teams',
   ADMIN_JURY: '/admin/jury',
   ADMIN_CHALLENGES: '/admin/challenges',
-  ADMIN_BADGES_SEND_UNSENT: '/admin/badges/send-unsent',
+  ADMIN_PARTICIPANTS: '/admin/participants',
 } as const;

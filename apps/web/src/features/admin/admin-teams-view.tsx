@@ -28,46 +28,74 @@ function progressLabel(state: string): string {
   return state.replace('_', ' ');
 }
 
-/** Emails every badge that was never sent or failed (runs in the background). */
-function SendUnsentBadgeEmails() {
+type BadgeEmailStatus = 'pending' | 'sent' | 'failed' | null | undefined;
+
+const EMAIL_STATUS: Record<
+  'pending' | 'sent' | 'failed' | 'none',
+  { tone: BadgeTone; label: string }
+> = {
+  sent: { tone: 'success', label: 'Email sent' },
+  pending: { tone: 'info', label: 'Sending…' },
+  failed: { tone: 'danger', label: 'Email failed' },
+  none: { tone: 'warning', label: 'Not emailed' },
+};
+
+/** Sends one participant's badge email on demand (admins are not rate limited). */
+function ResendBadgeEmail({
+  participantId,
+  participantName,
+  email,
+  status,
+}: {
+  participantId: string;
+  participantName: string;
+  email: string | null | undefined;
+  status: BadgeEmailStatus;
+}) {
+  const [current, setCurrent] = useState<BadgeEmailStatus>(status);
   const [isSending, setIsSending] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!email) {
+    return <span className={styles.emailResult}>No email</span>;
+  }
 
   const send = async () => {
     setIsSending(true);
-    setResult(null);
+    setError(null);
     try {
-      const { queued } = await api.admin.sendUnsentBadgeEmails();
-      setResult(
-        queued === 0
-          ? 'Every badge email has already been sent.'
-          : `${queued} badge email${queued === 1 ? '' : 's'} queued.`,
-      );
+      const result = await api.admin.resendBadgeEmail(participantId);
+      setCurrent(result.emailStatus);
     } catch (err) {
-      setResult(err instanceof ApiClientError ? err.message : 'Could not queue the emails.');
+      setError(err instanceof ApiClientError ? err.message : 'Could not send the email.');
     } finally {
       setIsSending(false);
     }
   };
 
+  const display = EMAIL_STATUS[current ?? 'none'];
+
   return (
-    <div className={styles.emailRow}>
+    <span className={styles.emailRow}>
+      <Badge tone={display.tone}>{display.label}</Badge>
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
         size="sm"
         onClick={send}
         loading={isSending}
-        loadingLabel="Queuing…"
+        loadingLabel="Sending…"
+        aria-label={`Send badge email to ${participantName}`}
+        title={email}
       >
-        Send unsent badge emails
+        {current === 'sent' ? 'Resend' : 'Send'}
       </Button>
-      {result ? (
-        <span role="status" className={styles.emailResult}>
-          {result}
+      {error ? (
+        <span role="alert" className={styles.emailResult}>
+          {error}
         </span>
       ) : null}
-    </div>
+    </span>
   );
 }
 
@@ -179,6 +207,12 @@ export function AdminTeamsView() {
                       ) : (
                         <Badge tone="neutral">Not checked in</Badge>
                       )}
+                      <ResendBadgeEmail
+                        participantId={participant.id}
+                        participantName={participant.name}
+                        email={participant.email}
+                        status={participant.badgeEmailStatus}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -219,7 +253,6 @@ function RosterHeader({
         Live roster from the backend — registration records, team progress, and entrance check-in
         state for every participant.
       </p>
-      <SendUnsentBadgeEmails />
       <dl className={styles.statRow}>
         <div className={styles.stat}>
           <dt>Teams</dt>

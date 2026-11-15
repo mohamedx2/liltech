@@ -256,33 +256,5 @@ describeDb('event hardening', () => {
       });
       expect(badge.emailStatus).toBe('sent');
     });
-
-    it('lets an admin email every unsent or failed badge, and only an admin', async () => {
-      const team = await registerTeam('unsent');
-      await prisma.qrToken.updateMany({
-        where: { participantId: { in: team.badges.slice(0, 2).map((b) => b.participantId) } },
-        data: { emailStatus: 'failed' },
-      });
-      await prisma.qrToken.update({
-        where: { participantId: team.badges[2].participantId },
-        data: { emailStatus: null },
-      });
-      const before = mail.sent.length;
-
-      const response = await asAdmin(request(app).post('/api/admin/badges/send-unsent'));
-      expect(response.status).toBe(202);
-      expect(response.body).toEqual({ queued: 3 });
-      await waitForScheduledBadgeEmails();
-      expect(mail.sent.length).toBe(before + 3);
-
-      const leader = await prisma.user.findUniqueOrThrow({
-        where: { email: 'leader@unsent.test' },
-      });
-      const teamToken = (await createSessionForUser(leader.id)).token;
-      const asTeam = await request(app)
-        .post('/api/admin/badges/send-unsent')
-        .set('Authorization', `Bearer ${teamToken}`);
-      expect(asTeam.status).toBe(403);
-    });
   });
 });

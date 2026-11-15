@@ -4,13 +4,13 @@ import {
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
   challengeAdminDetailSchema,
-  sendUnsentBadgeEmailsResponseSchema,
+  resendBadgeEmailResponseSchema,
   type AdminChallengeListResponse,
   type AdminJuryAccountDetail,
   type ChallengeAdminDetail,
   type CreateChallengeRequest,
   type CreateJuryAccountRequest,
-  type SendUnsentBadgeEmailsResponse,
+  type ResendBadgeEmailResponse,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
   adminTeamListResponseSchema,
@@ -50,7 +50,8 @@ export interface AdminApi {
     input: UpdateJuryAccountRequest,
   ) => Promise<AdminJuryAccountDetail>;
   deleteJuryAccount: (id: string) => Promise<void>;
-  sendUnsentBadgeEmails: () => Promise<SendUnsentBadgeEmailsResponse>;
+  /** Resends one participant's badge email (admins are not rate limited). */
+  resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
   getChallenges: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminChallengeListResponse>;
   createChallenge: (input: CreateChallengeRequest) => Promise<ChallengeAdminDetail>;
   updateChallenge: (id: string, input: UpdateChallengeRequest) => Promise<ChallengeAdminDetail>;
@@ -175,11 +176,12 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
       );
     },
 
-    async sendUnsentBadgeEmails() {
-      const data = await transport.request<unknown>(PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_UNSENT, {
-        method: 'POST',
-      });
-      return parseOrThrow(sendUnsentBadgeEmailsResponseSchema, data, 'Badge email');
+    async resendBadgeEmail(participantId) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_PARTICIPANTS}/${encodeURIComponent(participantId)}/resend-badge-email`,
+        { method: 'POST' },
+      );
+      return parseOrThrow(resendBadgeEmailResponseSchema, data, 'Badge email');
     },
 
     async getChallenges(config) {

@@ -279,11 +279,7 @@ Any of `{ name, email, password }` (at least one). A new password ends every exi
 
 `204`. Deletes the account; its sessions go with it.
 
-#### `POST /api/admin/badges/send-unsent`
-
-`202 { queued }`. Emails, in the background, every active badge that was never sent or whose last attempt failed (audited with the count).
-
-At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and emails left `pending` by a restart are sent again.
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and emails left `pending` by a restart are sent again. Badges that were never emailed are sent one by one from the admin Teams page (`GET /api/admin/teams` returns each participant's `email` and `badgeEmailStatus`).
 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 

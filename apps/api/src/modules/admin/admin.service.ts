@@ -16,7 +16,10 @@ export async function listTeams(): Promise<AdminTeamListResponse> {
     include: {
       participants: {
         orderBy: [{ isLeader: 'desc' }, { name: 'asc' }],
-        include: { checkIn: { select: { checkedInAt: true } } },
+        include: {
+          checkIn: { select: { checkedInAt: true } },
+          badge: { select: { emailStatus: true } },
+        },
       },
     },
   });
@@ -37,6 +40,8 @@ export async function listTeams(): Promise<AdminTeamListResponse> {
       ...(participant.checkIn
         ? { checkedInAt: participant.checkIn.checkedInAt.toISOString() }
         : {}),
+      email: participant.email,
+      badgeEmailStatus: participant.badge?.emailStatus ?? null,
     })),
   }));
 

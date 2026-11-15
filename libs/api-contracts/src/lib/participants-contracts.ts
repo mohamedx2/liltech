@@ -110,10 +110,3 @@ export const resendBadgeEmailResponseSchema = z.strictObject({
 });
 
 export type ResendBadgeEmailResponse = z.infer<typeof resendBadgeEmailResponseSchema>;
-
-/** `POST /api/admin/badges/send-unsent` — emails queued in the background. */
-export const sendUnsentBadgeEmailsResponseSchema = z.strictObject({
-  queued: z.number().int().nonnegative(),
-});
-
-export type SendUnsentBadgeEmailsResponse = z.infer<typeof sendUnsentBadgeEmailsResponseSchema>;

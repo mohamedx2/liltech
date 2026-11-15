@@ -12,7 +12,6 @@ import {
 } from 'api-contracts';
 import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
 import { resendBadgeEmail } from '../badges/badges.service';
-import { sendUnsentBadgeEmails } from '../badges/badge-maintenance.service';
 import { listTeams } from './admin.service';
 import {
   createJuryAccount,
@@ -93,10 +92,6 @@ adminRouter.delete('/admin/jury/:id', ...adminOnly, async (req, res) => {
   const { id } = parseOrThrow(juryIdParamsSchema, req.params);
   await deleteJuryAccount(id, authenticatedUserId(req));
   res.status(204).send();
-});
-
-adminRouter.post('/admin/badges/send-unsent', ...adminOnly, async (req, res) => {
-  res.status(202).json(await sendUnsentBadgeEmails(authenticatedUserId(req)));
 });
 
 adminRouter.post(

@@ -1,8 +1,6 @@
-import type { SendUnsentBadgeEmailsResponse } from 'api-contracts';
 import { env } from '../../config/env';
 import { getPrismaClient } from '../../config/database';
 import { logger } from '../../utils/logger';
-import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import { decryptQrToken, encryptQrToken, generateQrToken } from '../checkin/qr-token';
 import { scheduleBadgeEmails, type BadgeDelivery } from './badges.service';
 
@@ -114,36 +112,6 @@ export async function retryInterruptedBadgeEmails(): Promise<number> {
   const deliveries = await deliveriesFor({ emailStatus: 'pending' });
   scheduleBadgeEmails(deliveries);
   return deliveries.length;
-}
-
-/**
- * Admin action: email every active badge that was never sent or whose last
- * attempt failed. Runs in the background; audited with the count.
- */
-export async function sendUnsentBadgeEmails(
-  adminUserId: string,
-): Promise<SendUnsentBadgeEmailsResponse> {
-  const deliveries = await deliveriesFor({
-    OR: [{ emailStatus: null }, { emailStatus: 'failed' }],
-  });
-
-  if (deliveries.length > 0) {
-    const prisma = getPrismaClient();
-    await prisma.qrToken.updateMany({
-      where: { participantId: { in: deliveries.map((delivery) => delivery.participantId) } },
-      data: { emailStatus: 'pending' },
-    });
-    scheduleBadgeEmails(deliveries);
-  }
-
-  await recordAuditLog({
-    action: AuditAction.BadgeEmailResent,
-    actorId: adminUserId,
-    targetType: 'badges',
-    summary: `send unsent: ${deliveries.length} emails queued`,
-  });
-
-  return { queued: deliveries.length };
 }
 
 /** Startup repair; logs and never throws, so the API always starts. */
