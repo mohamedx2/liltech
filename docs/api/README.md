@@ -192,6 +192,98 @@ Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest f
 
 Schema: `auditLogListRequestSchema` / `auditLogEntrySchema` list.
 
+### Mini-CTF (LOUAGE 404)
+
+Seven sequential stages. Every decision (which stage is current, whether a
+submission is accepted, when the main challenge unlocks) is made server-side;
+the client only renders `/ctf/chain`.
+
+All endpoints require `Authorization: Bearer <token>` with the `team` role.
+
+#### `GET /api/ctf/chain`
+
+Returns the team, the seven-stage tracker and the stage the team may work on.
+
+```json
+{
+  "team": { "name": "Team Rocket" },
+  "stages": [
+    { "slug": "louage-404-01", "position": 1, "title": "The Louage", "state": "unlocked", "status": "live", "requiredForUnlock": true },
+    { "slug": "louage-404-02", "position": 2, "title": "The Location", "state": "locked", "status": "live", "requiredForUnlock": true }
+  ],
+  "current": {
+    "stage": {
+      "slug": "louage-404-01",
+      "position": 1,
+      "totalStages": 7,
+      "title": "The Louage",
+      "description": "...",
+      "status": "live",
+      "state": "unlocked",
+      "assetDriveUrl": "https://drive.google.com/drive/folders/...",
+      "hintCount": 3
+    },
+    "progress": { "attempts": 0, "hintsUsed": 0, "solved": false, "solvedAt": null },
+    "hints": []
+  },
+  "summary": { "solved": 0, "total": 7 },
+  "eligible": true
+}
+```
+
+`current` is `null` when the team has solved everything (or is not eligible).
+`eligible` is false until the team has checked in. No answer, digest or pepper
+is ever part of this payload.
+
+#### `GET /api/ctf/stages/:slug`
+
+One stage, same `stage`/`progress`/`hints` shape. `403 FORBIDDEN` when the stage
+is locked.
+
+#### `POST /api/ctf/stages/:slug/hints`
+
+Reveals the next hint.
+
+```json
+{ "hint": { "position": 1, "body": "..." }, "hintsUsed": 1, "hintCount": 3 }
+```
+
+`409 CONFLICT` when every hint is already revealed or the stage is solved.
+
+#### `POST /api/ctf/stages/:slug/submit`
+
+```json
+{ "answer": "L404{...}" }
+```
+
+```json
+{
+  "correct": true,
+  "stageSolved": true,
+  "stageSlug": "louage-404-01",
+  "nextStageUnlocked": true,
+  "nextStagePosition": 2,
+  "completedChain": false,
+  "message": "Correct flag. The next stage is unlocked."
+}
+```
+
+Replaying a solved stage returns the same success without a new solve.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `CTF_NOT_SOLVED` | Incorrect flag (attempt recorded) |
+| 403 | `FORBIDDEN` | Stage is locked |
+| 403 | `STAGE_NOT_PUBLISHED` | Stage is `draft`/`closed` |
+| 409 | `STAGE_NOT_CONFIGURED` | Stage has no answer provisioned |
+| 429 | `RATE_LIMITED` | More than 5 attempts per minute for this stage |
+
+#### `GET /api/challenges/current`
+
+`403 CTF_NOT_SOLVED` until every required stage is solved; then
+`{ "unlocked": true, "challenge": null, "message": "..." }` because the main
+brief is not published yet.
+
 ## Planned Endpoint Groups
 
 From the LilTech specification. Groups below are **contract plans**, not commitments to shapes; each group's exact methods/paths will be documented here (and implemented in `libs/api-contracts`) when the module is built.
