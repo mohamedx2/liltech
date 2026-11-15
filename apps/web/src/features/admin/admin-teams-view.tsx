@@ -8,6 +8,9 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Icon } from '@/components/ui/icon';
 import { DataTable } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { FormField, TextInput } from '@/components/ui/input';
+import { Alert } from '@/components/feedback/alert';
 import styles from './admin-teams-view.module.css';
 
 /**
@@ -99,6 +102,158 @@ function ResendBadgeEmail({
   );
 }
 
+/**
+ * Admin password reset for a team account (the shared login). The old
+ * password cannot be shown: the server only keeps its hash.
+ */
+function ResetTeamPassword({ team }: { team: TeamResponse }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const close = () => {
+    if (isSaving) return;
+    setOpen(false);
+    setPassword('');
+    setError(null);
+    setResult(null);
+    setCopied(false);
+  };
+
+  const submit = async () => {
+    if (password && password.length < 12) {
+      setError('Use at least 12 characters, or leave it empty to generate one.');
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      const reset = await api.admin.resetTeamPassword(team.id, password || undefined);
+      setResult({ email: reset.email, password: reset.password });
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Could not reset the password.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.password);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        aria-label={`Reset the password of ${team.name}`}
+      >
+        Reset password
+      </Button>
+      {open ? (
+        <Dialog
+          open={open}
+          onClose={close}
+          title={`Reset password: ${team.name}`}
+          footer={
+            <div className={styles.dialogFooter}>
+              {result ? (
+                <Button type="button" variant="primary" size="sm" onClick={close}>
+                  Done
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={close}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    loading={isSaving}
+                    loadingLabel="Resetting…"
+                    onClick={submit}
+                  >
+                    Set new password
+                  </Button>
+                </>
+              )}
+            </div>
+          }
+        >
+          {result ? (
+            <div className={styles.resetResult}>
+              <Alert tone="success" title="New login for this team">
+                Give these to the team. This password is shown only now.
+              </Alert>
+              <dl className={styles.credentials}>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{result.email}</dd>
+                </div>
+                <div>
+                  <dt>Password</dt>
+                  <dd>
+                    <code className={styles.password}>{result.password}</code>
+                    <Button type="button" variant="ghost" size="sm" onClick={copy}>
+                      {copied ? 'Copied' : 'Copy'}
+                    </Button>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <div className={styles.resetResult}>
+              <Alert tone="warning" title="The current password cannot be shown">
+                Only a secure hash of it is stored. Setting a new one signs every member of this
+                team out until they log in with it.
+              </Alert>
+              {error ? (
+                <Alert tone="error" title="Could not reset">
+                  {error}
+                </Alert>
+              ) : null}
+              <FormField
+                label="New password"
+                hint="Leave empty to generate a strong password automatically."
+              >
+                {({ id, describedBy, invalid }) => (
+                  <TextInput
+                    id={id}
+                    type="text"
+                    aria-describedby={describedBy}
+                    invalid={invalid}
+                    value={password}
+                    autoComplete="new-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                )}
+              </FormField>
+            </div>
+          )}
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
 export function AdminTeamsView() {
   const [teams, setTeams] = useState<TeamResponse[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -173,6 +328,7 @@ export function AdminTeamsView() {
                 <div className={styles.teamCell}>
                   <span className={styles.teamName}>{team.name}</span>
                   <span className={styles.leaderName}>Leader: {team.leader.name || '—'}</span>
+                  <ResetTeamPassword team={team} />
                 </div>
               ),
             },

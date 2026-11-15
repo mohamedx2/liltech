@@ -7,12 +7,14 @@ import {
   createJuryAccountRequestSchema,
   juryIdParamsSchema,
   participantIdParamsSchema,
+  resetTeamPasswordRequestSchema,
+  teamIdParamsSchema,
   updateJuryAccountRequestSchema,
   type AdminJuryListResponse,
 } from 'api-contracts';
 import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
 import { resendBadgeEmail } from '../badges/badges.service';
-import { listTeams } from './admin.service';
+import { listTeams, resetTeamPassword } from './admin.service';
 import {
   createJuryAccount,
   deleteJuryAccount,
@@ -70,6 +72,12 @@ adminRouter.get('/admin/teams', requireAuth, requireRole('admin'), (_req, res, n
 });
 
 const adminOnly = [requireAuth, requireRole('admin')] as const;
+
+adminRouter.post('/admin/teams/:teamId/reset-password', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const input = parseOrThrow(resetTeamPasswordRequestSchema, req.body ?? {});
+  res.status(200).json(await resetTeamPassword(teamId, input, authenticatedUserId(req)));
+});
 
 adminRouter.get('/admin/jury', ...adminOnly, async (_req, res) => {
   const items = await listJuryAccountDetails();

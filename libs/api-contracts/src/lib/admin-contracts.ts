@@ -30,3 +30,31 @@ export const adminJuryListResponseSchema = z.object({
 });
 
 export type AdminJuryListResponse = z.infer<typeof adminJuryListResponseSchema>;
+
+/**
+ * `POST /api/admin/teams/:teamId/reset-password` (admin only, audited).
+ * Team passwords are stored only as bcrypt hashes, so the current password
+ * can never be shown; the admin sets a new one (or lets the server generate
+ * one) and hands it to the team. Every session of the team account ends.
+ */
+export const resetTeamPasswordRequestSchema = z.strictObject({
+  /** Omit to let the server generate a strong password. */
+  password: z.string().min(12).max(256).optional(),
+});
+
+export type ResetTeamPasswordRequest = z.infer<typeof resetTeamPasswordRequestSchema>;
+
+export const teamIdParamsSchema = z.strictObject({
+  teamId: z.uuid(),
+});
+
+export const resetTeamPasswordResponseSchema = z.strictObject({
+  teamId: z.uuid(),
+  teamName: z.string(),
+  /** The team account login (the leader email). */
+  email: z.string(),
+  /** The new password, returned once to the administrator. */
+  password: z.string(),
+});
+
+export type ResetTeamPasswordResponse = z.infer<typeof resetTeamPasswordResponseSchema>;

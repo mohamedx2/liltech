@@ -1290,5 +1290,45 @@ export const swaggerSpec = {
         },
       },
     },
+    '/admin/teams/{teamId}/reset-password': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Set a new password on a team account (Admin only, audited)',
+        description:
+          'The current password cannot be shown (only its hash is stored). Omit password to generate one. All sessions of the team account end. The new password is returned once.',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                properties: { password: { type: 'string', minLength: 12, maxLength: 256 } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            {
+              type: 'object',
+              properties: {
+                teamId: { type: 'string', format: 'uuid' },
+                teamName: { type: 'string' },
+                email: { type: 'string' },
+                password: { type: 'string' },
+              },
+            },
+            'New credentials for the team account',
+          ),
+          400: errorResponse('Invalid payload'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+        },
+      },
+    },
   },
 } as const;

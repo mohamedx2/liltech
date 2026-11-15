@@ -1,5 +1,14 @@
+import { randomBytes } from 'node:crypto';
 import { getPrismaClient } from '../../config/database';
-import type { AdminTeamListResponse, TeamResponse } from 'api-contracts';
+import type {
+  AdminTeamListResponse,
+  ResetTeamPasswordRequest,
+  ResetTeamPasswordResponse,
+  TeamResponse,
+} from 'api-contracts';
+import { ApiError } from '../../utils/api-error';
+import { AuditAction, recordAuditLog } from '../audit/audit.service';
+import { hashPassword } from '../auth/password.service';
 
 /**
  * Admin operational listings (read-only). Backed by existing models only —
@@ -46,4 +55,51 @@ export async function listTeams(): Promise<AdminTeamListResponse> {
   }));
 
   return { items, total: items.length };
+}
+
+/** 16 characters of base64url (96 bits): strong, and easy to read out loud. */
+function generateTeamPassword(): string {
+  return randomBytes(12).toString('base64url');
+}
+
+/**
+ * Sets a new password on a team account (the shared login) and ends all of
+ * its sessions. The old password is never readable: only its hash is stored.
+ */
+export async function resetTeamPassword(
+  teamId: string,
+  request: ResetTeamPasswordRequest,
+  adminUserId: string,
+): Promise<ResetTeamPasswordResponse> {
+  const prisma = getPrismaClient();
+  const password = request.password ?? generateTeamPassword();
+  const passwordHash = await hashPassword(password);
+
+  return prisma.$transaction(async (tx) => {
+    const team = await tx.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, name: true, leader: { select: { id: true, email: true, role: true } } },
+    });
+
+    if (!team || team.leader.role !== 'team') {
+      throw ApiError.notFound('Team not found.');
+    }
+
+    await tx.user.update({ where: { id: team.leader.id }, data: { passwordHash } });
+    await tx.session.updateMany({
+      where: { userId: team.leader.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await recordAuditLog(
+      {
+        action: AuditAction.TeamPasswordReset,
+        actorId: adminUserId,
+        targetType: 'team',
+        targetId: team.id,
+      },
+      tx,
+    );
+
+    return { teamId: team.id, teamName: team.name, email: team.leader.email, password };
+  });
 }

@@ -5,12 +5,14 @@ import {
   adminJuryListResponseSchema,
   challengeAdminDetailSchema,
   resendBadgeEmailResponseSchema,
+  resetTeamPasswordResponseSchema,
   type AdminChallengeListResponse,
   type AdminJuryAccountDetail,
   type ChallengeAdminDetail,
   type CreateChallengeRequest,
   type CreateJuryAccountRequest,
   type ResendBadgeEmailResponse,
+  type ResetTeamPasswordResponse,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
   adminTeamListResponseSchema,
@@ -52,6 +54,8 @@ export interface AdminApi {
   deleteJuryAccount: (id: string) => Promise<void>;
   /** Resends one participant's badge email (admins are not rate limited). */
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
+  /** Sets a new team account password (generated when omitted); returned once. */
+  resetTeamPassword: (teamId: string, password?: string) => Promise<ResetTeamPasswordResponse>;
   getChallenges: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<AdminChallengeListResponse>;
   createChallenge: (input: CreateChallengeRequest) => Promise<ChallengeAdminDetail>;
   updateChallenge: (id: string, input: UpdateChallengeRequest) => Promise<ChallengeAdminDetail>;
@@ -174,6 +178,14 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
           method: 'DELETE',
         },
       );
+    },
+
+    async resetTeamPassword(teamId, password) {
+      const data = await transport.request<unknown>(
+        `${PLANNED_ENDPOINTS.ADMIN_TEAMS}/${encodeURIComponent(teamId)}/reset-password`,
+        { method: 'POST', body: password ? { password } : {} },
+      );
+      return parseOrThrow(resetTeamPasswordResponseSchema, data, 'Password reset');
     },
 
     async resendBadgeEmail(participantId) {
