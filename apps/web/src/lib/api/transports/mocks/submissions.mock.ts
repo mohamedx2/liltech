@@ -56,7 +56,7 @@ export function handleCreateSubmission(body: unknown): SubmissionItem {
   const newSubmission: SubmissionItem = {
     id: `sub-${Date.now().toString(36)}`,
     teamId: devMockState.team.id,
-    track: devMockState.team.track ?? 'track_a',
+    track: 'track_a',
     title,
     description: description || undefined,
     repoUrl: repoUrl || undefined,

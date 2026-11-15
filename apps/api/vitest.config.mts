@@ -19,9 +19,14 @@ export default defineConfig(() => ({
       NODE_ENV: 'test',
       DATABASE_URL:
         process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/vitest_placeholder',
+      // Test-only key (32 zero bytes); real keys come from the environment.
+      QR_TOKEN_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     },
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     passWithNoTests: true,
+    // Integration suites share one test database and reset it between tests,
+    // so test files must not run concurrently.
+    fileParallelism: false,
     reporters: ['default'],
     coverage: {
       reportsDirectory: './test-output/vitest/coverage',

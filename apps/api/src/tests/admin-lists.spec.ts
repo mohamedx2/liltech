@@ -92,9 +92,9 @@ describeDb('admin listings and badge roster', () => {
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Roster Member' },
-          { name: 'Roster Member Two' },
-          { name: 'Roster Member Three' },
+          { name: 'Roster Member', email: 'roster-member@admin-lists.test' },
+          { name: 'Roster Member Two', email: 'roster-member-two@admin-lists.test' },
+          { name: 'Roster Member Three', email: 'roster-member-three@admin-lists.test' },
         ],
       });
 
@@ -141,9 +141,9 @@ describeDb('admin listings and badge roster', () => {
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Admin Member' },
-          { name: 'Admin Member Two' },
-          { name: 'Admin Member Three' },
+          { name: 'Admin Member', email: 'admin-member@admin-lists.test' },
+          { name: 'Admin Member Two', email: 'admin-member-two@admin-lists.test' },
+          { name: 'Admin Member Three', email: 'admin-member-three@admin-lists.test' },
         ],
       });
 
@@ -208,9 +208,9 @@ describeDb('admin listings and badge roster', () => {
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Team Role Member' },
-          { name: 'Team Role Member Two' },
-          { name: 'Team Role Member Three' },
+          { name: 'Team Role Member', email: 'team-role-member@admin-lists.test' },
+          { name: 'Team Role Member Two', email: 'team-role-member-two@admin-lists.test' },
+          { name: 'Team Role Member Three', email: 'team-role-member-three@admin-lists.test' },
         ],
       });
 

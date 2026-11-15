@@ -10,6 +10,15 @@ import {
   TEAM_MEMBERS_TOTAL_MIN,
   teamProgressStateSchema,
   teamRegistrationResponseSchema as canonicalTeamRegistrationResponseSchema,
+  resendBadgeEmailResponseSchema,
+  teamBadgesResponseSchema,
+  teamMemberProfileSchema,
+  teamPortalSummarySchema,
+  type ResendBadgeEmailResponse,
+  type TeamBadgesResponse,
+  type TeamMemberBadge,
+  type TeamMemberProfile,
+  type TeamPortalSummary,
 } from 'api-contracts';
 
 /**
@@ -205,42 +214,18 @@ export type TeamRegistrationResponse = z.infer<typeof teamRegistrationResponseSc
  * Reuse canonical enums (`TeamProgressState`, `ChallengeTrack`) from `api-contracts`.
  */
 
-export const participantProfileSchema = z.object({
-  id: z.string(),
-  teamId: z.string(),
-  fullName: z.string(),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  roleInTeam: z.enum(['leader', 'member']),
-  isCheckedIn: z.boolean(),
-});
+/**
+ * Team portal contracts are canonical (`libs/api-contracts`): the team, its
+ * members with badge colors, and every member's QR badge.
+ */
+export const participantProfileSchema = teamMemberProfileSchema;
+export type ParticipantProfile = TeamMemberProfile;
 
-export type ParticipantProfile = z.infer<typeof participantProfileSchema>;
+export const teamSummarySchema = teamPortalSummarySchema;
+export type TeamSummary = TeamPortalSummary;
 
-export const teamSummarySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  track: challengeTrackSchema.nullable().optional(),
-  progress: teamProgressStateSchema,
-  isCheckedIn: z.boolean(),
-  members: z.array(participantProfileSchema),
-});
-
-export type TeamSummary = z.infer<typeof teamSummarySchema>;
-
-export const badgePassResponseSchema = z.object({
-  participantId: z.string(),
-  participantName: z.string(),
-  teamId: z.string(),
-  teamName: z.string(),
-  track: challengeTrackSchema.nullable().optional(),
-  /** QR badge image (SVG data or data URL) issued to the participant by email. */
-  qrData: z.string(),
-  /** High-entropy, revocable badge token treated as a credential by the backend. */
-  qrToken: z.string(),
-});
-
-export type BadgePassResponse = z.infer<typeof badgePassResponseSchema>;
+export { teamBadgesResponseSchema, resendBadgeEmailResponseSchema };
+export type { TeamBadgesResponse, TeamMemberBadge, ResendBadgeEmailResponse };
 
 export const miniCtfStatusResponseSchema = z.object({
   /** Server-owned decision: gate availability (phase, check-in eligibility). */

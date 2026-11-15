@@ -193,7 +193,7 @@ Every push to `main` (and every manual **Run workflow** on the CI workflow) runs
 
 Required GitHub configuration:
 
-- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`, and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` to provision an administrator on deploy (see `.env.example`).
+- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`, and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` to provision an administrator on deploy (see `.env.example`). `QR_TOKEN_KEY` is **required** (the API refuses to start without it); `SMTP_USER` / `SMTP_PASS` (Gmail app password) and optionally `MAIL_FROM` enable badge emails.
 - **Variables**: `DEPLOY_ENABLED` — deploy runs **only** when this is `true`, so the VPS is never touched before it is ready. Optional overrides: `NEXT_PUBLIC_API_URL`, `CORS_ORIGIN` (defaults use `http://<DEPLOY_SSH_HOST>:3000` / `:4000`).
 
 On the VPS the workflow assumes only Docker + the compose plugin (`docker compose version`) — nothing else is provisioned by hand. To harden host-key verification later, replace the workflow's runtime `ssh-keyscan` step with a pinned `known_hosts` entry (a `SSH_KNOWN_HOSTS` secret) — see the comment in `.github/workflows/ci.yml`.

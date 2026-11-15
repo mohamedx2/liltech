@@ -32,6 +32,41 @@ const MAX_TEAMMATES = TEAM_MEMBERS_TOTAL_MAX - 1;
 
 const NO_ERRORS: RegistrationErrors = { teammates: {} };
 
+/**
+ * Maps API error details (`{ path: 'members.1.email', message }`) onto the
+ * form fields. Request member index N is teammate row N.
+ */
+function serverFieldErrors(details: unknown, rows: readonly MemberRow[]): RegistrationErrors {
+  const errors: RegistrationErrors = { teammates: {} };
+  if (!Array.isArray(details)) return errors;
+
+  for (const detail of details) {
+    if (typeof detail !== 'object' || detail === null) continue;
+    const { path, message } = detail as { path?: unknown; message?: unknown };
+    if (typeof path !== 'string' || typeof message !== 'string') continue;
+
+    const [root, second, third] = path.split('.');
+    if (root === 'teamName') {
+      errors.teamName ??= message;
+    } else if (root === 'leader' && second === 'email') {
+      errors.leaderEmail ??= message;
+    } else if (root === 'leader' && second === 'name') {
+      errors.leaderFullName ??= message;
+    } else if (root === 'leader' && second === 'password') {
+      errors.password ??= message;
+    } else if (root === 'members' && (third === 'email' || third === 'name')) {
+      const row = rows[Number(second)];
+      if (row) {
+        const field = third === 'email' ? 'email' : 'fullName';
+        const rowErrors = (errors.teammates[row.rowKey] ??= {});
+        rowErrors[field] ??= message;
+      }
+    }
+  }
+
+  return errors;
+}
+
 function emptyRow(rowKey: number): MemberRow {
   return { rowKey, fullName: '', email: '' };
 }
@@ -174,11 +209,14 @@ export function TeamRegistrationForm() {
     try {
       setCreatedTeam(await api.registrations.registerTeam(parsed.data));
     } catch (error: unknown) {
-      setServerError(
-        error instanceof ApiClientError
-          ? error.message
-          : 'Unable to complete registration. Please try again.',
-      );
+      if (error instanceof ApiClientError) {
+        // Field-level details (duplicate email, taken team name, …) land on
+        // the matching input; the server message stays in the summary.
+        setErrors(serverFieldErrors(error.details, teammates));
+        setServerError(error.message);
+      } else {
+        setServerError('Unable to complete registration. Please try again.');
+      }
       focusErrorSummary();
     } finally {
       setSubmitting(false);
@@ -197,10 +235,11 @@ export function TeamRegistrationForm() {
             {hasBadges ? (
               <>
                 <div className={styles.badgeNotice} role="note">
-                  <strong>Save these badge codes now. They are shown only once.</strong>
+                  <strong>Each participant has been emailed their own QR badge.</strong>
                   <p>
-                    Badges are not sent by email yet. Send each person their own code: staff scan or
-                    type it at the entrance for check-in. Treat each code like a password.
+                    You can also sign in with the team account at any time to show every
+                    member&apos;s QR code on a phone at the entrance, or resend an email. Treat each
+                    code like a password.
                   </p>
                 </div>
                 <ul className={styles.doneList} aria-label="Participant badge codes">
