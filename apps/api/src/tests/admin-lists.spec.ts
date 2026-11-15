@@ -164,7 +164,7 @@ describeDb('admin listings and badge roster', () => {
       });
       expect(team.participants).toHaveLength(4);
       expect(team.participants[0]).toMatchObject({ name: 'Admin Leader', isLeader: true });
-      expect(team.participants[0].checkedInAt).toBeUndefined();
+      expect(team.participants[0].checkedInAt).toBeNull();
     });
 
     it('requires authentication and the admin role', async () => {
