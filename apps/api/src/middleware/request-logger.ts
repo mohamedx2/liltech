@@ -7,9 +7,14 @@ import { randomUUID } from 'node:crypto';
  * Every request gets an `x-request-id` so client-reported issues can be traced
  * back to exact log lines.
  */
+const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
+
 export function requestLogger(log: Logger) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    // A client-supplied id is kept only when it is short and log-safe.
+    const supplied = req.headers['x-request-id'];
+    const requestId =
+      typeof supplied === 'string' && SAFE_REQUEST_ID.test(supplied) ? supplied : randomUUID();
     req.id = requestId;
     res.setHeader('x-request-id', requestId);
 

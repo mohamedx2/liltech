@@ -131,15 +131,6 @@ export const ctfSubmitResponseSchema = z.strictObject({
 
 export type CtfSubmitResponse = z.infer<typeof ctfSubmitResponseSchema>;
 
-/**
- * `GET /api/challenges/current` — refused with `403 CTF_NOT_SOLVED` until every
- * required Mini-CTF stage is solved. The main brief is not published yet, so an
- * unlocked team gets that fact explicitly instead of invented content.
- */
-export const currentChallengeResponseSchema = z.strictObject({
-  unlocked: z.literal(true),
-  challenge: z.null(),
-  message: z.string(),
-});
-
-export type CurrentChallengeResponse = z.infer<typeof currentChallengeResponseSchema>;
+// `GET /api/challenges/*` contracts live in `challenges-contracts.ts`: the chain
+// reports completion through the team's `challenge_unlocked` progress state
+// instead of owning a challenge payload of its own.

@@ -26,7 +26,7 @@
 Canonical constants live in `libs/api-contracts/src/lib/` and must never be redefined in `apps/web`:
 
 - **Roles (`Role`):**
-  - `team` — Registered team account (3–5 participants led by a team leader)
+  - `team` — Registered team account (4–7 participants led by a team leader)
   - `jury` — Challenge-scoped evaluator (isolated to assigned track)
   - `admin` — Event staff / administrators (check-in operations, event lifecycle, management)
 - **Event Phases (`EventPhase`):**
@@ -51,7 +51,7 @@ Organized cleanly under `apps/web/src/app/` with Next.js App Router route groups
 |---|---|---|---|
 | Global | `layout.tsx`, `error.tsx`, `not-found.tsx` | All | Person 1 |
 | `(public)` | `/` (Landing), `/schedule` (Timeline), `/challenges` (Track Overview) | Public | Person 1 |
-| `(auth)` | `/login`, `/register` (Team 3–5 member registration), `/unauthorized` | Public / Guest | Person 1 |
+| `(auth)` | `/login`, `/register` (Team 4–7 member registration), `/unauthorized` | Public / Guest | Person 1 |
 | `(participant)` | `/team` (Dashboard & QR pass), `/team/ctf` (Mini-CTF Gate), `/team/challenge`, `/team/submissions`, `/team/announcements` | `Role.Team` | Person 2 |
 | `(staff)` / Check-In | `/checkin` (QR Check-In Scanner & Eligibility) | `Role.Admin` (staff) | Person 3 |
 | `(jury)` | `/jury` (Track-Scoped Assigned Teams), `/jury/evaluate/[teamId]` | `Role.Jury` | Person 3 |
@@ -71,7 +71,7 @@ Organized cleanly under `apps/web/src/app/` with Next.js App Router route groups
 ## 5. Main User Workflows
 
 1. **Public Discovery & Registration (Person 1):**
-   - Visitor views live `EventPhase`, server-synchronized countdown, schedule, and track summary → Team leader registers 3–5 participants → Receives confirmation (and QR badge delivery notice once backend email module is live).
+   - Visitor views live `EventPhase`, server-synchronized countdown, schedule, and track summary → Team leader registers 4–7 participants → Receives confirmation (and QR badge delivery notice once backend email module is live).
 2. **Authentication & Route Protection (Person 1):**
    - User signs in via `/login` → Backend establishes session → UI routes user to their role portal (`team`, `jury`, `admin`) → Expired (`401`) or forbidden (`403`) requests redirect or render clear recovery UI.
 3. **Entrance Check-In (Person 3):**
@@ -105,7 +105,7 @@ All HTTP requests go through `apps/web/src/lib/api/` using `env.NEXT_PUBLIC_API_
 | `health` | `GET /api/health` | **Implemented** | Uses `healthResponseSchema` from `libs/api-contracts` |
 | `events` | Event state & server time | **Planned (missing)** | Provisional adapter types in `lib/api/contracts/pending.ts`; `mock` handler for UI dev; `real` fails cleanly if 404 |
 | `auth` | Login / logout / current session | **Planned (missing)** | Same provisional adapter; zero client-side credential storage |
-| `registrations` | Team registration (3–5 participants) | **Planned (missing)** | Same provisional adapter; Zod client validation mirrors spec constraints |
+| `registrations` | Team registration (4–7 participants) | **Planned (missing)** | Same provisional adapter; Zod client validation mirrors spec constraints |
 | `participants`, `mini-ctf`, `challenges`, `submissions`, `announcements` | Team competition endpoints | **Planned (missing)** | Owned by Person 2 |
 | `checkin`, `jury`, `scoring`, `admin`, `results` | Operational & evaluation endpoints | **Planned (missing)** | Owned by Person 3 |
 

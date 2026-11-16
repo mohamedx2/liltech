@@ -16,7 +16,7 @@ Organized by **GDG on Campus EPI** and the **ISITCom Google Club**.
 
 LilTech is a one-night hackathon with **two parallel challenge tracks, two separate juries, and two podiums**:
 
-1. Team leaders register teams of 3–5 participants.
+1. Team leaders register teams of 4–7 participants.
 2. Every participant receives a personal QR badge by email.
 3. Staff scan QR codes at the entrance (check-in).
 4. At 20:00 the event goes live and the **Mini-CTF** opens for eligible teams.
@@ -120,7 +120,7 @@ docker compose ps                    # verify it is healthy
 
 pnpm nx run api:prisma-generate      # generate the Prisma client
 pnpm nx run api:db-migrate           # create/apply migrations
-pnpm nx run api:db-seed              # optional: seed platform metadata
+pnpm nx run api:db-seed              # optional: seed platform metadata (+ admin if SEED_ADMIN_* set)
 pnpm nx run api:db-studio            # optional: inspect the database
 pnpm nx run api:db-reset             # nuke & recreate your local database
 ```
@@ -179,6 +179,24 @@ docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://…/
 ```
 
 > ⚠️ The production Dockerfiles are provided as infrastructure groundwork and have not been battle-tested against a real deployment yet — treat them as a starting point.
+
+## Deployment
+
+Every push to `main` (and every manual **Run workflow** on the CI workflow) runs the `verify` job and then, automatically, the `deploy` job:
+
+1. Builds and pushes the two images to GHCR (`ghcr.io/mohamedx2/liltech-api`, `ghcr.io/mohamedx2/liltech-web` — `latest` + `sha-<commit>` tags).
+2. SSHes to the VPS and, against `docker-compose.prod.yml` copied to `/opt/liltech`:
+   - writes `/opt/liltech/.env` from repository secrets (never stored in the repo),
+   - logs the VPS in to GHCR with an ephemeral job token,
+   - pulls images, applies Prisma migrations (one-shot `migrate` service) and provisions the optional administrator account (one-shot `seed` service), starts the stack (web `:3000`, API `:4000`, Postgres internal-only),
+   - smoke-tests `GET /api/health` from the runner.
+
+Required GitHub configuration:
+
+- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`, and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` to provision an administrator on deploy (see `.env.example`). `QR_TOKEN_KEY` is **required** (the API refuses to start without it); `SMTP_USER` / `SMTP_PASS` (Gmail app password) and optionally `MAIL_FROM` enable badge emails.
+- **Variables**: `DEPLOY_ENABLED` — deploy runs **only** when this is `true`, so the VPS is never touched before it is ready. Optional overrides: `NEXT_PUBLIC_API_URL`, `CORS_ORIGIN` (defaults use `http://<DEPLOY_SSH_HOST>:3000` / `:4000`).
+
+On the VPS the workflow assumes only Docker + the compose plugin (`docker compose version`) — nothing else is provisioned by hand. To harden host-key verification later, replace the workflow's runtime `ssh-keyscan` step with a pinned `known_hosts` entry (a `SSH_KNOWN_HOSTS` secret) — see the comment in `.github/workflows/ci.yml`.
 
 ## Git Workflow
 

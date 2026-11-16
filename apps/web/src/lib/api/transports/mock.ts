@@ -6,6 +6,22 @@ import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
+import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
+import {
+  handleGetAdminChallenges,
+  handleGetAdminJury,
+  handleGetAdminOverview,
+  handleGetAdminTeam,
+  handleGetAdminTeams,
+  handleGetAuditLog,
+  handlePublishAdminAnnouncement,
+} from './mocks/admin.mock';
+import {
+  handleGetJuryEvaluation,
+  handleGetJuryOverview,
+  handleGetJuryTeams,
+  handleSubmitJuryEvaluation,
+} from './mocks/jury.mock';
 import { handleGetMiniCtfStatus, handleSubmitMiniCtfFlag } from './mocks/mini-ctf.mock';
 import {
   handleGetCtfChain,
@@ -17,8 +33,8 @@ import { handleGetMyBadge, handleGetMyTeam } from './mocks/participants.mock';
 import { handleCreateSubmission, handleGetMySubmissions } from './mocks/submissions.mock';
 import type { MockRouteMap } from './mocks/types';
 import { PLANNED_ENDPOINTS } from '../endpoints';
-import type { MiniCtfSubmitRequest } from '../contracts/pending';
 import type { CtfSubmitRequest as CtfSubmitAnswerRequest } from 'api-contracts';
+import type { MiniCtfSubmitRequest, SubmitEvaluationRequest } from '../contracts/pending';
 
 export interface MockTransportOptions {
   /** Simulated network latency in milliseconds. */
@@ -56,6 +72,43 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`POST ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: (config) => handleCreateSubmission(config.body),
 
     [`GET ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: () => handleGetAnnouncements(),
+    [`POST ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: (config) => {
+      const body = (config.body ?? {}) as { body?: string };
+      return handlePublishAdminAnnouncement(body.body ?? '');
+    },
+
+    [`GET ${PLANNED_ENDPOINTS.JURY_OVERVIEW}`]: () => handleGetJuryOverview(),
+    [`GET ${PLANNED_ENDPOINTS.JURY_TEAMS}`]: () => handleGetJuryTeams(),
+    [`GET ${PLANNED_ENDPOINTS.JURY_EVALUATION}`]: (config) => {
+      const teamId = (config as { params?: Record<string, string> }).params?.teamId ?? '';
+      return handleGetJuryEvaluation(teamId);
+    },
+    [`POST ${PLANNED_ENDPOINTS.JURY_EVALUATION}`]: (config) => {
+      const teamId = (config as { params?: Record<string, string> }).params?.teamId ?? '';
+      return handleSubmitJuryEvaluation(teamId, (config.body ?? {}) as SubmitEvaluationRequest);
+    },
+
+    [`POST ${PLANNED_ENDPOINTS.CHECKIN_SCAN}`]: (config) => {
+      const body = (config.body ?? {}) as { token?: string };
+      return handleScanCheckIn(body.token ?? '');
+    },
+    [`POST ${PLANNED_ENDPOINTS.CHECKIN_REVOKE}`]: (config) => {
+      const body = (config.body ?? {}) as { participantId?: string };
+      return handleRevokeBadge(body.participantId ?? '');
+    },
+    [`GET ${PLANNED_ENDPOINTS.CHECKIN_BADGES}`]: () => handleGetBadges(),
+
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_AUDIT_LOG}`]: (config) => {
+      const params = (config as { params?: Record<string, string> }).params;
+      const limit = params?.limit ? parseInt(params.limit, 10) : 50;
+      const offset = params?.offset ? parseInt(params.offset, 10) : 0;
+      return handleGetAuditLog(limit, offset);
+    },
+
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_TEAMS}`]: () => handleGetAdminTeams(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
   };
 
   /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */
@@ -87,6 +140,19 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     return undefined;
   }
 
+  /** Parameterized read routes (`:id` segments). Writes need the real API. */
+  const patternRoutes: ReadonlyArray<{
+    method: string;
+    pattern: RegExp;
+    handle: (match: RegExpMatchArray) => unknown;
+  }> = [
+    {
+      method: 'GET',
+      pattern: /^\/admin\/teams\/([^/]+)$/,
+      handle: (match) => handleGetAdminTeam(decodeURIComponent(match[1])),
+    },
+  ];
+
   return {
     async request<TResponse>(path: string, config: ApiRequestConfig = {}): Promise<TResponse> {
       if (latencyMs > 0) {
@@ -102,8 +168,34 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
       }
 
       const method = config.method ?? 'GET';
-      const handler = routes[`${method} ${path}`] ?? ctfStageRoute(method, path, config);
+      const [cleanPath, queryString] = path.split('?');
+      const queryParams: Record<string, string> = {};
+      if (queryString) {
+        const sp = new URLSearchParams(queryString);
+        sp.forEach((value, key) => {
+          queryParams[key] = value;
+        });
+      }
+
+      const effectiveConfig = {
+        ...config,
+        params: {
+          ...queryParams,
+          ...((config as { params?: Record<string, string> }).params ?? {}),
+        },
+      };
+
+      const handler =
+        routes[`${method} ${path}`] ??
+        routes[`${method} ${cleanPath}`] ??
+        ctfStageRoute(method, cleanPath, effectiveConfig);
       if (!handler) {
+        for (const route of patternRoutes) {
+          const match = route.method === method ? cleanPath.match(route.pattern) : null;
+          if (match) {
+            return route.handle(match) as TResponse;
+          }
+        }
         throw new ApiClientError({
           message: `No mock defined for ${method} ${path}.`,
           status: 404,
@@ -111,7 +203,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
         });
       }
 
-      return handler(config) as TResponse;
+      return handler(effectiveConfig) as TResponse;
     },
   };
 }

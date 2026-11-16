@@ -2,99 +2,154 @@
   width: 100%;
 }
 
-.headerRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
 .content {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
 }
 
-.badgePreviewWrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
+.memberList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
 }
 
-@media (min-width: 40rem) {
-  .badgePreviewWrapper {
-    flex-direction: row;
-    align-items: center;
-  }
-}
-
-.qrContainer {
-  background-color: #ffffff;
-  padding: var(--space-3);
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-}
-
-.qrImage {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
-
-.tokenBox {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  background-color: rgb(235 194 122 / 0.06);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.tokenLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.tokenCode {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--palette-gold);
-}
-
-.metaInfo {
+.member {
+  --badge-color: var(--color-border);
+  --badge-text: var(--color-text);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  flex: 1;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-top: 6px solid var(--badge-color);
+  border-radius: var(--radius-lg);
 }
 
-.metaItem {
+/* Badge group colors match the colors printed on the badge emails. */
+.color_blue {
+  --badge-color: #1a73e8;
+  --badge-text: #ffffff;
+}
+
+.color_red {
+  --badge-color: #d93025;
+  --badge-text: #ffffff;
+}
+
+.color_yellow {
+  --badge-color: #f9ab00;
+  --badge-text: #202124;
+}
+
+.color_green {
+  --badge-color: #188038;
+  --badge-text: #ffffff;
+}
+
+.color_none {
+  --badge-color: var(--color-border);
+}
+
+.memberHeader {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.metaLabel {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.metaValue {
-  font-size: var(--text-base);
+.memberName {
+  display: block;
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--color-text);
 }
 
-.footer {
-  justify-content: flex-start;
+.memberRole {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.colorChip {
+  flex-shrink: 0;
+  padding: 0.125rem var(--space-2);
+  border-radius: var(--radius-lg);
+  background-color: var(--badge-color);
+  color: var(--badge-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.qrContainer {
+  width: 100%;
+  max-width: 14rem;
+  aspect-ratio: 1 / 1;
+  align-self: center;
+  background-color: #ffffff;
+  padding: var(--space-2);
+  border: 6px solid var(--badge-color);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qrImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.qrMissing {
+  max-width: 14rem;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: #3c4043;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.emailStatus {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.resendHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.feedbackOk,
+.feedbackError {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.feedbackOk {
+  color: var(--color-success, #188038);
+}
+
+.feedbackError {
+  color: var(--color-danger, #d93025);
 }

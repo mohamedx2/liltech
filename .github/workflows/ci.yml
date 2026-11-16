@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -85,3 +86,191 @@ jobs:
 
       - name: Lint, typecheck, test & build (affected)
         run: pnpm exec nx ${{ steps.base.outputs.args }}
+
+  deploy:
+    name: Deploy to VPS (Docker)
+    needs: verify
+    # Deploys on every push to main (after verify passes) and on manual runs.
+    # Guarded by the DEPLOY_ENABLED repository variable so the VPS is only
+    # touched once it is ready. See README.md → Deployment.
+    if: >-
+      (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+      && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_API: ghcr.io/${{ github.repository }}-api
+      IMAGE_WEB: ghcr.io/${{ github.repository }}-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_API }}:latest
+            ${{ env.IMAGE_API }}:sha-${{ github.sha }}
+
+      - name: Build & push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          # NEXT_PUBLIC_* variables are baked into the browser bundle at build time.
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || format('http://{0}:4000/api', secrets.DEPLOY_SSH_HOST) }}
+            NEXT_PUBLIC_API_MODE=real
+          tags: |
+            ${{ env.IMAGE_WEB }}:latest
+            ${{ env.IMAGE_WEB }}:sha-${{ github.sha }}
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Runtime host-key pinning. For a stronger guarantee, replace this
+          # with a pinned known_hosts entry (see README.md → Deployment).
+          ssh-keyscan -p ${{ secrets.DEPLOY_SSH_PORT }} ${{ secrets.DEPLOY_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Preflight — Docker available on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'docker --version && docker compose version'
+
+      - name: Copy compose file
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'mkdir -p /opt/liltech'
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.DEPLOY_SSH_PORT }} \
+            docker-compose.prod.yml Caddyfile \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:/opt/liltech/
+
+      - name: Write remote .env from secrets
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN || format('http://{0}:3000', secrets.DEPLOY_SSH_HOST) }}
+          SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
+          QR_TOKEN_KEY: ${{ secrets.QR_TOKEN_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL || 'https://liltechsousse.com' }}
+        run: |
+          # The API refuses to start without QR_TOKEN_KEY: fail the deploy early instead.
+          if [ -z "$QR_TOKEN_KEY" ]; then
+            echo '::error::The QR_TOKEN_KEY repository secret is required.'
+            exit 1
+          fi
+          cat > /tmp/liltech.env <<EOF
+          NODE_ENV=production
+          POSTGRES_USER=liltech
+          POSTGRES_PASSWORD=${DB_PASSWORD}
+          POSTGRES_DB=liltech
+          API_PORT=4000
+          API_HOST=0.0.0.0
+          CORS_ORIGIN=${CORS_ORIGIN}
+          SESSION_TTL_HOURS=24
+          TRUST_PROXY_HOPS=1
+          API_DOCS_ENABLED=${{ vars.API_DOCS_ENABLED || 'true' }}
+          LOG_LEVEL=info
+          API_IMAGE=${{ env.IMAGE_API }}:latest
+          WEB_IMAGE=${{ env.IMAGE_WEB }}:latest
+          QR_TOKEN_KEY=${QR_TOKEN_KEY}
+          SMTP_HOST=smtp.gmail.com
+          SMTP_PORT=465
+          SMTP_USER=${SMTP_USER}
+          SMTP_PASS=${SMTP_PASS}
+          MAIL_FROM=${MAIL_FROM}
+          PUBLIC_APP_URL=${PUBLIC_APP_URL}
+          EOF
+          # Optional administrator provisioning for the seed one-shot service:
+          # only written when the secrets exist, so deploys without them no-op.
+          if [ -n "$SEED_ADMIN_EMAIL" ]; then
+            echo "SEED_ADMIN_EMAIL=$SEED_ADMIN_EMAIL" >> /tmp/liltech.env
+          fi
+          if [ -n "$SEED_ADMIN_PASSWORD" ]; then
+            echo "SEED_ADMIN_PASSWORD=$SEED_ADMIN_PASSWORD" >> /tmp/liltech.env
+          fi
+          if [ -n "$SEED_ADMIN_NAME" ]; then
+            echo "SEED_ADMIN_NAME=$SEED_ADMIN_NAME" >> /tmp/liltech.env
+          fi
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.DEPLOY_SSH_PORT }} \
+            /tmp/liltech.env \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:/opt/liltech/.env
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'chmod 600 /opt/liltech/.env'
+          rm -f /tmp/liltech.env
+
+      - name: Log the VPS in to GHCR (ephemeral token)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'docker login ghcr.io -u ${{ github.actor }} --password-stdin'
+
+      - name: Pull, migrate, start
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'cd /opt/liltech \
+              && docker compose -f docker-compose.prod.yml pull \
+              && docker compose -f docker-compose.prod.yml up -d --remove-orphans \
+              && docker logout ghcr.io \
+              && docker compose -f docker-compose.prod.yml ps'
+
+      - name: Smoke test
+        # Internal check (on the VPS itself) is the hard gate: it proves the
+        # containers are actually healthy, immune to host-firewall rules.
+        # Each probe gets --max-time so a silently-dropped port fails fast
+        # instead of hanging on the OS TCP timeout.
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'ok=0
+             for i in $(seq 1 12); do
+               if curl -fsS --max-time 5 http://127.0.0.1:4000/api/health > /dev/null 2>&1; then ok=1; break; fi
+               sleep 5
+             done
+             if [ "$ok" != "1" ]; then echo "::error::API is unhealthy on the VPS itself (127.0.0.1:4000)"; exit 1; fi
+             echo "API healthy on the VPS"'
+          # External reachability from the runner is advisory only: failure
+          # usually means the VPS firewall does not allow inbound 3000/4000.
+          if curl -fsS --max-time 5 "http://${{ secrets.DEPLOY_SSH_HOST }}:4000/api/health" > /dev/null 2>&1; then
+            echo "API reachable from the outside"
+          else
+            echo "::warning::API not reachable from the internet on port 4000 — open inbound TCP 3000/4000 on the VPS firewall (or proxy via 80/443)"
+          fi
+          curl -fsS --max-time 5 "http://${{ secrets.DEPLOY_SSH_HOST }}:3000" > /dev/null 2>&1 || \
+            echo "::warning::Web not reachable from the internet on port 3000 — open inbound TCP 3000/4000 on the VPS firewall (or proxy via 80/443)"

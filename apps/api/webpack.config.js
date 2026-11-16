@@ -19,7 +19,13 @@ module.exports = {
       // Prisma Client loads a platform-specific query engine at runtime.
       // Keep it out of the bundle so Node resolves the generated client and
       // native engine from node_modules.
-      externalDependencies: ['@prisma/client', 'pino'],
+      externalDependencies: [
+        '@prisma/client',
+        'pino',
+        'swagger-ui-express',
+        'nodemailer',
+        'qrcode',
+      ],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: false,

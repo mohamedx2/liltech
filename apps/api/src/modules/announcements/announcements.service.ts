@@ -1,4 +1,5 @@
 import { getPrismaClient } from '../../config/database';
+import { ApiError } from '../../utils/api-error';
 import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import type { Announcement, CreateAnnouncementRequest } from 'api-contracts';
 
@@ -68,4 +69,28 @@ export async function listAnnouncements(
     })),
     total,
   };
+}
+
+/** Removes a wrong or outdated announcement from every feed (admin only, audited). */
+export async function deleteAnnouncement(
+  announcementId: string,
+  adminUserId: string,
+): Promise<void> {
+  const prisma = getPrismaClient();
+
+  await prisma.$transaction(async (tx) => {
+    const removed = await tx.announcement.deleteMany({ where: { id: announcementId } });
+    if (removed.count === 0) {
+      throw ApiError.notFound('Announcement not found.');
+    }
+    await recordAuditLog(
+      {
+        action: AuditAction.AnnouncementDeleted,
+        actorId: adminUserId,
+        targetType: 'announcement',
+        targetId: announcementId,
+      },
+      tx,
+    );
+  });
 }

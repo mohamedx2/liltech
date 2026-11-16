@@ -43,7 +43,7 @@ apps/web/src/
 │   └── env.ts                 # Zod-validated NEXT_PUBLIC_* environment variables
 ├── features/
 │   ├── auth/                  # LoginForm, UnauthorizedView
-│   └── registration/          # TeamRegistrationForm (3–5 participants constraint)
+│   └── registration/          # TeamRegistrationForm (4–7 participants constraint)
 ├── lib/
 │   ├── api/                   # Centralized typed API client, endpoints, transports, mocks, pending contracts
 │   └── auth/                  # AuthProvider context, session state, role-to-route access helpers
@@ -95,6 +95,28 @@ export default function ParticipantLayout({ children }: { children: ReactNode })
   );
 }
 ```
+
+### Jury Evaluation Portal (`(jury)`)
+
+The Jury workspace (`/jury` and `/jury/evaluate/[teamId]`) enforces strict challenge track isolation (e.g. `track_a` or `track_b`):
+- **Jury Layout (`apps/web/src/app/(jury)/layout.tsx`):** Guarded with `RoleGuard allowedRoles={[Role.Jury]}` and wrapped in `DashboardShell role={Role.Jury}`.
+- **Assigned Teams Overview (`/jury`):** Track banner with track title/description, evaluation progress metrics (Assigned, Evaluated, Pending, Average score), search & status filter tabs ('All', 'Pending', 'Graded'), and a semantic `DataTable` listing deliverables and actions.
+- **Team Evaluation Workspace (`/jury/evaluate/[teamId]`):** Detailed review of team deliverables (GitHub repo and uploaded files), 4 standardized criteria (Technical Execution, Innovation, UI/UX, Pitch — 25 pts each, 100 pts total) with synchronized range sliders, number inputs, and fast presets, real-time total score calculation with rating bands, qualitative jury notes, and submission locking.
+
+### Admin Control Panel & Staff Check-In Scanner (`(admin)`)
+
+The Admin workspace (`/admin` and `/checkin`) provides high-density, authoritative operational controls:
+- **Admin Layout (`apps/web/src/app/(admin)/layout.tsx`):** Guarded with `RoleGuard allowedRoles={[Role.Admin]}` and wrapped in `DashboardShell role={Role.Admin}`.
+- **Admin Dashboard (`/admin`):** High-density event orchestration center featuring:
+  - Authoritative Phase Control Stepper (`registration` → `checkin` → `live` → `submissions_closed` → `pitching` → `results`) with confirmation modal and server synchronization (`POST /api/event-state`).
+  - Infrastructure Health Telemetry querying `api.health.getHealth()` (PostgreSQL latency, database connectivity, and API uptime).
+  - Organizer Broadcast Announcement Composer with character counter and instant distribution (`POST /api/announcements`).
+  - Audited Activity Stream (`GET /api/admin/audit-log`) displaying chronological admin actions with actor attribution and UTC timestamps.
+- **Staff Check-In Scanner (`/checkin`):** Ultra-fast, zero-distraction barcode/QR badge validation interface designed for physical check-in desks:
+  - Auto-focusing scanner input listening for hardware 2D barcode / QR scanners or manual entry with automated validation (`POST /api/checkin/scan`).
+  - Visual status feedback (audio cue hooks, confirmation toasts, and duplicate/invalid alerts).
+  - Real-time venue attendance counter (Total Registered, Checked In, Attendance % progress bar).
+  - Searchable and filterable badge roster with instant credential revocation (`POST /api/checkin/revoke`).
 
 Role home routes and portal navigation links are already centralized in [`apps/web/src/lib/auth/route-access.ts`](../../apps/web/src/lib/auth/route-access.ts):
 - `Role.Team` → `/team` (`/team`, `/team/ctf`, `/team/challenge`, `/team/submissions`, `/team/announcements`)

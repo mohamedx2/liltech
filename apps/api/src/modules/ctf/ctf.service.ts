@@ -157,10 +157,9 @@ function resolveState(
 async function persistImplicitUnlock(teamId: string, stageId: string): Promise<void> {
   const prisma = getPrismaClient();
 
-  await prisma.ctfProgress.upsert({
-    where: { teamId_stageId: { teamId, stageId } },
-    update: {},
-    create: { teamId, stageId, state: 'unlocked' },
+  await prisma.ctfProgress.createMany({
+    data: [{ teamId, stageId, state: 'unlocked' }],
+    skipDuplicates: true,
   });
 }
 
@@ -335,10 +334,14 @@ export async function revealNextHint(userId: string, slug: string): Promise<CtfH
     throw ApiError.conflict('All hints for this stage are already revealed.');
   }
 
-  const updated = await prisma.ctfProgress.upsert({
+  await prisma.ctfProgress.createMany({
+    data: [{ teamId: team.id, stageId: stage.id, state: 'unlocked' }],
+    skipDuplicates: true,
+  });
+
+  const updated = await prisma.ctfProgress.update({
     where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-    update: { hintsUsed: next.position, state: 'unlocked' },
-    create: { teamId: team.id, stageId: stage.id, state: 'unlocked', hintsUsed: next.position },
+    data: { hintsUsed: next.position, state: 'unlocked' },
   });
 
   return {
@@ -428,10 +431,11 @@ export async function submitAnswer(
   }
 
   // Ensure the row exists so the solve below is a single atomic update.
-  await prisma.ctfProgress.upsert({
-    where: { teamId_stageId: { teamId: team.id, stageId: stage.id } },
-    update: {},
-    create: { teamId: team.id, stageId: stage.id, state: 'unlocked' },
+  // `createMany ... skipDuplicates` compiles to `ON CONFLICT DO NOTHING`, so two
+  // submissions arriving together cannot race into a P2002 like an `upsert` can.
+  await prisma.ctfProgress.createMany({
+    data: [{ teamId: team.id, stageId: stage.id, state: 'unlocked' }],
+    skipDuplicates: true,
   });
 
   if (!matchesAnswerHash(answer, stage.answerHash)) {
@@ -462,10 +466,13 @@ export async function submitAnswer(
     }
 
     if (nextStage) {
-      await tx.ctfProgress.upsert({
-        where: { teamId_stageId: { teamId: team.id, stageId: nextStage.id } },
-        update: { state: 'unlocked' },
-        create: { teamId: team.id, stageId: nextStage.id, state: 'unlocked' },
+      await tx.ctfProgress.createMany({
+        data: [{ teamId: team.id, stageId: nextStage.id, state: 'unlocked' }],
+        skipDuplicates: true,
+      });
+      await tx.ctfProgress.updateMany({
+        where: { teamId: team.id, stageId: nextStage.id, solvedAt: null },
+        data: { state: 'unlocked' },
       });
     }
 

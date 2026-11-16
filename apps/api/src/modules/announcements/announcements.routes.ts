@@ -1,13 +1,19 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { createAnnouncementRequestSchema } from 'api-contracts';
+import { announcementIdParamsSchema, createAnnouncementRequestSchema } from 'api-contracts';
 import { ApiError } from '../../utils/api-error';
 import { requireAuth, requireRole } from '../../middleware/auth';
-import { listAnnouncements, publishAnnouncement } from './announcements.service';
+import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
+import {
+  deleteAnnouncement,
+  listAnnouncements,
+  publishAnnouncement,
+} from './announcements.service';
 
 /**
  * Announcement endpoints.
  * - `POST /api/announcements` — admin only (audited)
  * - `GET  /api/announcements` — any authenticated role
+ * - `DELETE /api/announcements/:announcementId` — admin only (audited)
  */
 
 export const announcementsRouter: Router = Router();
@@ -56,5 +62,16 @@ announcementsRouter.get(
         res.status(200).json(result);
       })
       .catch(next);
+  },
+);
+
+announcementsRouter.delete(
+  '/announcements/:announcementId',
+  requireAuth,
+  requireRole('admin'),
+  async (req: Request, res: Response) => {
+    const { announcementId } = parseOrThrow(announcementIdParamsSchema, req.params);
+    await deleteAnnouncement(announcementId, authenticatedUserId(req));
+    res.status(204).send();
   },
 );

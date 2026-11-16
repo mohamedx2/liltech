@@ -40,7 +40,7 @@ The platform handles: team registration, participant accounts with personal QR b
 
 **Event shape:** two parallel challenge tracks, two separate juries, two podiums.
 
-**Event workflow:** team leader registers a team (3–5 members) → every participant receives a personal QR code by email → staff scan QR codes at the entrance → at 20:00 administrators launch the event → the Mini-CTF opens for eligible checked-in teams → a valid flag unlocks the team's main challenge → teams submit deliverables until 08:00 → pitches at 09:00 → jury evaluation → results and podiums published at 11:00.
+**Event workflow:** team leader registers a team (4–7 members) → every participant receives a personal QR code by email → staff scan QR codes at the entrance → at 20:00 administrators launch the event → the Mini-CTF opens for eligible checked-in teams → a valid flag unlocks the team's main challenge → teams submit deliverables until 08:00 → pitches at 09:00 → jury evaluation → results and podiums published at 11:00.
 
 **Canonical states:**
 
@@ -136,7 +136,7 @@ Before implementing any complex screen, establish a deliberate design system: co
 
 ## 9. Security Rules
 
-- **Passwords:** hashed with a modern, salted, deliberately slow algorithm (argon2id or bcrypt). Never stored or logged in plaintext.
+- **Passwords:** hashed with a modern, salted, deliberately slow algorithm (argon2id or bcrypt). Never stored or logged in plaintext. **Accepted exception (organizer decision, 2026-11-15):** jury account passwords are also stored readable (`User.juryPlainPassword`) so administrators can hand them to jury members; they are returned only by admin-only endpoints and never logged. Do not extend this to any other role.
 - **Authentication:** server-side sessions or short-lived signed tokens; no security logic in the frontend.
 - **RBAC:** every protected endpoint declares and checks its role server-side; jury access is challenge-scoped.
 - **Input validation** on every endpoint (body, params, query). Reject unknown fields where it matters.

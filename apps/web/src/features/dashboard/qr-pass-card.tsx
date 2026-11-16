@@ -1,97 +1,178 @@
-import React from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+'use client';
+
+import React, { useState } from 'react';
+import type { BadgeColor } from 'api-contracts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/feedback/alert';
-import type { BadgePassResponse } from '@/lib/api/contracts/pending';
-import { getTrackLabel } from '@/lib/format';
+import { api, ApiClientError } from '@/lib/api';
+import type { TeamBadgesResponse, TeamMemberBadge } from '@/lib/api/contracts/pending';
 import styles from './qr-pass-card.module.css';
 
+const COLOR_LABELS: Record<BadgeColor, string> = {
+  blue: 'Blue',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+};
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function emailStatusLabel(badge: TeamMemberBadge): string {
+  if (!badge.email) return 'No email on file';
+  if (badge.emailStatus === 'sent') return `Emailed to ${badge.email}`;
+  if (badge.emailStatus === 'failed') return `Email to ${badge.email} failed`;
+  if (badge.emailStatus === 'pending') return `Sending to ${badge.email}…`;
+  return `Not emailed yet (${badge.email})`;
+}
+
+function MemberBadge({ badge }: { badge: TeamMemberBadge }) {
+  const [state, setState] = useState(badge);
+  const [isSending, setIsSending] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(
+    null,
+  );
+
+  const canResend =
+    Boolean(state.email) &&
+    !state.isRevoked &&
+    (!state.emailResendAvailableAt ||
+      new Date(state.emailResendAvailableAt).getTime() <= Date.now());
+
+  const handleResend = async () => {
+    setIsSending(true);
+    setFeedback(null);
+    try {
+      const result = await api.participants.resendBadgeEmail(state.participantId);
+      setState((previous) => ({
+        ...previous,
+        emailStatus: result.emailStatus,
+        emailLastSentAt: result.emailLastSentAt,
+        emailResendAvailableAt: result.emailResendAvailableAt,
+      }));
+      setFeedback(
+        result.emailStatus === 'sent'
+          ? { tone: 'success', text: 'Badge email sent.' }
+          : { tone: 'error', text: 'The email could not be sent. Show the QR code below instead.' },
+      );
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        text: error instanceof ApiClientError ? error.message : 'Could not resend the email.',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const colorClass = state.color ? styles[`color_${state.color}`] : styles.color_none;
+
+  return (
+    <li className={[styles.member, colorClass].filter(Boolean).join(' ')}>
+      <div className={styles.memberHeader}>
+        <div>
+          <span className={styles.memberName}>{state.participantName}</span>
+          <span className={styles.memberRole}>
+            {state.roleInTeam === 'leader' ? 'Team leader' : 'Member'}
+          </span>
+        </div>
+        <span className={styles.colorChip}>
+          {state.color ? `${COLOR_LABELS[state.color]} group` : 'No color'}
+        </span>
+      </div>
+
+      <div className={styles.qrContainer}>
+        {state.qrImageDataUrl ? (
+          <img
+            src={state.qrImageDataUrl}
+            alt={`Entrance QR code for ${state.participantName}`}
+            className={styles.qrImage}
+            width={180}
+            height={180}
+          />
+        ) : (
+          <p className={styles.qrMissing}>
+            {state.isRevoked
+              ? 'This badge was revoked. Please contact the organizers.'
+              : 'This QR code can no longer be displayed. Resend the email to get a new one.'}
+          </p>
+        )}
+      </div>
+
+      <div className={styles.statusRow}>
+        {state.isCheckedIn ? (
+          <Badge tone="success" showDot>
+            Checked in
+          </Badge>
+        ) : state.isRevoked ? (
+          <Badge tone="danger">Revoked</Badge>
+        ) : (
+          <Badge tone="info">Ready to scan</Badge>
+        )}
+        <span className={styles.emailStatus}>{emailStatusLabel(state)}</span>
+      </div>
+
+      <div className={styles.actions}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleResend}
+          disabled={!canResend}
+          loading={isSending}
+          loadingLabel="Sending…"
+        >
+          Resend email
+        </Button>
+        {!canResend && state.emailResendAvailableAt && !state.isRevoked ? (
+          <span className={styles.resendHint}>
+            Available at {formatTime(state.emailResendAvailableAt)}
+          </span>
+        ) : null}
+      </div>
+
+      {feedback ? (
+        <p
+          role="status"
+          className={feedback.tone === 'success' ? styles.feedbackOk : styles.feedbackError}
+        >
+          {feedback.text}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 export interface QrPassCardProps {
-  badge: BadgePassResponse;
+  badges: TeamBadgesResponse;
   className?: string;
 }
 
-export function QrPassCard({ badge, className = '' }: QrPassCardProps) {
-  const handleDownload = () => {
-    if (!badge.qrData) return;
-    const link = document.createElement('a');
-    link.href = badge.qrData;
-    link.download = `liltech-badge-${badge.participantName.toLowerCase().replace(/\s+/g, '-')}.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
+/** Every member's entrance QR badge, readable on a phone at check-in. */
+export function QrPassCard({ badges, className = '' }: QrPassCardProps) {
   return (
     <Card surface="raised" className={[styles.card, className].filter(Boolean).join(' ')}>
       <CardHeader>
-        <div className={styles.headerRow}>
-          <div>
-            <CardTitle as="h2">Personal Entrance Pass</CardTitle>
-            <CardDescription>Scan at the venue entrance for team check-in</CardDescription>
-          </div>
-          {badge.track && <Badge tone="info">{getTrackLabel(badge.track)}</Badge>}
-        </div>
+        <CardTitle as="h2">Entrance QR Badges</CardTitle>
+        <CardDescription>
+          Each member shows their own QR code at the entrance. Codes were also sent by email.
+        </CardDescription>
       </CardHeader>
 
       <CardContent className={styles.content}>
-        <div className={styles.badgePreviewWrapper}>
-          <div className={styles.qrContainer}>
-            {badge.qrData ? (
-              <img
-                src={badge.qrData}
-                alt={`Personal entrance QR code for ${badge.participantName}`}
-                className={styles.qrImage}
-                width={180}
-                height={180}
-              />
-            ) : (
-              <div className={styles.tokenBox}>
-                <span className={styles.tokenLabel}>Digital Pass Token</span>
-                <code className={styles.tokenCode}>{badge.qrToken}</code>
-              </div>
-            )}
-          </div>
+        <ul className={styles.memberList}>
+          {badges.badges.map((badge) => (
+            <MemberBadge key={badge.participantId} badge={badge} />
+          ))}
+        </ul>
 
-          <div className={styles.metaInfo}>
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>Participant</span>
-              <span className={styles.metaValue}>{badge.participantName}</span>
-            </div>
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>Team</span>
-              <span className={styles.metaValue}>{badge.teamName}</span>
-            </div>
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>Verification Status</span>
-              <span className={styles.metaValue}>
-                <Badge tone="success" showDot>
-                  Issued &amp; Active
-                </Badge>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <Alert tone="warning" title="Confidential Credential">
-          Do not share this pass or token with other teams. Your pass can only be scanned once at
-          the entrance.
+        <Alert tone="warning" title="Personal credentials">
+          Each QR code admits one person and can be scanned once. Do not share them outside your
+          team.
         </Alert>
       </CardContent>
-
-      <CardFooter className={styles.footer}>
-        <Button variant="outline" size="sm" onClick={handleDownload}>
-          Save Badge to Device
-        </Button>
-      </CardFooter>
     </Card>
   );
 }

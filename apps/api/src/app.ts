@@ -1,7 +1,7 @@
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import { corsOrigins } from './config/env';
+import { corsOrigins, env } from './config/env';
 import { logger } from './utils/logger';
 import { requestLogger } from './middleware/request-logger';
 import { errorHandler } from './middleware/error-handler';
@@ -17,6 +17,12 @@ export function createApp(): Express {
 
   app.disable('x-powered-by');
 
+  // Behind Caddy, `req.ip` must be the client address from X-Forwarded-For,
+  // otherwise every request shares the proxy's IP and per-IP rate limits
+  // become global. Only the configured number of proxy hops is trusted.
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
+
+  // Helmet defaults: CSP, HSTS, X-Frame-Options, nosniff, referrer policy.
   app.use(helmet());
   app.use(
     cors({

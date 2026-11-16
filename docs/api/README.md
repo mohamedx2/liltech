@@ -25,6 +25,16 @@ Current codes: `CONFLICT`, `CTF_NOT_SOLVED`, `FORBIDDEN`, `INTERNAL`, `NOT_FOUND
 
 ## Implemented Endpoints
 
+### Documentation & Spec
+
+#### `GET /api/docs`
+
+Interactive Swagger UI documentation. Renders complete OpenAPI 3.0 specs with executable API test console, authorization token persistence, and schema inspectors.
+
+#### `GET /api/docs/openapi.json`
+
+Machine-readable OpenAPI 3.0.3 specification in JSON format.
+
 ### Health
 
 #### `GET /api/health`
@@ -106,6 +116,8 @@ Schema: `eventStateResponseSchema`.
 
 #### `POST /api/event-state`
 
+Phases advance one step at a time (`registration → checkin → live → submissions_closed → pitching → results`). Skipping ahead or going back needs `{ "phase": "…", "force": true }`; the audit entry records `from -> to` and marks overrides. The admin dashboard sends `force` only after the admin confirms.
+
 Admin only. Atomically transitions the phase and records an audit entry (`event_phase_transition`).
 
 **Request body:** `{ "phase": "checkin|live|..." }`
@@ -118,7 +130,19 @@ Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
 #### `POST /api/registration/teams`
 
-Public. Registers a team of 3–5 members (leader + 2–4 members). Creates the leader account (password ≥ 12 chars, bcrypt) plus participant records. Issues one revocable QR badge token **per participant** (raw token returned once, stored hashed server-side). Duplicate team name or leader email → `CONFLICT` (409).
+Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the shared team account (leader email + password ≥ 12 chars, bcrypt) plus participant records. Every participant needs an email, unique within the team (case-insensitive) → otherwise `VALIDATION_ERROR` (400).
+
+Each participant gets one of four badge colors (`blue`, `red`, `yellow`, `green`): always the least used color so far, chosen inside a serializable transaction, so the four groups never differ by more than one. Each participant also gets one revocable QR badge; the token is stored as a SHA-256 hash (scan lookup) and AES-256-GCM encrypted under `QR_TOKEN_KEY` (so the team can display it again). After the transaction commits, each participant is emailed their own QR badge (Gmail SMTP); a delivery failure never fails the registration and is recorded per badge.
+
+Conflicts → `CONFLICT` (409) with field-level `details` (`path` is the request field, e.g. `members.1.email`):
+
+- a participant email already registered on **another team** (a person can only be on one team): message names the email(s);
+- a leader email already used by an account;
+- a team name already taken.
+
+Malformed JSON → `VALIDATION_ERROR` (400), never a 500.
+
+Registration is accepted while the event phase is `registration` or `checkin` (otherwise `CONFLICT` 409 "Registration is closed.") and is rate limited per client IP (`REGISTRATION_RATE_LIMIT_PER_HOUR`, 10 by default → `RATE_LIMITED` 429).
 
 **Request body:**
 
@@ -126,13 +150,13 @@ Public. Registers a team of 3–5 members (leader + 2–4 members). Creates the 
 {
   "teamName": "string (3–60)",
   "leader": { "name": "string", "email": "string", "password": "string (≥12)" },
-  "members": [ { "name": "string", "email?": "string" } ]
+  "members": [ { "name": "string", "email": "string" } ]
 }
 ```
 
 **Response `201`:** `teamResponseSchema` (id, name, progressState `registered`, leader, participants) plus a `badges` array of `issueBadgeResponseSchema` (participantId, participantName, raw token, issuedAt).
 
-Schema: `createTeamRequestSchema` / `teamResponseSchema` + `issueBadgeResponseSchema[]`.
+Schema: `createTeamRequestSchema` / `teamRegistrationResponseSchema` (`teamResponseSchema` + `badges: issueBadgeResponseSchema[]`). The raw tokens are also returned once here; the team can read them again later through `GET /api/participants/badge`.
 
 #### `GET /api/registration/teams/me`
 
@@ -140,9 +164,42 @@ Authenticated as `team`. Returns the authenticated team's own registration: part
 
 Schema: `participantSummarySchema` list wrapped in `teamResponseSchema`.
 
+### Team portal
+
+Team role only. The team is always the authenticated account's own team (`Team.leaderId`); no team id is ever accepted. The team account is shared: the leader gives its credentials to the members.
+
+#### `GET /api/participants/team`
+
+The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). Schema: `teamPortalSummarySchema`.
+
+#### `GET /api/participants/badge`
+
+Every member's QR badge, so any member can show it on a phone at the entrance even if the email failed: `qrToken`, a PNG `qrImageDataUrl`, `color`, `isRevoked`, `isCheckedIn`, and the email state (`emailStatus` `pending|sent|failed`, `emailLastSentAt`, `emailResendAvailableAt`). Revoked badges, and badges issued before encrypted storage existed, have `qrToken: null`. Schema: `teamBadgesResponseSchema`.
+
+#### `POST /api/participants/badge/:participantId/resend-email`
+
+Resends one member's badge email, **at most once per hour per participant**. The limit is claimed atomically from the stored `emailLastSentAt`, so parallel clicks or a server restart cannot bypass it. Too soon → `RATE_LIMITED` (429) with `details.emailResendAvailableAt`. A participant of another team → `NOT_FOUND` (404). Revoked badge or no email → `CONFLICT` (409). A badge without a readable stored token is reissued (the old QR code stops working). Schema: `resendBadgeEmailResponseSchema`.
+
+### Challenges
+
+The event runs two challenges one after the other. An administrator starts and ends each one; both actions are refused (`CONFLICT`, 409) unless the event phase is `live`. Only one challenge can be live at a time (service check plus a partial unique index), challenges start in `position` order, and an ended challenge cannot start again. Starting sets `publicAt = startedAt + publicDelayMinutes` (60 by default).
+
+A team reads a running challenge's description before `publicAt` only if it solved **that challenge's** Mini-CTF (`access: "early"`); from `publicAt`, or once the challenge has ended, every team can (`access: "public"`). Otherwise `access` is `"locked"` and `content` is `null` (title, teaser and `publicAt` stay visible). The Mini-CTF module records a solve with `recordMiniCtfSolve(teamId, challengeId)` (challenges service); that is the only integration point.
+
+#### `GET /api/challenges` · `GET /api/challenges/current` (team)
+
+Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. A team with no member checked in at the entrance: `reason: "NOT_CHECKED_IN"` (challenges are for teams present at the venue). Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
+
+#### Admin (audited)
+
+- `GET /api/admin/challenges` — full content, status, timing, Mini-CTF solve count.
+- `POST /api/admin/challenges` — `{ position, title, summary?, description, problemStatement?, deliverables?, resources?: [{ name, url }], publicDelayMinutes? }`; duplicate position → 409.
+- `PATCH /api/admin/challenges/:id` — content and delay (a delay change moves `publicAt` of a running challenge).
+- `POST /api/admin/challenges/:id/start`, `POST /api/admin/challenges/:id/end` — event must be `live`.
+
 ### Check-in (staff)
 
-Admin-only endpoints. QR tokens are verified against their stored SHA-256 hash; raw token material is never echoed back for validation.
+Admin-only endpoints. QR tokens are verified against their stored SHA-256 hash; raw token material is never echoed back for validation. Scan responses and the badge roster include the participant's badge `color`.
 
 #### `POST /api/checkin/scan`
 
@@ -162,9 +219,9 @@ Revokes a badge token (treated as a credential). Audit entry `checkin.badge_revo
 
 #### `GET /api/checkin/badges`
 
-Returns all badges (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
+Admin only. Returns the badge roster (participant name, team name, issuedAt, revokedAt?, checkedInAt?) for staff review.
 
-Schema: `badgeSummarySchema[]`.
+**Response `200`:** `{ items: badgeSummarySchema[], total }`.
 
 ### Announcements
 
@@ -178,7 +235,11 @@ Admin only. Publishes a live announcement (body 1–500 chars). Records audit en
 
 Any authenticated role (`team`, `jury`, `admin`). Reads the announcement feed, newest first.
 
-Schema: `createAnnouncementRequestSchema` / `announcementSchema`.
+#### `DELETE /api/announcements/:announcementId`
+
+Admin only. Removes a wrong or outdated announcement from every feed. `204`; unknown id → 404. Audited as `announcement.deleted`.
+
+Schema: `createAnnouncementRequestSchema` / `announcementSchema` / `announcementIdParamsSchema`.
 
 Note: real-time delivery transport is pending (OPEN_QUESTIONS #7); clients may poll with the server-provided timestamps until then.
 
@@ -186,9 +247,9 @@ Note: real-time delivery transport is pending (OPEN_QUESTIONS #7); clients may p
 
 #### `GET /api/admin/audit-log`
 
-Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest first. Returns sensitive administrative actions recorded server-side (actions: `event.phase_changed`, `checkin.scan`, `checkin.badge_revoked`, `announcement.published`, `registration.team_created`). Entry `details` are intentionally not exposed.
+Admin only, offset-paginated (limit 1–100, default 50; offset ≥ 0), newest first. Optional `action` query filters by action prefix (e.g. `team.`, `checkin.`, `ctf.`). Returns sensitive administrative actions recorded server-side with their target type and id (actions include `event.phase_changed`, `checkin.scan`, `checkin.manual`, `checkin.undone`, `checkin.badge_revoked`, `badge.reissued`, `badge.email_resent`, `badge.email_bulk_resent`, `team.renamed`, `team.status_changed`, `team.password_reset`, `team.deleted`, `participant.added|updated|removed`, `ctf.solve_granted|revoked`, `challenge.*`, `jury.*`, `announcement.published|deleted`, `registration.team_created`).
 
-**Response `200`:** `{ entries: [{ id, action, actorName?, createdAt }], limit, offset }`.
+**Response `200`:** `{ items: [{ id, action, actorName, targetType?, targetId?, createdAt }], total }`.
 
 Schema: `auditLogListRequestSchema` / `auditLogEntrySchema` list.
 
@@ -278,11 +339,78 @@ Replaying a solved stage returns the same success without a new solve.
 | 409 | `STAGE_NOT_CONFIGURED` | Stage has no answer provisioned |
 | 429 | `RATE_LIMITED` | More than 5 attempts per minute for this stage |
 
-#### `GET /api/challenges/current`
+#### Interaction with the main challenge
 
-`403 CTF_NOT_SOLVED` until every required stage is solved; then
-`{ "unlocked": true, "challenge": null, "message": "..." }` because the main
-brief is not published yet.
+The chain is the single source of truth for Mini-CTF completion: solving the
+last required stage sets the team to `challenge_unlocked`. `GET /api/challenges`
+and `GET /api/challenges/current` then report every running challenge as
+`access: "early"` (or `"public"` once its reveal delay passes); before that they
+report `access: "locked"` with `content: null`. See the challenge section below.
+
+---
+
+### Admin operations toolkit
+
+Admin only; contract in `libs/api-contracts/src/lib/admin-operations-contracts.ts`. These are the fixes organizers apply on event night. Every write is audited in the same transaction as the change, and team/participant writes respond with the refreshed `AdminTeam`.
+
+#### `GET /api/admin/overview`
+
+Situation board aggregates: phase, team counts by standing and progress, check-in coverage (fully / partially / not checked in, per badge color), badge email delivery (sent / pending / failed / missing email), revoked badges, challenge timing with Mini-CTF solve counts, jury account and announcement counts. Schema: `adminOverviewResponseSchema`.
+
+#### `GET /api/admin/teams`, `GET /api/admin/teams/:teamId`
+
+Roster (newest first) / one team: standing (`status`, `statusReason`, `statusChangedAt`), progress, leader account email (the team login), every participant with email, badge color, check-in time and the staff member who recorded it, badge state (`issuedAt`, `revokedAt`, `emailStatus`, `emailLastSentAt` — never the token), and Mini-CTF solves. Schemas: `adminTeamListResponseSchema` / `adminTeamSchema`.
+
+#### Team tools
+
+| Endpoint | Body | Rules |
+|---|---|---|
+| `PATCH /api/admin/teams/:teamId` | `{ name }` | 3–60 chars; taken name → 409. Audit `team.renamed`. |
+| `POST /api/admin/teams/:teamId/status` | `{ status: active\|withdrawn\|disqualified, reason? }` | Reason required unless `active`. A non-active team cannot be checked in (scan → 403, manual → 409) and gets 403 on `/api/challenges*`. Reversible. Audit `team.status_changed`. |
+| `POST /api/admin/teams/:teamId/reset-password` | — | New 16-char password returned once (`temporaryPassword`, hash stored only); every session of the team account is revoked. Audit `team.password_reset`. |
+| `DELETE /api/admin/teams/:teamId` | — | Only in phases `registration`/`checkin` (409 otherwise); deletes team, members, badges and team account. `204`. Audit `team.deleted`. |
+| `POST /api/admin/teams/:teamId/participants` | `{ name, email }` | Max 7 members (409); email unique across teams (409). Balanced badge color, new badge emailed in the background. `201`. Audit `participant.added`. |
+| `POST /api/admin/teams/:teamId/ctf-solves` | `{ challengeId }` | Grants Mini-CTF early access (already granted → 409). `201`. Audit `ctf.solve_granted`. |
+| `DELETE /api/admin/teams/:teamId/ctf-solves/:challengeId` | — | Withdraws it (none → 404). Audit `ctf.solve_revoked`. |
+
+#### Participant tools
+
+| Endpoint | Body | Rules |
+|---|---|---|
+| `PATCH /api/admin/participants/:participantId` | `{ name?, email? }` | Email unique across teams (409). For the leader, the team login email/name change too. Audit `participant.updated`. |
+| `DELETE /api/admin/participants/:participantId` | — | The leader cannot be removed (409). Audit `participant.removed`. |
+| `POST /api/admin/participants/:participantId/check-in` | — | Manual check-in without QR (works with a revoked badge; team must be `active`); already checked in → 409. Audit `checkin.manual`. |
+| `DELETE /api/admin/participants/:participantId/check-in` | — | Undo; a team with no check-in left goes back from `checked_in` to `registered`. Audit `checkin.undone`. |
+| `POST /api/admin/participants/:participantId/reissue-badge` | — | New QR token (old one stops working, revocation lifted), emailed in the background → `{ participantId, issuedAt, emailQueued }`. Audit `badge.reissued`. |
+| `POST /api/admin/badges/resend-failed` | — | Requeues every failed (or stuck > 10 min pending) badge email of a non-revoked badge → `{ queued }`. Audit `badge.email_bulk_resent`. |
+
+Check-in no longer moves a team back to `checked_in` from a later progress state when a late member is scanned (scan and manual check-in both only advance from `registered`).
+
+### Admin jury accounts
+
+Admin only; every route is pinned to `role: 'jury'`, so a team or admin account id answers 404. Mutations are audited (`jury.created`, `jury.updated`, `jury.deleted`). By organizer decision, jury passwords are readable by administrators (see AGENTS.md §9); no other endpoint ever returns them.
+
+#### `GET /api/admin/jury`
+
+`{ items: [{ id, name, email, password, createdAt }], total }`, newest first. `password` is `null` for accounts created before readable passwords existed. Schema: `adminJuryListResponseSchema`.
+
+#### `POST /api/admin/jury`
+
+`{ name, email, password? }` (strict; password ≥ 12). Without `password` the server generates a 16-character one. `201` returns the account with its password. Email already used → `CONFLICT` (409). Schema: `createJuryAccountRequestSchema`.
+
+#### `PATCH /api/admin/jury/:id`
+
+Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`.
+
+#### `DELETE /api/admin/jury/:id`
+
+`204`. Deletes the account; its sessions go with it.
+
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and both are queued as `pending` and emailed in the same run (participants with an email), together with any email left `pending` by a restart. Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
+
+#### `POST /api/admin/participants/:participantId/resend-badge-email`
+
+Resends a participant's badge email without the hourly limit (audited as `badge.email_resent`).
 
 ## Planned Endpoint Groups
 
@@ -299,9 +427,7 @@ From the LilTech specification. Groups below are **contract plans**, not commitm
 | Challenge | Briefs and resources for the unlocked track |
 | Submissions | Team deliverables with deadline enforcement |
 | Announcements | Live announcement feed |
-| Admin teams | Team management |
 | Admin CTF | CTF administration (no flags in public responses) |
-| Admin challenges | Challenge management |
 | Jury | Jury accounts, challenge scoping |
 | Jury scoring | Score entry (own scores only) |
 | Admin jury management | Jury assignment |

@@ -3,6 +3,8 @@ import { createApp } from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { waitForScheduledBadgeEmails } from './modules/badges/badges.service';
+import { runBadgeMaintenance } from './modules/badges/badge-maintenance.service';
 
 /**
  * Server startup — separated from `app.ts` so the Express app itself can be
@@ -21,6 +23,9 @@ if (!env) {
 async function bootstrap(): Promise<void> {
   await connectDatabase();
 
+  // Make every badge readable and re-send emails cut off by a restart.
+  await runBadgeMaintenance();
+
   const app = createApp();
 
   const server = app.listen(env.API_PORT, env.API_HOST, () => {
@@ -35,6 +40,8 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'graceful shutdown started');
     server.close(async () => {
+      // Let queued badge emails finish (bounded by the forced-exit timer below).
+      await waitForScheduledBadgeEmails();
       await disconnectDatabase();
       logger.info('graceful shutdown complete');
       process.exit(0);

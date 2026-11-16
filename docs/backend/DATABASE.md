@@ -13,7 +13,7 @@ Core models (applied via migrations under `apps/api/prisma/migrations/`):
 | `SystemSetting` | pre-existing minimal model (initial schema) |
 | `User` | accounts for roles `team` / `jury` / `admin`; email + `passwordHash` |
 | `Session` | opaque bearer sessions (token hash stored, expiresAt, revokedAt) |
-| `Team` | 3–5 members, `progressState` (`registered → checked_in → ctf_unlocked → ctf_solved → challenge_unlocked → submitted`), leader FK |
+| `Team` | 4–7 members, `progressState` (`registered → checked_in → ctf_unlocked → ctf_solved → challenge_unlocked → submitted`), leader FK, administrative `status` (`active` / `withdrawn` / `disqualified`) with `statusReason` and `statusChangedAt` |
 | `Participant` | team member; one `QrToken` per participant |
 | `QrToken` | raw token stored as SHA-256 hash only; unique per participant; revocable |
 | `CheckInRecord` | who/when/by-whom; unique constraint per participant (single check-in) |
@@ -30,6 +30,9 @@ Three migrations applied to both dev (`liltech`) and test (`liltech_test`) datab
 1. `20261110174519_init_schema` — initial `SystemSetting` model (pre-existing).
 2. `20261110180113_registration_checkin_and_event_state_foundation` — User, Session, Team, Participant, QrToken, CheckInRecord, EventPhaseState, Announcement, AuditLog + enums, FKs, unique constraints, indexes.
 3. `20261110205320_audit_target_id_varchar` — `AuditLog.targetId` widened from `Int` to `VarChar(50)` for UUID targets.
+4. `20261115130000_badge_colors_email_delivery_jury_passwords` — badge colors, badge email delivery state, readable jury passwords.
+5. `20261115140000_challenges_and_ctf_solves` — `Challenge`, `ChallengeCtfSolve`.
+6. `20261115160000_team_status` — `Team.status` (`team_status` enum, default `active`), `statusReason`, `statusChangedAt`, index on `status`. A non-active team cannot be checked in or read challenges.
 
 Commands (Windows notes: this Prisma version does not support `--env-file`; pass `DATABASE_URL` inline):
 

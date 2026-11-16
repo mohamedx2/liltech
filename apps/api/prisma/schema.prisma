@@ -1,16 +1,16 @@
 // LilTech 2026 Platform — Prisma schema
 //
-// The foundation domain covers what the specification defines unambiguously:
-// authentication accounts and sessions, team/participant registration, QR
-// badge tokens, check-in, the event phase state (single writer), live
-// announcements, and the audit log.
+// The domain covers authentication accounts and sessions, team/participant
+// registration (with an administrative team standing), QR badge tokens,
+// check-in, the event phase state (single writer), the two sequential
+// challenges with Mini-CTF early access, live announcements, and the audit log.
 //
 // The Mini-CTF gate (stage 1, "Louage 404") is modelled below: a stage holds
 // only a SHA-256 hash of its answer, teams keep per-stage progress and a
 // timestamped attempt log, and a correct answer unlocks the main challenge.
 //
 // Still intentionally absent (blocked on `docs/decisions/OPEN_QUESTIONS.md`):
-// challenge tracks/assignment, stages 2-7, submissions, jury scoping, scores,
+// Mini-CTF flag material and attempt log, submissions, jury scoping, scores,
 // leaderboards, results. Answers are never stored in plaintext anywhere.
 
 generator client {
@@ -44,19 +44,23 @@ enum Role {
 /// Account for one of the API roles. Created by registration (team) or
 /// administratively (jury/admin — provisioning endpoint pending decision).
 model User {
-  id             String          @id @default(uuid()) @db.Uuid
-  role           Role
-  email          String          @unique @db.VarChar(254)
-  name           String          @db.VarChar(100)
+  id                String          @id @default(uuid()) @db.Uuid
+  role              Role
+  email             String          @unique @db.VarChar(254)
+  name              String          @db.VarChar(100)
   /// bcrypt hash (slow, salted). Never logged, never returned.
-  passwordHash   String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  sessions       Session[]
-  team           Team?
-  checkInRecords CheckInRecord[]
-  auditLogs      AuditLog[]
-  announcements  Announcement[]
+  passwordHash      String
+  /// Jury accounts only: the password kept readable for administrators, who
+  /// hand it to the jury member (organizer decision, AGENTS.md §9). Returned
+  /// exclusively by admin-only endpoints; never logged. Null for other roles.
+  juryPlainPassword String?         @db.VarChar(256)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  sessions          Session[]
+  team              Team?
+  checkInRecords    CheckInRecord[]
+  auditLogs         AuditLog[]
+  announcements     Announcement[]
 
   @@map("users")
 }
@@ -77,21 +81,40 @@ model Session {
   @@map("sessions")
 }
 
-/// Team registered by its leader. 3–5 members (leader included).
+/// Team registered by its leader. 4–7 members (leader included).
 model Team {
-  id            String        @id @default(uuid()) @db.Uuid
-  name          String        @unique @db.VarChar(60)
-  leader        User          @relation(fields: [leaderId], references: [id])
-  leaderId      String        @unique @db.Uuid
-  progressState TeamProgress  @default(registered)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  participants  Participant[]
-  ctfProgress   CtfProgress[]
-  ctfAttempts   CtfAttempt[]
+  id              String              @id @default(uuid()) @db.Uuid
+  name            String              @unique @db.VarChar(60)
+  leader          User                @relation(fields: [leaderId], references: [id])
+  leaderId        String              @unique @db.Uuid
+  progressState   TeamProgress        @default(registered)
+  /// Administrative standing; a team that is not `active` cannot be checked
+  /// in and cannot read challenges.
+  status          TeamStatus          @default(active)
+  /// Why the team was withdrawn or disqualified (shown to administrators).
+  statusReason    String?             @db.VarChar(300)
+  statusChangedAt DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  participants    Participant[]
+  /// LOUAGE 404 chain: per-stage state and the timestamped attempt log.
+  ctfProgress     CtfProgress[]
+  ctfAttempts     CtfAttempt[]
+  /// Per-challenge Mini-CTF solves (early access to a running challenge).
+  ctfSolves       ChallengeCtfSolve[]
 
   @@index([progressState])
+  @@index([status])
   @@map("teams")
+}
+
+/// Administrative standing of a team, set by administrators (audited).
+enum TeamStatus {
+  active
+  withdrawn
+  disqualified
+
+  @@map("team_status")
 }
 
 /// Team progress through the event (canonical states from the specification).
@@ -113,26 +136,58 @@ model Participant {
   teamId    String         @db.Uuid
   name      String         @db.VarChar(100)
   isLeader  Boolean
-  /// Optional contact email — delivery transport is pending (open question 8).
+  /// Contact email; the QR badge is delivered here. Required for new
+  /// registrations (nullable for teams registered before it was required).
+  /// Unique across all teams — enforced in the registration transaction.
   email     String?        @db.VarChar(254)
+  /// Badge color, balanced across all participants at registration time.
+  color     BadgeColor?
   createdAt DateTime       @default(now())
   badge     QrToken?
   checkIn   CheckInRecord?
 
   @@index([teamId])
+  @@index([email])
+  @@index([color])
   @@map("participants")
+}
+
+/// The four badge colors participants are spread across.
+enum BadgeColor {
+  blue
+  red
+  yellow
+  green
+
+  @@map("badge_color")
+}
+
+/// Delivery state of a participant's badge email.
+enum BadgeEmailStatus {
+  pending
+  sent
+  failed
+
+  @@map("badge_email_status")
 }
 
 /// One QR badge per participant. The raw token is high-entropy
 /// (32 bytes, base64url) and only its SHA-256 digest is persisted; the badge
 /// is revocable (credential semantics).
 model QrToken {
-  id            String      @id @default(uuid()) @db.Uuid
-  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  participantId String      @unique @db.Uuid
-  tokenHash     String      @unique @db.VarChar(64)
-  issuedAt      DateTime    @default(now())
-  revokedAt     DateTime?
+  id              String            @id @default(uuid()) @db.Uuid
+  participant     Participant       @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId   String            @unique @db.Uuid
+  tokenHash       String            @unique @db.VarChar(64)
+  /// AES-256-GCM encryption of the raw token under `QR_TOKEN_KEY`, so the
+  /// owning team can display its badges again. Null for badges issued before
+  /// this column existed. Never logged, never returned to anyone but the team.
+  tokenCiphertext String?           @db.VarChar(255)
+  issuedAt        DateTime          @default(now())
+  revokedAt       DateTime?
+  /// Last badge email attempt (successful or not) — drives the resend limit.
+  emailLastSentAt DateTime?
+  emailStatus     BadgeEmailStatus?
 
   @@map("qr_tokens")
 }
@@ -182,10 +237,66 @@ model AuditLog {
   /// Identifier of the audited target; semantics depend on `targetType`
   /// (e.g. the fixed `1` of the event phase state row).
   targetId   String?  @db.VarChar(50)
+  /// Short human-readable context, e.g. `registration -> checkin`. Never
+  /// holds secrets or personal data.
+  summary    String?  @db.VarChar(200)
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
   @@map("audit_log")
+}
+
+/// Lifecycle of one main challenge, driven by administrators while the
+/// event phase is `live`.
+enum ChallengeStatus {
+  upcoming
+  live
+  ended
+
+  @@map("challenge_status")
+}
+
+/// One main challenge. Challenges run one after the other (`position`). When
+/// a challenge starts, teams that solved its Mini-CTF can read it at once;
+/// everyone else from `publicAt` (start + `publicDelayMinutes`).
+model Challenge {
+  id                 String              @id @default(uuid()) @db.Uuid
+  position           Int                 @unique
+  title              String              @db.VarChar(150)
+  /// Teaser shown to every team before the description unlocks.
+  summary            String              @default("") @db.VarChar(500)
+  description        String
+  problemStatement   String              @default("")
+  deliverables       String[]            @default([])
+  /// `[{ name, url }]`, validated by the API contract.
+  resources          Json                @default("[]")
+  publicDelayMinutes Int                 @default(60)
+  status             ChallengeStatus     @default(upcoming)
+  startedAt          DateTime?
+  endedAt            DateTime?
+  publicAt           DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ctfSolves          ChallengeCtfSolve[]
+
+  @@index([status])
+  @@map("challenges")
+}
+
+/// A team solved the Mini-CTF of a challenge, which gives it early access to
+/// that challenge's description. Written by the Mini-CTF module through
+/// `recordMiniCtfSolve`; one row per team and challenge.
+model ChallengeCtfSolve {
+  id          String    @id @default(uuid()) @db.Uuid
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId String    @db.Uuid
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String    @db.Uuid
+  solvedAt    DateTime  @default(now())
+
+  @@unique([challengeId, teamId])
+  @@index([teamId])
+  @@map("challenge_ctf_solves")
 }
 
 /// Live announcement feed.

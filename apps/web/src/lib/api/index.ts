@@ -1,12 +1,14 @@
 import type { HealthResponse } from 'api-contracts';
 import { env } from '../../config/env';
-import { getAuthToken } from './auth-token';
+import { createAdminApi, type AdminApi } from './modules/admin';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
 import { createCtfApi, type CtfApi } from './modules/ctf';
+import { createCheckinApi, type CheckinApi } from './modules/checkin';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
+import { createJuryApi, type JuryApi } from './modules/jury';
 import { createMiniCtfApi, type MiniCtfApi } from './modules/mini-ctf';
 import { createParticipantsApi, type ParticipantsApi } from './modules/participants';
 import { createRegistrationsApi, type RegistrationsApi } from './modules/registrations';
@@ -33,28 +35,17 @@ export interface ApiClient {
   registrations: RegistrationsApi;
   participants: ParticipantsApi;
   miniCtf: MiniCtfApi;
+  /** LOUAGE 404 seven-stage chain (`apps/api/src/modules/ctf`). */
   ctf: CtfApi;
   challenges: ChallengesApi;
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
+  jury: JuryApi;
+  checkin: CheckinApi;
+  admin: AdminApi;
 }
 
-/**
- * Attaches the stored session token to every request that does not set its own.
- * Centralising it here keeps components and modules free of token plumbing.
- */
-function withSessionToken(transport: ApiTransport): ApiTransport {
-  return {
-    request: <TResponse>(path: string, config: ApiRequestConfig = {}) => {
-      const token = config.authToken ?? getAuthToken();
-
-      return transport.request<TResponse>(path, token ? { ...config, authToken: token } : config);
-    },
-  };
-}
-
-export function createApiClient(baseTransport: ApiTransport): ApiClient {
-  const transport = withSessionToken(baseTransport);
+export function createApiClient(transport: ApiTransport): ApiClient {
   const health = createHealthApi(transport);
 
   return {
@@ -69,6 +60,9 @@ export function createApiClient(baseTransport: ApiTransport): ApiClient {
     challenges: createChallengesApi(transport),
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),
+    jury: createJuryApi(transport),
+    checkin: createCheckinApi(transport),
+    admin: createAdminApi(transport),
   };
 }
 

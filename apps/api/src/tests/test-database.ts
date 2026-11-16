@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { waitForScheduledBadgeEmails } from '../modules/badges/badges.service';
 
 /**
  * Integration-test helpers.
@@ -28,6 +29,9 @@ export function INTEGRATION_DB_AVAILABLE(): boolean {
 let prisma: PrismaClient | null = null;
 
 export async function resetIntegrationDatabase(): Promise<void> {
+  // Background badge emails from the previous test must not write into the
+  // next one.
+  await waitForScheduledBadgeEmails();
   if (!prisma) {
     throw new Error('Integration test database not initialized.');
   }
@@ -35,6 +39,8 @@ export async function resetIntegrationDatabase(): Promise<void> {
     // CTF first: stages cascade to hints, progress and attempts, and deleting
     // them keeps fixtures from leaking into the next test.
     prisma.ctfStage.deleteMany(),
+    prisma.challengeCtfSolve.deleteMany(),
+    prisma.challenge.deleteMany(),
     prisma.checkInRecord.deleteMany(),
     prisma.qrToken.deleteMany(),
     prisma.participant.deleteMany(),

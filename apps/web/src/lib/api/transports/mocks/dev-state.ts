@@ -1,11 +1,19 @@
-import { ChallengeTrack, EventPhase, Role, TeamProgressState } from 'api-contracts';
+import {
+  ChallengeTrack,
+  EventPhase,
+  Role,
+  TeamProgressState,
+  type AuditLogEntry,
+  type BadgeSummary,
+} from 'api-contracts';
 import type {
   AnnouncementItem,
   AuthUser,
-  BadgePassResponse,
   ChallengeDetailResponse,
+  JuryTeamItem,
   MiniCtfStatusResponse,
   SubmissionItem,
+  TeamBadgesResponse,
   TeamSummary,
 } from '../../contracts/pending';
 
@@ -49,16 +57,30 @@ export const DEV_MOCK_USERS: readonly AuthUser[] = [
 export interface DevMockState {
   currentUser: AuthUser | null;
   phase: EventPhase;
+  /** Mock stand-in for the server-owned phase entry timestamp. */
+  phaseChangedAt: string;
   registeredTeamEmails: Map<string, AuthUser>;
 
   /** Participant portal mock domain (provisional contracts, see `pending.ts`). */
   team: TeamSummary;
-  badge: BadgePassResponse;
+  badge: TeamBadgesResponse;
   ctf: Omit<MiniCtfStatusResponse, 'isOpen'> & { mockAcceptableFlag: string };
   challenge: ChallengeDetailResponse;
   submissions: SubmissionItem[];
   announcements: AnnouncementItem[];
   rateLimitAttempts: number;
+  juryTeams: JuryTeamItem[];
+  juryEvaluations: Map<
+    string,
+    {
+      criteriaScores: Record<string, number>;
+      notes: string;
+      totalScore: number;
+      evaluatedAt: string;
+    }
+  >;
+  auditLog: AuditLogEntry[];
+  badges: BadgeSummary[];
 }
 
 /**
@@ -69,50 +91,114 @@ const SUBMISSION_DEADLINE = '2026-11-22T08:00:00.000Z';
 function createPortalState() {
   return {
     team: {
-      id: 'dev-team-01',
+      id: '7d1c2f3e-0000-4000-8000-000000000001',
       name: 'Sample Builders (Dev Mock)',
-      track: ChallengeTrack.TrackA,
       progress: TeamProgressState.CheckedIn,
       isCheckedIn: true,
       members: [
         {
-          id: 'usr-part-01',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a1',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Team Leader',
           email: 'team@liltech.mock',
-          phone: '+216 20 123 456',
           roleInTeam: 'leader' as const,
+          color: 'blue' as const,
           isCheckedIn: true,
         },
         {
-          id: 'usr-part-02',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a2',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Teammate One',
           email: 'teammate1@liltech.mock',
-          phone: '+216 20 234 567',
           roleInTeam: 'member' as const,
+          color: 'red' as const,
           isCheckedIn: true,
         },
         {
-          id: 'usr-part-03',
-          teamId: 'dev-team-01',
+          id: '7d1c2f3e-0000-4000-8000-0000000000a3',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
           fullName: 'Mock Teammate Two',
           email: 'teammate2@liltech.mock',
-          phone: '+216 20 345 678',
           roleInTeam: 'member' as const,
+          color: 'yellow' as const,
+          isCheckedIn: false,
+        },
+        {
+          id: '7d1c2f3e-0000-4000-8000-0000000000a4',
+          teamId: '7d1c2f3e-0000-4000-8000-000000000001',
+          fullName: 'Mock Teammate Three',
+          email: 'teammate3@liltech.mock',
+          roleInTeam: 'member' as const,
+          color: 'green' as const,
           isCheckedIn: false,
         },
       ],
     },
     badge: {
-      participantId: 'usr-part-01',
-      participantName: 'Mock Team Leader',
-      teamId: 'dev-team-01',
+      teamId: '7d1c2f3e-0000-4000-8000-000000000001',
       teamName: 'Sample Builders (Dev Mock)',
-      track: ChallengeTrack.TrackA,
-      // Accessible SVG placeholder for the emailed QR badge
-      qrData: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/><rect x="90" y="30" width="20" height="20"/><rect x="30" y="90" width="20" height="20"/><rect x="150" y="90" width="20" height="20"/><rect x="90" y="150" width="20" height="20"/></svg>`,
-      qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-TOKEN',
+      badges: [
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a1',
+          participantName: 'Mock Team Leader',
+          roleInTeam: 'leader' as const,
+          color: 'blue' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-1',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: true,
+          email: 'team@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a2',
+          participantName: 'Mock Teammate One',
+          roleInTeam: 'member' as const,
+          color: 'red' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-2',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: true,
+          email: 'teammate1@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a3',
+          participantName: 'Mock Teammate Two',
+          roleInTeam: 'member' as const,
+          color: 'yellow' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-3',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'teammate2@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+        {
+          participantId: '7d1c2f3e-0000-4000-8000-0000000000a4',
+          participantName: 'Mock Teammate Three',
+          roleInTeam: 'member' as const,
+          color: 'green' as const,
+          // Placeholder image — never a real badge token.
+          qrToken: 'LILTECH-2026-DEV-MOCK-BADGE-4',
+          qrImageDataUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23ffffff"/><rect x="20" y="20" width="40" height="40"/><rect x="140" y="20" width="40" height="40"/><rect x="20" y="140" width="40" height="40"/><rect x="80" y="80" width="40" height="40"/></svg>`,
+          isRevoked: false,
+          isCheckedIn: false,
+          email: 'teammate3@liltech.mock',
+          emailStatus: 'sent' as const,
+          emailLastSentAt: '2026-11-15T10:00:00.000Z',
+          emailResendAvailableAt: null,
+        },
+      ],
     },
     ctf: {
       isSolved: false,
@@ -138,9 +224,21 @@ function createPortalState() {
         'Demonstration video or live deployment URL',
       ],
       resources: [
-        { name: 'Urban Telemetry Dataset (GeoJSON/CSV)', url: '#', size: '2.4 MB' },
-        { name: 'API Protocol Specification (.pdf)', url: '#', size: '420 KB' },
-        { name: 'Benchmark Evaluation Script (.py)', url: '#', size: '18 KB' },
+        {
+          name: 'Urban Telemetry Dataset (GeoJSON/CSV)',
+          url: 'https://liltechsousse.com/resources',
+          size: '2.4 MB',
+        },
+        {
+          name: 'API Protocol Specification (.pdf)',
+          url: 'https://liltechsousse.com/resources',
+          size: '420 KB',
+        },
+        {
+          name: 'Benchmark Evaluation Script (.py)',
+          url: 'https://liltechsousse.com/resources',
+          size: '18 KB',
+        },
       ],
     },
     submissions: [
@@ -183,15 +281,197 @@ function createPortalState() {
       },
     ],
     rateLimitAttempts: 0,
+    juryTeams: [
+      {
+        id: 'dev-team-01',
+        name: 'Sample Builders (Dev Mock)',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 3,
+        submitted: true,
+        submittedAt: '2026-11-21T21:15:00.000Z',
+        submissionTitle: 'Initial Architecture Draft & Prototype',
+        submissionRepoUrl: 'https://github.com/sample-builders/liltech-dispatcher',
+        submissionFileName: 'prototype-v1.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-02',
+        name: 'Quantum Coders',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 4,
+        submitted: true,
+        submittedAt: '2026-11-21T22:45:00.000Z',
+        submissionTitle: 'Neural Fleet Optimization Dispatcher',
+        submissionRepoUrl: 'https://github.com/quantum-coders/fleet-ai',
+        submissionFileName: 'quantum-dispatcher-v2.tar.gz',
+        evaluationStatus: 'graded' as const,
+        myScore: 88,
+        evaluatedAt: '2026-11-22T09:30:00.000Z',
+      },
+      {
+        id: 'dev-team-03',
+        name: 'Algorithmic Titans',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.Submitted,
+        membersCount: 4,
+        submitted: true,
+        submittedAt: '2026-11-22T04:10:00.000Z',
+        submissionTitle: 'Dynamic Urban Route Clustering',
+        submissionRepoUrl: 'https://github.com/algo-titans/route-clustering',
+        submissionFileName: 'algo-titans-solution.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-04',
+        name: 'DeepRoute Innovators',
+        track: ChallengeTrack.TrackA,
+        progress: TeamProgressState.ChallengeUnlocked,
+        membersCount: 3,
+        submitted: false,
+        submittedAt: null,
+        submissionTitle: null,
+        submissionRepoUrl: null,
+        submissionFileName: null,
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+      {
+        id: 'dev-team-05',
+        name: 'CloudNexus Systems',
+        track: ChallengeTrack.TrackB,
+        progress: TeamProgressState.Submitted,
+        membersCount: 5,
+        submitted: true,
+        submittedAt: '2026-11-22T03:00:00.000Z',
+        submissionTitle: 'Serverless IoT Mesh Controller',
+        submissionRepoUrl: 'https://github.com/cloudnexus/iot-controller',
+        submissionFileName: 'cloudnexus-iot.zip',
+        evaluationStatus: 'pending' as const,
+        myScore: null,
+        evaluatedAt: null,
+      },
+    ],
+    juryEvaluations: new Map([
+      [
+        'dev-team-02',
+        {
+          criteriaScores: {
+            technical_execution: 22,
+            innovation_originality: 23,
+            ui_ux_design: 21,
+            pitch_presentation: 22,
+          },
+          notes:
+            'Very impressive neural network approach to traffic rerouting. Presentation was clear and defended architectural trade-offs well.',
+          totalScore: 88,
+          evaluatedAt: '2026-11-22T09:30:00.000Z',
+        },
+      ],
+    ]),
+    auditLog: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        action: 'event.phase_changed',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T18:00:00.000Z',
+      },
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        action: 'registration.team_created',
+        actorName: null,
+        createdAt: '2026-11-21T18:15:00.000Z',
+      },
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        action: 'checkin.scan',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T18:30:00.000Z',
+      },
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        action: 'announcement.published',
+        actorName: 'Mock Organizer Admin',
+        createdAt: '2026-11-21T19:30:00.000Z',
+      },
+    ],
+    badges: [
+      {
+        participantId: '00000000-0000-4000-8000-000000000001',
+        participantName: 'Mock Team Leader',
+        teamName: 'Sample Builders (Dev Mock)',
+        color: 'blue' as const,
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: '2026-11-21T18:30:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000002',
+        participantName: 'Mock Teammate One',
+        teamName: 'Sample Builders (Dev Mock)',
+        color: 'red' as const,
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: '2026-11-21T18:45:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000003',
+        participantName: 'Mock Teammate Two',
+        teamName: 'Sample Builders (Dev Mock)',
+        color: 'yellow' as const,
+        issuedAt: '2026-11-20T10:00:00.000Z',
+        checkedInAt: undefined,
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000004',
+        participantName: 'Kais Ben Ali',
+        teamName: 'Quantum Coders',
+        color: 'green' as const,
+        issuedAt: '2026-11-20T11:00:00.000Z',
+        checkedInAt: '2026-11-21T19:00:00.000Z',
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000005',
+        participantName: 'Nour Trabelsi',
+        teamName: 'Quantum Coders',
+        color: 'blue' as const,
+        issuedAt: '2026-11-20T11:00:00.000Z',
+        checkedInAt: undefined,
+      },
+      {
+        participantId: '00000000-0000-4000-8000-000000000006',
+        participantName: 'Yassine Gharbi',
+        teamName: 'Algorithmic Titans',
+        color: 'red' as const,
+        issuedAt: '2026-11-20T12:00:00.000Z',
+        checkedInAt: undefined,
+      },
+    ],
   } satisfies Pick<
     DevMockState,
-    'team' | 'badge' | 'ctf' | 'challenge' | 'submissions' | 'announcements' | 'rateLimitAttempts'
+    | 'team'
+    | 'badge'
+    | 'ctf'
+    | 'challenge'
+    | 'submissions'
+    | 'announcements'
+    | 'rateLimitAttempts'
+    | 'juryTeams'
+    | 'juryEvaluations'
+    | 'auditLog'
+    | 'badges'
   >;
 }
 
 const initialState = (): DevMockState => ({
   currentUser: null,
   phase: EventPhase.Registration,
+  // Event kickoff reference timestamp from the LilTech specification (Nov 21, 2026 19:00 UTC / 20:00 CET)
+  phaseChangedAt: '2026-11-21T19:00:00.000Z',
   registeredTeamEmails: new Map(),
   ...createPortalState(),
 });
@@ -201,6 +481,7 @@ export const devMockState: DevMockState = initialState();
 export function resetDevMockState(): void {
   devMockState.currentUser = null;
   devMockState.phase = EventPhase.Registration;
+  devMockState.phaseChangedAt = '2026-11-21T19:00:00.000Z';
   devMockState.registeredTeamEmails.clear();
   Object.assign(devMockState, createPortalState());
 }

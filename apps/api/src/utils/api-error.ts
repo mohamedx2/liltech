@@ -53,12 +53,18 @@ export class ApiError extends Error {
     return new ApiError(ApiErrorCode.NOT_FOUND, message, 404);
   }
 
-  static conflict(message = 'The request conflicts with the current state.'): ApiError {
-    return new ApiError(ApiErrorCode.CONFLICT, message, 409);
+  static conflict(
+    message = 'The request conflicts with the current state.',
+    details?: unknown,
+  ): ApiError {
+    return new ApiError(ApiErrorCode.CONFLICT, message, 409, details);
   }
 
-  static rateLimited(message = 'Too many requests. Please slow down.'): ApiError {
-    return new ApiError(ApiErrorCode.RATE_LIMITED, message, 429);
+  static rateLimited(
+    message = 'Too many requests. Please slow down.',
+    details?: unknown,
+  ): ApiError {
+    return new ApiError(ApiErrorCode.RATE_LIMITED, message, 429, details);
   }
 
   static ctfNotSolved(): ApiError {

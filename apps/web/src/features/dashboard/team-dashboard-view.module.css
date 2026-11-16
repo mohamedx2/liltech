@@ -107,8 +107,6 @@
   gap: var(--space-6);
 }
 
-@media (min-width: 60rem) {
-  .bottomGrid {
-    grid-template-columns: 1fr 1.2fr;
-  }
+.bottomGrid > * {
+  min-width: 0;
 }

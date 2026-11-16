@@ -36,6 +36,8 @@ const FIXTURE_STAGES = [1, 2, 3, 4, 5, 6, 7].map((position) => ({
 describeDb('LOUAGE 404 chain', () => {
   let app: Express;
   let prisma: PrismaClient;
+  /** Admin used for check-in records and the challenge setup. */
+  let adminUserId: string;
 
   beforeAll(async () => {
     process.env.CTF_ANSWER_PEPPER = TEST_PEPPER;
@@ -49,6 +51,14 @@ describeDb('LOUAGE 404 chain', () => {
 
   beforeEach(async () => {
     await resetIntegrationDatabase();
+
+    const admin = await createUser({
+      role: 'admin',
+      name: 'CTF Admin',
+      email: 'ctf-admin@test.local',
+      passwordHash: await hashPassword(LEADER_PASSWORD),
+    });
+    adminUserId = admin.id;
 
     for (const stage of FIXTURE_STAGES) {
       await prisma.ctfStage.create({
@@ -79,7 +89,11 @@ describeDb('LOUAGE 404 chain', () => {
       .send({
         teamName: `CTF ${suffix}`,
         leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD },
-        members: [{ name: 'Member One' }, { name: 'Member Two' }],
+        members: [
+          { name: 'Member One', email: `one.${email}` },
+          { name: 'Member Two', email: `two.${email}` },
+          { name: 'Member Three', email: `three.${email}` },
+        ],
       });
 
     expect(response.status).toBe(201);
@@ -101,6 +115,51 @@ describeDb('LOUAGE 404 chain', () => {
       where: { id: teamId },
       data: { progressState: 'checked_in' },
     });
+
+    // The challenge module reads the venue check-in record, not just the team
+    // progress state, so a real check-in writes both.
+    const leader = await prisma.participant.findFirstOrThrow({
+      where: { teamId, isLeader: true },
+      select: { id: true },
+    });
+    await prisma.checkInRecord.create({
+      data: { participantId: leader.id, checkedByUserId: adminUserId },
+    });
+  }
+
+  /**
+   * Puts the event live with one running challenge whose public reveal is far
+   * away, so challenge access is decided only by Mini-CTF completion.
+   */
+  async function liveRunningChallenge(): Promise<void> {
+    const { token } = await createSessionForUser(adminUserId);
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const phase = await request(app)
+      .post('/api/event-state')
+      .set(auth)
+      .send({ phase: 'live', force: true });
+    expect(phase.status).toBe(200);
+
+    const created = await request(app)
+      .post('/api/admin/challenges')
+      .set(auth)
+      .send({
+        position: 1,
+        title: 'Main challenge',
+        summary: 'Teaser',
+        description: 'Full description',
+        problemStatement: 'Problem statement',
+        deliverables: ['A repository'],
+        resources: [],
+        publicDelayMinutes: 600,
+      });
+    expect(created.status).toBe(201);
+
+    const started = await request(app)
+      .post(`/api/admin/challenges/${created.body.id}/start`)
+      .set(auth);
+    expect(started.status).toBe(200);
   }
 
   async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
@@ -347,6 +406,7 @@ describeDb('LOUAGE 404 chain', () => {
 
   it('keeps the main challenge locked until every required stage is solved', async () => {
     const team = await readyTeam('main-locked');
+    await liveRunningChallenge();
 
     for (let index = 0; index < FIXTURE_STAGES.length - 1; index++) {
       const stage = FIXTURE_STAGES[index];
@@ -354,11 +414,16 @@ describeDb('LOUAGE 404 chain', () => {
       expect(solved.status).toBe(200);
     }
 
+    // Challenge access is the merged contract: a running challenge whose public
+    // reveal has not happened yet stays `locked` (no content) until the chain is
+    // finished, then becomes `early`.
     const beforeLast = await request(app)
       .get('/api/challenges/current')
       .set('Authorization', `Bearer ${team.token}`);
-    expect(beforeLast.status).toBe(403);
-    expect(beforeLast.body.error.code).toBe('CTF_NOT_SOLVED');
+    expect(beforeLast.status).toBe(200);
+    expect(beforeLast.body.available).toBe(true);
+    expect(beforeLast.body.current.access).toBe('locked');
+    expect(beforeLast.body.current.content).toBeNull();
 
     const last = FIXTURE_STAGES[FIXTURE_STAGES.length - 1];
     const solved = await submit(team.token, last.slug, last.answer);
@@ -368,7 +433,9 @@ describeDb('LOUAGE 404 chain', () => {
       .get('/api/challenges/current')
       .set('Authorization', `Bearer ${team.token}`);
     expect(after.status).toBe(200);
-    expect(after.body.unlocked).toBe(true);
+    expect(after.body.available).toBe(true);
+    expect(after.body.current.access).toBe('early');
+    expect(after.body.current.content).not.toBeNull();
 
     const teamRow = await prisma.team.findUnique({ where: { id: team.teamId } });
     expect(teamRow?.progressState).toBe('challenge_unlocked');
@@ -410,10 +477,14 @@ describeDb('LOUAGE 404 chain', () => {
     const later = await submit(team.token, 'fixture-06', FIXTURE_STAGES[5].answer);
     expect(later.status).toBe(403);
 
+    await liveRunningChallenge();
+
     const main = await request(app)
       .get('/api/challenges/current')
       .set('Authorization', `Bearer ${team.token}`);
-    expect(main.status).toBe(403);
+    expect(main.status).toBe(200);
+    expect(main.body.current.access).toBe('locked');
+    expect(main.body.current.content).toBeNull();
   });
 
   it('never exposes answers, digests or the pepper', async () => {

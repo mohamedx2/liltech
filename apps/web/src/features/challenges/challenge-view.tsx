@@ -3,40 +3,65 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiClientError } from '@/lib/api';
-import type { ChallengeDetailResponse } from '@/lib/api/contracts/pending';
-import { getTrackLabel } from '@/lib/format';
+import type { CurrentChallengeResponse } from 'api-contracts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button';
-import { Alert } from '@/components/feedback/alert';
 import { LockIcon } from '@/components/icons/lock-icon';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import styles from './challenge-view.module.css';
 
+function formatTime(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+function NoticeCard({
+  badge,
+  title,
+  description,
+  children,
+}: {
+  badge: string;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={styles.lockedContainer}>
+      <Card surface="default" className={styles.lockedCard}>
+        <CardHeader>
+          <div className={styles.lockedBadgeRow}>
+            <Badge tone="warning" showDot>
+              {badge}
+            </Badge>
+          </div>
+          <div className={styles.lockedTitle}>
+            <LockIcon size={24} />
+            <CardTitle as="h1">{title}</CardTitle>
+          </div>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        {children ? <CardContent className={styles.lockedContent}>{children}</CardContent> : null}
+      </Card>
+    </div>
+  );
+}
+
 export function ChallengeView() {
-  const [challenge, setChallenge] = useState<ChallengeDetailResponse | null>(null);
+  const [response, setResponse] = useState<CurrentChallengeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLockedByCtf, setIsLockedByCtf] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadChallenge = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
-    setIsLockedByCtf(false);
 
     try {
-      const data = await api.challenges.getCurrentChallenge();
-      setChallenge(data);
+      setResponse(await api.challenges.getCurrentChallenge());
     } catch (err) {
-      if (err instanceof ApiClientError) {
-        if (err.code === 'CTF_NOT_SOLVED') {
-          setIsLockedByCtf(true);
-        } else {
-          setErrorMessage(err.message);
-        }
-      } else {
-        setErrorMessage('Failed to load challenge workspace.');
-      }
+      setErrorMessage(
+        err instanceof ApiClientError ? err.message : 'Failed to load the challenge.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -47,51 +72,14 @@ export function ChallengeView() {
   }, [loadChallenge]);
 
   if (isLoading) {
-    return <LoadingState message="Decrypting and loading your track challenge brief..." />;
+    return <LoadingState message="Loading the challenge..." />;
   }
 
-  if (isLockedByCtf) {
-    return (
-      <div className={styles.lockedContainer}>
-        <Card surface="default" className={styles.lockedCard}>
-          <CardHeader>
-            <div className={styles.lockedBadgeRow}>
-              <Badge tone="warning" showDot>
-                Challenge Locked
-              </Badge>
-            </div>
-            <div className={styles.lockedTitle}>
-              <LockIcon size={24} />
-              <CardTitle as="h1">Mini-CTF clearance required</CardTitle>
-            </div>
-            <CardDescription>
-              Unlock condition: submit a valid Mini-CTF flag. Your challenge brief and resources
-              stay locked until the server confirms the solve.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className={styles.lockedContent}>
-            <Alert tone="warning" title="Solve the Mini-CTF First">
-              Head to the Mini-CTF gate to investigate the challenge and submit the required flag.
-            </Alert>
-            <div className={styles.actionRow}>
-              <Link
-                href="/team/ctf"
-                className={buttonClassName({ variant: 'primary', size: 'lg' })}
-              >
-                Go to Mini-CTF Gate →
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (errorMessage || !challenge) {
+  if (errorMessage || !response) {
     return (
       <ErrorState
         title="Challenge Unavailable"
-        message={errorMessage ?? 'Could not retrieve challenge brief.'}
+        message={errorMessage ?? 'Could not retrieve the challenge.'}
         onRetry={() => {
           loadChallenge();
         }}
@@ -99,7 +87,61 @@ export function ChallengeView() {
     );
   }
 
-  const trackLabel = getTrackLabel(challenge.track);
+  if (!response.available) {
+    return (
+      <NoticeCard
+        badge={
+          response.reason === 'EVENT_NOT_STARTED'
+            ? 'Not Started'
+            : response.reason === 'NOT_CHECKED_IN'
+              ? 'Check-in Required'
+              : 'Waiting'
+        }
+        title={
+          response.reason === 'EVENT_NOT_STARTED'
+            ? "The hackathon hasn't started yet"
+            : response.reason === 'NOT_CHECKED_IN'
+              ? 'Your team is not checked in yet'
+              : 'No challenge has started yet'
+        }
+        description={response.message}
+      />
+    );
+  }
+
+  const { challenge: schedule, access, content } = response.current;
+
+  if (access === 'locked' || !content) {
+    const opensAt = schedule.status === 'live' ? formatTime(schedule.publicAt) : '';
+    return (
+      <NoticeCard
+        badge="Challenge Locked"
+        title={schedule.title}
+        description={
+          opensAt
+            ? `The description opens for every team at ${opensAt}. Solve this challenge's Mini-CTF to read it now.`
+            : 'This challenge has not started yet.'
+        }
+      >
+        {schedule.summary ? <p className={styles.overview}>{schedule.summary}</p> : null}
+        {opensAt ? (
+          <div className={styles.actionRow}>
+            <Link href="/team/ctf" className={buttonClassName({ variant: 'primary', size: 'lg' })}>
+              Go to Mini-CTF Gate →
+            </Link>
+          </div>
+        ) : null}
+      </NoticeCard>
+    );
+  }
+
+  const challenge = {
+    title: schedule.title,
+    description: content.description,
+    problemStatement: content.problemStatement,
+    deliverablesRequirements: content.deliverables,
+    resources: content.resources,
+  };
 
   return (
     <div className={styles.container}>
@@ -107,9 +149,14 @@ export function ChallengeView() {
         <div className={styles.headerTitles}>
           <div className={styles.trackBadgeRow}>
             <Badge tone="info" showDot>
-              Assigned Track: {trackLabel}
+              Challenge {schedule.position}
             </Badge>
-            <Badge tone="success">Challenge Active</Badge>
+            <Badge tone={schedule.status === 'live' ? 'success' : 'neutral'}>
+              {schedule.status === 'live' ? 'Challenge Active' : 'Challenge Ended'}
+            </Badge>
+            {access === 'early' ? (
+              <Badge tone="warning">Early access (Mini-CTF solved)</Badge>
+            ) : null}
           </div>
           <h1 className={styles.title}>{challenge.title}</h1>
           <p className={styles.overview}>{challenge.description}</p>
@@ -137,8 +184,7 @@ export function ChallengeView() {
         <CardHeader>
           <CardTitle as="h2">Deliverable Requirements</CardTitle>
           <CardDescription>
-            Ensure your submission satisfies all required specifications prior to the 08:00 UTC
-            deadline.
+            Make sure your submission covers every requirement below.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -184,15 +230,15 @@ export function ChallengeView() {
                   </svg>
                   <div>
                     <h3 className={styles.resourceName}>{res.name}</h3>
-                    {res.size && <span className={styles.resourceSize}>{res.size}</span>}
                   </div>
                 </div>
                 <a
                   href={res.url}
-                  download={res.name}
+                  target="_blank"
+                  rel="noreferrer noopener"
                   className={buttonClassName({ variant: 'outline', size: 'sm' })}
                 >
-                  Download
+                  Open
                 </a>
               </div>
             ))}

@@ -16,6 +16,28 @@ export const AuditAction = {
   BadgeRevoked: 'checkin.badge_revoked',
   AnnouncementPublished: 'announcement.published',
   TeamCreated: 'registration.team_created',
+  BadgeEmailResent: 'badge.email_resent',
+  JuryCreated: 'jury.created',
+  JuryUpdated: 'jury.updated',
+  JuryDeleted: 'jury.deleted',
+  ChallengeCreated: 'challenge.created',
+  ChallengeUpdated: 'challenge.updated',
+  ChallengeStarted: 'challenge.started',
+  ChallengeEnded: 'challenge.ended',
+  AnnouncementDeleted: 'announcement.deleted',
+  TeamRenamed: 'team.renamed',
+  TeamStatusChanged: 'team.status_changed',
+  TeamPasswordReset: 'team.password_reset',
+  TeamDeleted: 'team.deleted',
+  ParticipantAdded: 'participant.added',
+  ParticipantUpdated: 'participant.updated',
+  ParticipantRemoved: 'participant.removed',
+  CheckInManual: 'checkin.manual',
+  CheckInUndone: 'checkin.undone',
+  BadgeReissued: 'badge.reissued',
+  BadgeEmailBulkResent: 'badge.email_bulk_resent',
+  CtfSolveGranted: 'ctf.solve_granted',
+  CtfSolveRevoked: 'ctf.solve_revoked',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -25,6 +47,8 @@ export interface AuditLogEntryInput {
   actorId?: string;
   targetType?: string;
   targetId?: string;
+  /** Short non-sensitive context, e.g. `registration -> checkin`. */
+  summary?: string;
 }
 
 export async function recordAuditLog(
@@ -39,6 +63,7 @@ export async function recordAuditLog(
       actorId: entry.actorId,
       targetType: entry.targetType,
       targetId: entry.targetId,
+      summary: entry.summary,
     },
   });
 }

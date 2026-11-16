@@ -17,7 +17,7 @@ export interface DashboardShellProps {
 
 /**
  * Shared portal layout shell for authenticated role workspaces
- * (`team`, `jury`, `admin`). Ready for Persons 2 & 3 route layouts.
+ * (`team`, `jury`, `admin`).
  */
 export function DashboardShell({ role, children }: DashboardShellProps) {
   const pathname = usePathname();
@@ -32,17 +32,26 @@ export function DashboardShell({ role, children }: DashboardShellProps) {
             <p className={styles.roleHeading}>{getRoleLabel(role)} portal</p>
             <nav aria-label={`${getRoleLabel(role)} sections`}>
               <ul className={styles.navList}>
-                {navItems.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={styles.navLink}
-                      aria-current={pathname === item.href ? 'page' : undefined}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+                {navItems.map((item) => {
+                  const isCurrent =
+                    pathname === item.href ||
+                    (item.href !== '/admin' &&
+                      item.href !== '/team' &&
+                      item.href !== '/jury' &&
+                      Boolean(pathname?.startsWith(item.href)));
+
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={styles.navLink}
+                        aria-current={isCurrent ? 'page' : undefined}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </nav>
           </aside>

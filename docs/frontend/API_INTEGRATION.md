@@ -35,17 +35,28 @@ Credentials default to `'include'` so cookie/session authentication works cleanl
 
 ---
 
-## 2. Backend Implementation Status & Provisional Contracts
+## 2. Backend Implementation Status & Contract Alignment
 
-Currently in `apps/api`, **only `GET /api/health` is implemented**. All other endpoint groups listed in [`docs/api/README.md`](../api/README.md) are planned.
+The table below details how the frontend client modules relate to the backend Express routes in `apps/api`:
 
-| Module | Endpoint(s) Used by Frontend | Backend Status | Contract Source | Behavior in `real` Mode Today |
+| Module | Endpoint(s) Used by Frontend | Backend Status | Contract Source | Behavior in `real` Mode |
 |---|---|---|---|---|
-| `health` | `GET /api/health` | **Implemented** | `healthResponseSchema` (`libs/api-contracts`) | Calls live Express API & displays DB status |
-| `events` | `GET /api/event-state` | **Planned (missing)** | Provisional `eventStateResponseSchema` (`pending.ts`) | Returns `404`; UI falls back cleanly to `"Event State Pending API"` notice |
-| `auth` | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `Role` & `ChallengeTrack` | `GET /auth/me` `401`/`404` treats visitor as signed out; login surfaces a clear pending-endpoint message |
-| `registrations` | `POST /api/registrations` | **Planned (missing)** | Provisional schemas (`pending.ts`) reusing `TeamProgressState` | Validates 3–5 members locally; `404` surfaces a clear pending-endpoint message |
-| Team / Check-In / Jury / Admin / Results | Participant, check-in, jury scoring, admin & leaderboard routes | **Planned (missing)** | Owned by Persons 2 & 3 | To be added as modular `lib/api/modules/*.ts` files |
+| `health` | `GET /api/health` | **Implemented** | `healthResponseSchema` (`libs/api-contracts`) | Calls live Express API & displays DB connection status and latency |
+| `events` | `GET /api/event-state`, `POST /api/event-state` | **Implemented** | `eventStateResponseSchema` (`libs/api-contracts`) | Authoritative server clock, current phase banner, and admin phase stepper transitions |
+| `auth` | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | **Implemented** | Canonical auth contracts (`libs/api-contracts`) | Rate-limited login (10 attempts/min), DB-backed session tokens, automatic Bearer header |
+| `registrations` | `POST /api/registration/teams`, `GET /api/registration/teams/me` | **Implemented** | `createTeamRequestSchema`, `teamResponseSchema` (`libs/api-contracts`) | Enforces 4–7 member constraints, creates leader account and participant badges |
+| `checkin` | `POST /api/checkin/scan`, `POST /api/checkin/revoke`, `GET /api/checkin/badges` | **Implemented** | Canonical checkin contracts (`libs/api-contracts`) | Validates 43-character hashed tokens, updates attendee counts, allows credential revocation |
+| `announcements` | `POST /api/announcements`, `GET /api/announcements` | **Implemented** | `createAnnouncementRequestSchema`, `announcementSchema` (`libs/api-contracts`) | Admin broadcast publishing and live feed polling across roles |
+| `admin` | `GET /api/admin/audit-log` | **Implemented** | `auditLogListRequestSchema`, `auditLogEntrySchema` (`libs/api-contracts`) | Audited administrative actions stream with actor attribution and pagination |
+| `jury` | `GET /api/jury/overview`, `GET /api/jury/teams`, `GET/POST /api/jury/evaluation` | **Planned (Mocked)** | `pending.ts` (`juryOverviewResponseSchema`, `juryTeamEvaluationResponseSchema`) | Track-scoped evaluation rubric and private jury notes |
+| `participants` / `mini-ctf` / `challenges` / `submissions` | `/participants/*`, `/mini-ctf/*`, `/challenges/*`, `/submissions/*` | **Planned (Mocked)** | `pending.ts` schemas | Competitor workspace flows, flag unlock, deliverables uploads |
+
+### Session & Bearer Token Management
+
+- When authenticating via `POST /api/auth/login`, the backend issues an opaque session token (`LoginResponse.token`).
+- The token is managed through [`apps/web/src/lib/auth/token-storage.ts`](../../apps/web/src/lib/auth/token-storage.ts) (`localStorage` with in-memory fallback for SSR).
+- [`createRealTransport`](../../apps/web/src/lib/api/transports/real.ts) automatically attaches `Authorization: Bearer <token>` to outbound requests.
+- When an API request returns `401 Unauthorized`, the client clears the token and transitions the user to an unauthenticated state.
 
 ### Migrating Provisional Contracts to `libs/api-contracts`
 

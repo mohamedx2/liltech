@@ -26,7 +26,13 @@ export function TeamRoster({ members, className = '' }: TeamRosterProps) {
               header: 'Full Name',
               render: (member) => <strong>{member.fullName}</strong>,
             },
-            { key: 'email', header: 'Email', render: (member) => member.email },
+            { key: 'email', header: 'Email', render: (member) => member.email ?? '—' },
+            {
+              key: 'color',
+              header: 'Badge Color',
+              render: (member) =>
+                member.color ? member.color.charAt(0).toUpperCase() + member.color.slice(1) : '—',
+            },
             {
               key: 'roleInTeam',
               header: 'Role',

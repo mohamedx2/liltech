@@ -10,6 +10,12 @@ import { z } from 'zod';
  * All variables are documented in the root `.env.example`.
  */
 
+/** Empty values (`SMTP_USER=`) count as unset. */
+const optionalString = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
@@ -29,6 +35,41 @@ const envSchema = z.object({
 
   /** Lifetime of authentication session tokens, in hours. */
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+
+  /**
+   * Reverse-proxy hops in front of the API whose X-Forwarded-For is trusted
+   * (1 behind Caddy in production, 0 when the API is reached directly).
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+
+  /** Team registrations accepted per client IP per hour. */
+  REGISTRATION_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).max(10_000).default(10),
+
+  /** Serve Swagger UI and the OpenAPI JSON. Off by default in production. */
+  API_DOCS_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+
+  /**
+   * 32-byte key (base64) encrypting stored QR badge tokens so a team can see
+   * its badges again. Generate with:
+   * `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+   * Rotating it makes existing badges unreadable (a resend reissues them).
+   */
+  QR_TOKEN_KEY: z.string().refine((value) => Buffer.from(value, 'base64').length === 32, {
+    message: 'QR_TOKEN_KEY must be 32 bytes encoded as base64',
+  }),
+
+  /** SMTP delivery of QR badge emails (Gmail: smtp.gmail.com, 465, app password). */
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(465),
+  SMTP_USER: optionalString,
+  SMTP_PASS: optionalString,
+  /** Sender shown on badge emails, e.g. `LilTech 2026 <liltech@gmail.com>`. Defaults to SMTP_USER. */
+  MAIL_FROM: optionalString,
+  /** Public site URL linked from badge emails. */
+  PUBLIC_APP_URL: z.url().default('https://liltechsousse.com'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -65,3 +106,6 @@ export function corsOrigins(): string[] {
     .map((origin) => origin.trim())
     .filter(Boolean);
 }
+
+/** Swagger is public in development and test, opt-in in production. */
+export const apiDocsEnabled = env.API_DOCS_ENABLED ?? !isProduction;

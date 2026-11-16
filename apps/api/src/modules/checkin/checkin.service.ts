@@ -1,76 +1,29 @@
 import { Prisma } from '@prisma/client';
 import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
-import type { BadgeSummary, CheckInResponse, IssueBadgeResponse } from 'api-contracts';
-import { generateQrToken, hashQrToken } from './qr-token';
+import type { BadgeSummary, CheckInResponse } from 'api-contracts';
+import { hashQrToken } from './qr-token';
 
 /**
- * Check-in logic: QR badge issuance, verification, single check-in, and
- * revocation. Scan and revocation are audited transactionally.
+ * Check-in logic: QR badge verification, single check-in, and revocation
+ * (issuance and email delivery live in the badges module). Scan and revocation are audited transactionally.
  */
-
-export async function issueBadgeForParticipant(participantId: string): Promise<IssueBadgeResponse> {
-  const prisma = getPrismaClient();
-
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
-    include: { badge: true },
-  });
-
-  if (!participant) {
-    throw ApiError.notFound('Participant not found.');
-  }
-
-  if (participant.badge && !participant.badge.revokedAt) {
-    throw ApiError.conflict('This participant already has an active badge.');
-  }
-
-  const { token, tokenHash } = generateQrToken();
-
-  await prisma.qrToken.upsert({
-    where: { participantId },
-    update: { tokenHash, issuedAt: new Date(), revokedAt: null },
-    create: { participantId, tokenHash },
-  });
-
-  return {
-    participantId: participant.id,
-    participantName: participant.name,
-    token,
-    issuedAt: new Date().toISOString(),
-  };
-}
-
-/** Issue a QR badge within an already-open transaction (atomic with registration). */
-export async function issueBadgeForParticipantInTx(
-  tx: Prisma.TransactionClient,
-  participantId: string,
-  participantName: string,
-): Promise<IssueBadgeResponse> {
-  const { token, tokenHash } = generateQrToken();
-
-  const created = await tx.qrToken.create({
-    data: { participantId, tokenHash },
-    select: { issuedAt: true },
-  });
-
-  return {
-    participantId,
-    participantName,
-    token,
-    issuedAt: created.issuedAt.toISOString(),
-  };
-}
 
 export async function listBadges(): Promise<BadgeSummary[]> {
   const prisma = getPrismaClient();
 
+  // Prisma forbids `select` and `include` at the same query level — nested
+  // relations must be expressed with `select` all the way down.
   const badges = await prisma.qrToken.findMany({
     orderBy: { issuedAt: 'desc' },
     include: {
       participant: {
-        select: { name: true, checkIn: true },
-        include: { team: { select: { name: true } } },
+        select: {
+          name: true,
+          color: true,
+          team: { select: { name: true } },
+          checkIn: { select: { checkedInAt: true } },
+        },
       },
     },
   });
@@ -79,6 +32,7 @@ export async function listBadges(): Promise<BadgeSummary[]> {
     participantId: badge.participantId,
     participantName: badge.participant.name,
     teamName: badge.participant.team.name,
+    color: badge.participant.color,
     issuedAt: badge.issuedAt.toISOString(),
     ...(badge.revokedAt ? { revokedAt: badge.revokedAt.toISOString() } : {}),
     ...(badge.participant.checkIn
@@ -99,7 +53,7 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
           participant: {
             include: {
               checkIn: true,
-              team: { select: { id: true, name: true } },
+              team: { select: { id: true, name: true, status: true } },
             },
           },
         },
@@ -113,6 +67,12 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         throw ApiError.forbidden('This badge has been revoked.');
       }
 
+      if (badge.participant.team.status !== 'active') {
+        throw ApiError.forbidden(
+          `This team is ${badge.participant.team.status} and cannot be checked in.`,
+        );
+      }
+
       if (badge.participant.checkIn) {
         throw ApiError.conflict('This participant is already checked in.');
       }
@@ -121,8 +81,10 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         data: { participantId: badge.participantId, checkedByUserId: adminUserId },
       });
 
-      await tx.team.update({
-        where: { id: badge.participant.team.id },
+      // A late member checking in must not move the team back from a later
+      // progress state.
+      await tx.team.updateMany({
+        where: { id: badge.participant.team.id, progressState: 'registered' },
         data: { progressState: 'checked_in' },
       });
 
@@ -139,6 +101,7 @@ export async function scanCheckIn(token: string, adminUserId: string): Promise<C
         participant: {
           id: badge.participant.id,
           name: badge.participant.name,
+          color: badge.participant.color,
         },
         team: {
           id: badge.participant.team.id,
