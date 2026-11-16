@@ -15,14 +15,15 @@ HMAC-SHA256 digests, and the pepper lives in the server environment.
 | 02 | `louage-404-02` | The Location | live | Organizer answer supplied |
 | 03 | `louage-404-03` | The Departure | live | Organizer answer supplied |
 | 04 | `louage-404-04` | The Invisible Message | live | Organizer answer supplied |
-| 05 | `louage-404-05` | Find Si Mokdad | **draft** | Answer still pending confirmation |
+| 05 | `louage-404-05` | The Two Signatures | live | Organizer answer supplied |
 | 06 | `louage-404-06` | The Proverb | live | Organizer answer supplied |
 | 07 | `louage-404-07` | The Final Passenger | live | Organizer answer supplied |
 
-Stage 05 is deliberately `draft`: the chain stops there, `POST …/submit`
-returns `403 STAGE_NOT_PUBLISHED`, and the main challenge must stay locked.
-That is the intended, honest state until the organizer confirms the exact
-Facebook display name.
+The chain is fully published: every stage carries an answer digest, so
+teams can walk 01 → 07 without an organizer unlocking anything by hand. A
+stage may still be parked in `draft` (answer `NULL`); it then answers
+`403 STAGE_NOT_PUBLISHED` on submit and stops the chain, which is the
+intended state for any stage whose answer is not confirmed.
 
 ## Models
 

@@ -78,17 +78,15 @@ export const LOUAGE_404_STAGES: readonly StageContent[] = [
   {
     slug: 'louage-404-05',
     position: 5,
-    title: 'Find Si Mokdad',
+    title: 'The Two Signatures',
     description:
-      'The clue points at social media. Use everything you already know — the driver, the louage, the location — to identify the correct profile, and submit the exact name displayed on it.',
-    // No confirmed answer yet: kept in draft so nobody can progress past it or
-    // mistype a guess into a live stage.
-    status: 'draft',
+      'The passengers are not the last names on this case. Two people signed the papers that put this night on the road — the presidents of the clubs behind it. Every organization leaves a public trail: leadership pages, team listings, launch posts. Find the current president of GDG on Campus EPI and the current president of IGC, then submit both full names in that order, joined by underscores and wrapped in the flag.',
+    status: 'live',
     requiredForUnlock: true,
     hints: [
-      'Combine the identity clue from the previous stage with what you know about the driver and where he works.',
-      'Search Facebook and search engines for the name and the louage context together. Many profiles will match the name alone.',
-      'Verify the profile against the investigation: the photographs and the posts should agree with everything you have already seen. Submit the name exactly as displayed.',
+      'Two clubs, two presidents, one fixed order: the president of GDG on Campus EPI first, then the president of IGC.',
+      'Club leadership is public. Follow the official pages and the team or board listings for the current academic year — not old event flyers, where the names are out of date.',
+      'Write each full name as it appears, uppercased, name parts separated by underscores, GDG first: L404{GDG_PRESIDENT_FULL_NAME_IGC_PRESIDENT_FULL_NAME}.',
     ],
   },
   {

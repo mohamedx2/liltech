@@ -25,7 +25,7 @@ const MOCK_STAGES: readonly { slug: string; position: number; title: string }[] 
   { slug: 'louage-404-02', position: 2, title: 'The Location' },
   { slug: 'louage-404-03', position: 3, title: 'The Departure' },
   { slug: 'louage-404-04', position: 4, title: 'The Invisible Message' },
-  { slug: 'louage-404-05', position: 5, title: 'Find Si Mokdad' },
+  { slug: 'louage-404-05', position: 5, title: 'The Two Signatures' },
   { slug: 'louage-404-06', position: 6, title: 'The Proverb' },
   { slug: 'louage-404-07', position: 7, title: 'The Final Passenger' },
 ];
