@@ -70,10 +70,18 @@ describeDb('admin operations', () => {
   async function registerTeam(slug: string, memberCount = 3) {
     const registered = await registerTeamWithBadges({
       teamName: `Team ${slug}`,
-      leader: { name: `${slug} Leader`, email: `leader@${slug}.test`, password: PASSWORD },
+      leader: {
+        name: `${slug} Leader`,
+        email: `leader@${slug}.test`,
+        password: PASSWORD,
+        university: 'Test University',
+        phone: '+216 20 123 456',
+      },
       members: Array.from({ length: memberCount }, (_, index) => ({
         name: `${slug} Member ${index + 1}`,
         email: `m${index + 1}@${slug}.test`,
+        university: 'Test University',
+        phone: '+216 20 123 456',
       })),
     });
     const tokens = new Map(registered.badges.map((badge) => [badge.participantName, badge.token]));
@@ -242,6 +250,8 @@ describeDb('admin operations', () => {
       {
         name: 'Late Joiner',
         email: 'late@grow.test',
+        university: 'Test University',
+        phone: '+216 20 123 456',
       },
     );
     expect(added.status).toBe(201);
@@ -254,6 +264,8 @@ describeDb('admin operations', () => {
     ).send({
       name: 'One Too Many',
       email: 'extra@grow.test',
+      university: 'Test University',
+      phone: '+216 20 123 456',
     });
     expect(tooMany.status).toBe(409);
   });

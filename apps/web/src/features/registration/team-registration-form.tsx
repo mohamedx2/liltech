@@ -17,12 +17,40 @@ interface MemberRow extends TeamMemberInput {
   readonly rowKey: number;
 }
 
+type MemberField = keyof TeamMemberInput;
+
+const MEMBER_FIELDS: readonly MemberField[] = ['fullName', 'email', 'university', 'phone'];
+
+function isMemberField(value: unknown): value is MemberField {
+  return MEMBER_FIELDS.includes(value as MemberField);
+}
+
+/** Maps a server request field (`name`, `email`, …) onto a form field. */
+function memberFieldFromServer(field: string | undefined): MemberField | undefined {
+  if (field === 'name') return 'fullName';
+  return field !== 'fullName' && isMemberField(field) ? field : undefined;
+}
+
+const FIELD_ID_SUFFIX: Record<MemberField, string> = {
+  fullName: 'name',
+  email: 'email',
+  university: 'university',
+  phone: 'phone',
+};
+
+function leaderFieldId(field: MemberField): string {
+  return `reg-leader-${FIELD_ID_SUFFIX[field]}`;
+}
+
+function memberFieldId(rowKey: number, field: MemberField): string {
+  return `reg-member-${FIELD_ID_SUFFIX[field]}-${rowKey}`;
+}
+
 interface RegistrationErrors {
   teamName?: string;
   password?: string;
-  leaderFullName?: string;
-  leaderEmail?: string;
-  teammates: Record<number, { fullName?: string; email?: string }>;
+  leader: Partial<Record<MemberField, string>>;
+  teammates: Record<number, Partial<Record<MemberField, string>>>;
   roster?: string;
 }
 
@@ -30,14 +58,14 @@ interface RegistrationErrors {
 const MIN_TEAMMATES = TEAM_MEMBERS_TOTAL_MIN - 1;
 const MAX_TEAMMATES = TEAM_MEMBERS_TOTAL_MAX - 1;
 
-const NO_ERRORS: RegistrationErrors = { teammates: {} };
+const NO_ERRORS: RegistrationErrors = { leader: {}, teammates: {} };
 
 /**
  * Maps API error details (`{ path: 'members.1.email', message }`) onto the
  * form fields. Request member index N is teammate row N.
  */
 function serverFieldErrors(details: unknown, rows: readonly MemberRow[]): RegistrationErrors {
-  const errors: RegistrationErrors = { teammates: {} };
+  const errors: RegistrationErrors = { leader: {}, teammates: {} };
   if (!Array.isArray(details)) return errors;
 
   for (const detail of details) {
@@ -48,16 +76,15 @@ function serverFieldErrors(details: unknown, rows: readonly MemberRow[]): Regist
     const [root, second, third] = path.split('.');
     if (root === 'teamName') {
       errors.teamName ??= message;
-    } else if (root === 'leader' && second === 'email') {
-      errors.leaderEmail ??= message;
-    } else if (root === 'leader' && second === 'name') {
-      errors.leaderFullName ??= message;
     } else if (root === 'leader' && second === 'password') {
       errors.password ??= message;
-    } else if (root === 'members' && (third === 'email' || third === 'name')) {
+    } else if (root === 'leader') {
+      const field = memberFieldFromServer(second);
+      if (field) errors.leader[field] ??= message;
+    } else if (root === 'members') {
       const row = rows[Number(second)];
-      if (row) {
-        const field = third === 'email' ? 'email' : 'fullName';
+      const field = memberFieldFromServer(third);
+      if (row && field) {
         const rowErrors = (errors.teammates[row.rowKey] ??= {});
         rowErrors[field] ??= message;
       }
@@ -68,17 +95,16 @@ function serverFieldErrors(details: unknown, rows: readonly MemberRow[]): Regist
 }
 
 function emptyRow(rowKey: number): MemberRow {
-  return { rowKey, fullName: '', email: '' };
+  return { rowKey, fullName: '', email: '', university: '', phone: '' };
 }
 
 function hasErrors(errors: RegistrationErrors): boolean {
   return Boolean(
     errors.teamName ||
     errors.password ||
-    errors.leaderFullName ||
-    errors.leaderEmail ||
     errors.roster ||
-    Object.values(errors.teammates).some((row) => row.fullName || row.email),
+    Object.values(errors.leader).some(Boolean) ||
+    Object.values(errors.teammates).some((row) => Object.values(row).some(Boolean)),
   );
 }
 
@@ -94,8 +120,12 @@ export function TeamRegistrationForm() {
   const [teamName, setTeamName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [leaderName, setLeaderName] = useState('');
-  const [leaderEmail, setLeaderEmail] = useState('');
+  const [leader, setLeader] = useState<TeamMemberInput>({
+    fullName: '',
+    email: '',
+    university: '',
+    phone: '',
+  });
   const [teammates, setTeammates] = useState<MemberRow[]>(() =>
     Array.from({ length: MIN_TEAMMATES }, (_, index) => emptyRow(index + 1)),
   );
@@ -151,7 +181,14 @@ export function TeamRegistrationForm() {
     });
   }
 
-  function clearError(field: Exclude<keyof RegistrationErrors, 'teammates'>) {
+  function updateLeader(field: MemberField, value: string) {
+    setLeader((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) =>
+      prev.leader[field] ? { ...prev, leader: { ...prev.leader, [field]: undefined } } : prev,
+    );
+  }
+
+  function clearError(field: 'teamName' | 'password' | 'roster') {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
   }
 
@@ -163,11 +200,16 @@ export function TeamRegistrationForm() {
     const parsed = teamRegistrationRequestSchema.safeParse({
       teamName,
       password,
-      leader: { fullName: leaderName, email: leaderEmail },
-      teammates: teammates.map(({ fullName, email }) => ({ fullName, email })),
+      leader,
+      teammates: teammates.map(({ fullName, email, university, phone }) => ({
+        fullName,
+        email,
+        university,
+        phone,
+      })),
     });
 
-    const nextErrors: RegistrationErrors = { teammates: {} };
+    const nextErrors: RegistrationErrors = { leader: {}, teammates: {} };
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const [root, second, third] = issue.path;
@@ -175,13 +217,11 @@ export function TeamRegistrationForm() {
           nextErrors.teamName ??= issue.message;
         } else if (root === 'password') {
           nextErrors.password ??= issue.message;
-        } else if (root === 'leader' && second === 'fullName') {
-          nextErrors.leaderFullName ??= issue.message;
-        } else if (root === 'leader' && second === 'email') {
-          nextErrors.leaderEmail ??= issue.message;
+        } else if (root === 'leader' && isMemberField(second)) {
+          nextErrors.leader[second] ??= issue.message;
         } else if (root === 'teammates' && typeof second === 'number') {
           const row = teammates[second];
-          if (row && (third === 'fullName' || third === 'email')) {
+          if (row && isMemberField(third)) {
             const rowErrors = (nextErrors.teammates[row.rowKey] ??= {});
             rowErrors[third] ??= issue.message;
           }
@@ -191,7 +231,7 @@ export function TeamRegistrationForm() {
       }
     }
 
-    const emails = [leaderEmail, ...teammates.map((member) => member.email)]
+    const emails = [leader.email, ...teammates.map((member) => member.email)]
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean);
     if (new Set(emails).size !== emails.length) {
@@ -264,8 +304,8 @@ export function TeamRegistrationForm() {
                 <p className={styles.lede}>{createdTeam.message}</p>
                 <ul className={styles.doneList}>
                   <li>
-                    <b>{leaderName} (leader)</b>
-                    <span>{leaderEmail}</span>
+                    <b>{leader.fullName} (leader)</b>
+                    <span>{leader.email}</span>
                   </li>
                   {teammates.map((member) => (
                     <li key={member.rowKey}>
@@ -288,24 +328,22 @@ export function TeamRegistrationForm() {
   const summaryItems: Array<{ href: string; text: string }> = [];
   if (errors.teamName) summaryItems.push({ href: '#reg-team-name', text: errors.teamName });
   if (errors.password) summaryItems.push({ href: '#reg-password', text: errors.password });
-  if (errors.leaderFullName)
-    summaryItems.push({ href: '#reg-leader-name', text: errors.leaderFullName });
-  if (errors.leaderEmail)
-    summaryItems.push({ href: '#reg-leader-email', text: errors.leaderEmail });
+  for (const field of MEMBER_FIELDS) {
+    const message = errors.leader[field];
+    if (message)
+      summaryItems.push({ href: `#${leaderFieldId(field)}`, text: `Leader: ${message}` });
+  }
   if (errors.roster) summaryItems.push({ href: '#reg-teammates', text: errors.roster });
   teammates.forEach((member, index) => {
     const rowErrors = errors.teammates[member.rowKey];
-    if (rowErrors?.fullName) {
-      summaryItems.push({
-        href: `#reg-member-name-${member.rowKey}`,
-        text: `Teammate ${index + 1}: ${rowErrors.fullName}`,
-      });
-    }
-    if (rowErrors?.email) {
-      summaryItems.push({
-        href: `#reg-member-email-${member.rowKey}`,
-        text: `Teammate ${index + 1}: ${rowErrors.email}`,
-      });
+    for (const field of MEMBER_FIELDS) {
+      const message = rowErrors?.[field];
+      if (message) {
+        summaryItems.push({
+          href: `#${memberFieldId(member.rowKey, field)}`,
+          text: `Teammate ${index + 1}: ${message}`,
+        });
+      }
     }
   });
 
@@ -399,7 +437,7 @@ export function TeamRegistrationForm() {
                 id="reg-leader-name"
                 label="Leader full name"
                 required
-                error={errors.leaderFullName}
+                error={errors.leader.fullName}
               >
                 {({ id, describedBy, invalid }) => (
                   <TextInput
@@ -410,11 +448,8 @@ export function TeamRegistrationForm() {
                     required
                     invalid={invalid}
                     aria-describedby={describedBy}
-                    value={leaderName}
-                    onChange={(event) => {
-                      setLeaderName(event.target.value);
-                      clearError('leaderFullName');
-                    }}
+                    value={leader.fullName}
+                    onChange={(event) => updateLeader('fullName', event.target.value)}
                   />
                 )}
               </FormField>
@@ -424,7 +459,7 @@ export function TeamRegistrationForm() {
                 label="Leader email"
                 hint="Used to sign in."
                 required
-                error={errors.leaderEmail}
+                error={errors.leader.email}
               >
                 {({ id, describedBy, invalid }) => (
                   <TextInput
@@ -437,11 +472,55 @@ export function TeamRegistrationForm() {
                     required
                     invalid={invalid}
                     aria-describedby={describedBy}
-                    value={leaderEmail}
-                    onChange={(event) => {
-                      setLeaderEmail(event.target.value);
-                      clearError('leaderEmail');
-                    }}
+                    value={leader.email}
+                    onChange={(event) => updateLeader('email', event.target.value)}
+                  />
+                )}
+              </FormField>
+
+              <FormField
+                id="reg-leader-university"
+                label="Leader university"
+                hint="University or school."
+                required
+                error={errors.leader.university}
+              >
+                {({ id, describedBy, invalid }) => (
+                  <TextInput
+                    id={id}
+                    name="leaderUniversity"
+                    type="text"
+                    autoComplete="organization"
+                    maxLength={120}
+                    required
+                    invalid={invalid}
+                    aria-describedby={describedBy}
+                    value={leader.university}
+                    onChange={(event) => updateLeader('university', event.target.value)}
+                  />
+                )}
+              </FormField>
+
+              <FormField
+                id="reg-leader-phone"
+                label="Leader mobile number"
+                hint="For example +216 20 123 456."
+                required
+                error={errors.leader.phone}
+              >
+                {({ id, describedBy, invalid }) => (
+                  <TextInput
+                    id={id}
+                    name="leaderPhone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={20}
+                    required
+                    invalid={invalid}
+                    aria-describedby={describedBy}
+                    value={leader.phone}
+                    onChange={(event) => updateLeader('phone', event.target.value)}
                   />
                 )}
               </FormField>
@@ -500,6 +579,53 @@ export function TeamRegistrationForm() {
                         value={member.email}
                         onChange={(event) =>
                           updateTeammate(member.rowKey, 'email', event.target.value)
+                        }
+                      />
+                    )}
+                  </FormField>
+
+                  <FormField
+                    id={memberFieldId(member.rowKey, 'university')}
+                    label={`Teammate ${index + 1} university`}
+                    required
+                    error={rowErrors?.university}
+                  >
+                    {({ id, describedBy, invalid }) => (
+                      <TextInput
+                        id={id}
+                        name={`teammates[${index}].university`}
+                        type="text"
+                        maxLength={120}
+                        required
+                        invalid={invalid}
+                        aria-describedby={describedBy}
+                        value={member.university}
+                        onChange={(event) =>
+                          updateTeammate(member.rowKey, 'university', event.target.value)
+                        }
+                      />
+                    )}
+                  </FormField>
+
+                  <FormField
+                    id={memberFieldId(member.rowKey, 'phone')}
+                    label={`Teammate ${index + 1} mobile number`}
+                    required
+                    error={rowErrors?.phone}
+                  >
+                    {({ id, describedBy, invalid }) => (
+                      <TextInput
+                        id={id}
+                        name={`teammates[${index}].phone`}
+                        type="tel"
+                        inputMode="tel"
+                        maxLength={20}
+                        required
+                        invalid={invalid}
+                        aria-describedby={describedBy}
+                        value={member.phone}
+                        onChange={(event) =>
+                          updateTeammate(member.rowKey, 'phone', event.target.value)
                         }
                       />
                     )}

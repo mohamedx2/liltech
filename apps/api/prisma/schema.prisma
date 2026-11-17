@@ -123,20 +123,26 @@ enum TeamProgress {
 
 /// Member of a team, including the leader. Each participant gets one QR badge.
 model Participant {
-  id        String         @id @default(uuid()) @db.Uuid
-  team      Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  teamId    String         @db.Uuid
-  name      String         @db.VarChar(100)
-  isLeader  Boolean
+  id         String         @id @default(uuid()) @db.Uuid
+  team       Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId     String         @db.Uuid
+  name       String         @db.VarChar(100)
+  isLeader   Boolean
   /// Contact email; the QR badge is delivered here. Required for new
   /// registrations (nullable for teams registered before it was required).
   /// Unique across all teams — enforced in the registration transaction.
-  email     String?        @db.VarChar(254)
+  email      String?        @db.VarChar(254)
+  /// University or school. Required for new registrations (nullable for
+  /// participants registered before it was required).
+  university String?        @db.VarChar(120)
+  /// Mobile number as typed (digits, spaces, +, -, parentheses). Required for
+  /// new registrations (nullable for participants registered before it was required).
+  phone      String?        @db.VarChar(20)
   /// Badge color, balanced across all participants at registration time.
-  color     BadgeColor?
-  createdAt DateTime       @default(now())
-  badge     QrToken?
-  checkIn   CheckInRecord?
+  color      BadgeColor?
+  createdAt  DateTime       @default(now())
+  badge      QrToken?
+  checkIn    CheckInRecord?
 
   @@index([teamId])
   @@index([email])

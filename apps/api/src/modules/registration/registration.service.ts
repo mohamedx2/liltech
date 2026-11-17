@@ -79,11 +79,20 @@ export async function registerTeamWithBadges(
 
   const leaderEmail = request.leader.email.toLowerCase();
   const roster = [
-    { name: request.leader.name, isLeader: true, email: leaderEmail, path: 'leader.email' },
+    {
+      name: request.leader.name,
+      isLeader: true,
+      email: leaderEmail,
+      university: request.leader.university,
+      phone: request.leader.phone,
+      path: 'leader.email',
+    },
     ...request.members.map((member, index) => ({
       name: member.name,
       isLeader: false,
       email: member.email.toLowerCase(),
+      university: member.university,
+      phone: member.phone,
       path: `members.${index}.email`,
     })),
   ];
@@ -109,6 +118,8 @@ interface RosterEntry {
   name: string;
   isLeader: boolean;
   email: string;
+  university: string;
+  phone: string;
   /** Request path of this email, for field-level error details. */
   path: string;
 }
@@ -190,6 +201,8 @@ async function registerOnce(
                 name: entry.name,
                 isLeader: entry.isLeader,
                 email: entry.email,
+                university: entry.university,
+                phone: entry.phone,
                 color: colors[index],
               })),
             },

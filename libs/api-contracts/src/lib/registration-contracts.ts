@@ -22,10 +22,43 @@ const PASSWORD_MIN = 12;
 
 export const participantNameSchema = z.string().trim().min(1).max(PARTICIPANT_NAME_MAX);
 
-/** Every participant needs an email: their QR badge is delivered there. */
+const UNIVERSITY_MIN = 2;
+const UNIVERSITY_MAX = 120;
+const PHONE_MAX = 20;
+const PHONE_DIGITS_MIN = 8;
+const PHONE_DIGITS_MAX = 15;
+
+/** University or school of a participant. */
+export const participantUniversitySchema = z
+  .string()
+  .trim()
+  .min(UNIVERSITY_MIN, 'Enter the university or school (at least 2 characters).')
+  .max(UNIVERSITY_MAX, `University must be ${UNIVERSITY_MAX} characters or fewer.`);
+
+/**
+ * Mobile number as typed: an optional leading `+` or `(+`, then digits with optional
+ * spaces, dashes or parentheses; 8–15 digits in total (Tunisian numbers have 8,
+ * international E.164 numbers at most 15).
+ */
+export const participantPhoneSchema = z
+  .string()
+  .trim()
+  .max(PHONE_MAX, 'Enter a valid mobile number.')
+  .regex(/^(\+|\(\+?)?[0-9][0-9 ()-]*$/, 'Enter a valid mobile number.')
+  .refine((value) => {
+    const digits = value.replace(/[^0-9]/g, '').length;
+    return digits >= PHONE_DIGITS_MIN && digits <= PHONE_DIGITS_MAX;
+  }, 'Enter a valid mobile number (8 to 15 digits).');
+
+/**
+ * Every participant needs an email (their QR badge is delivered there), a
+ * university and a mobile number (so organizers can reach them on site).
+ */
 export const teamMemberInputSchema = z.strictObject({
   name: participantNameSchema,
   email: z.email(),
+  university: participantUniversitySchema,
+  phone: participantPhoneSchema,
 });
 
 export const createTeamRequestSchema = z
@@ -34,6 +67,8 @@ export const createTeamRequestSchema = z
     leader: z.strictObject({
       name: participantNameSchema,
       email: z.email(),
+      university: participantUniversitySchema,
+      phone: participantPhoneSchema,
       password: z.string().min(PASSWORD_MIN).max(256),
     }),
     members: z
