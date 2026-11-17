@@ -119,11 +119,31 @@ describe('API Client, RealTransport, and MockTransport', () => {
     const registered = await client.registrations.registerTeam({
       teamName: 'Real Pioneers',
       password: 'password123456',
-      leader: { fullName: 'Leader Real', email: 'leader.real@example.com' },
+      leader: {
+        fullName: 'Leader Real',
+        email: 'leader.real@example.com',
+        university: 'Test University',
+        phone: '+216 20 123 456',
+      },
       teammates: [
-        { fullName: 'Mate One', email: 'mate1@example.com' },
-        { fullName: 'Mate Two', email: 'mate2@example.com' },
-        { fullName: 'Mate Three', email: 'mate3@example.com' },
+        {
+          fullName: 'Mate One',
+          email: 'mate1@example.com',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
+        {
+          fullName: 'Mate Two',
+          email: 'mate2@example.com',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
+        {
+          fullName: 'Mate Three',
+          email: 'mate3@example.com',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
       ],
     });
 
@@ -150,11 +170,31 @@ describe('API Client, RealTransport, and MockTransport', () => {
     const registered = await client.registrations.registerTeam({
       teamName: 'Mock Pioneers',
       password: 'password123456',
-      leader: { fullName: 'Leader Mock', email: 'leader.mock@liltech.mock' },
+      leader: {
+        fullName: 'Leader Mock',
+        email: 'leader.mock@liltech.mock',
+        university: 'Test University',
+        phone: '+216 20 123 456',
+      },
       teammates: [
-        { fullName: 'Mate One', email: 'mate1@liltech.mock' },
-        { fullName: 'Mate Two', email: 'mate2@liltech.mock' },
-        { fullName: 'Mate Three', email: 'mate3@liltech.mock' },
+        {
+          fullName: 'Mate One',
+          email: 'mate1@liltech.mock',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
+        {
+          fullName: 'Mate Two',
+          email: 'mate2@liltech.mock',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
+        {
+          fullName: 'Mate Three',
+          email: 'mate3@liltech.mock',
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
       ],
     });
     expect(registered.status).toBe(TeamProgressState.Registered);

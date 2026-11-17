@@ -6,6 +6,8 @@ import {
   eventPhaseSchema,
   eventStateResponseSchema as canonicalEventStateResponseSchema,
   isoTimestampSchema,
+  participantPhoneSchema,
+  participantUniversitySchema,
   TEAM_MEMBERS_TOTAL_MAX,
   TEAM_MEMBERS_TOTAL_MIN,
   teamProgressStateSchema,
@@ -136,6 +138,8 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export const teamMemberInputSchema = z.object({
   fullName: z.string().trim().min(2, 'Enter the participant full name (at least 2 characters).'),
   email: z.string().trim().email('Enter a valid email address.'),
+  university: participantUniversitySchema,
+  phone: participantPhoneSchema,
 });
 
 export type TeamMemberInput = z.infer<typeof teamMemberInputSchema>;

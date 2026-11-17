@@ -66,6 +66,8 @@ function toAdminTeam(team: TeamWithDetails): AdminTeam {
       name: participant.name,
       isLeader: participant.isLeader,
       email: participant.email,
+      university: participant.university,
+      phone: participant.phone,
       color: participant.color,
       checkedInAt: participant.checkIn?.checkedInAt.toISOString() ?? null,
       checkedInByName: participant.checkIn?.checkedByUser.name ?? null,
@@ -330,7 +332,15 @@ export async function addParticipant(
         );
 
         const created = await tx.participant.create({
-          data: { teamId, name: request.name, email, isLeader: false, color },
+          data: {
+            teamId,
+            name: request.name,
+            email,
+            university: request.university,
+            phone: request.phone,
+            isLeader: false,
+            color,
+          },
         });
         const issued = await issueBadgeInTx(tx, created.id, created.name);
         await recordAuditLog(
@@ -371,7 +381,7 @@ export async function addParticipant(
   return toAdminTeam(team);
 }
 
-/** Fixes a typo in a name or email. A leader email change also changes the team login. */
+/** Fixes a typo in a name, email, university or mobile number. A leader email change also changes the team login. */
 export async function updateParticipant(
   participantId: string,
   request: UpdateParticipantRequest,
@@ -406,7 +416,12 @@ export async function updateParticipant(
 
       await tx.participant.update({
         where: { id: participantId },
-        data: { name: request.name, email },
+        data: {
+          name: request.name,
+          email,
+          university: request.university,
+          phone: request.phone,
+        },
       });
       if (participant.isLeader && (request.name || email)) {
         await tx.user.update({

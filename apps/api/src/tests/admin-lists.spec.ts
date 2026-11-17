@@ -89,12 +89,29 @@ describeDb('admin listings and badge roster', () => {
         leader: {
           name: 'Roster Leader',
           email: 'roster-leader@test.local',
+          university: 'Test University',
+          phone: '+216 20 123 456',
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Roster Member', email: 'roster-member@admin-lists.test' },
-          { name: 'Roster Member Two', email: 'roster-member-two@admin-lists.test' },
-          { name: 'Roster Member Three', email: 'roster-member-three@admin-lists.test' },
+          {
+            name: 'Roster Member',
+            email: 'roster-member@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Roster Member Two',
+            email: 'roster-member-two@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Roster Member Three',
+            email: 'roster-member-three@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
@@ -138,12 +155,29 @@ describeDb('admin listings and badge roster', () => {
         leader: {
           name: 'Admin Leader',
           email: 'admin-leader@test.local',
+          university: 'Test University',
+          phone: '+216 20 123 456',
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Admin Member', email: 'admin-member@admin-lists.test' },
-          { name: 'Admin Member Two', email: 'admin-member-two@admin-lists.test' },
-          { name: 'Admin Member Three', email: 'admin-member-three@admin-lists.test' },
+          {
+            name: 'Admin Member',
+            email: 'admin-member@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Admin Member Two',
+            email: 'admin-member-two@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Admin Member Three',
+            email: 'admin-member-three@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
@@ -205,12 +239,29 @@ describeDb('admin listings and badge roster', () => {
         leader: {
           name: 'Team Role Leader',
           email: 'team-role@test.local',
+          university: 'Test University',
+          phone: '+216 20 123 456',
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Team Role Member', email: 'team-role-member@admin-lists.test' },
-          { name: 'Team Role Member Two', email: 'team-role-member-two@admin-lists.test' },
-          { name: 'Team Role Member Three', email: 'team-role-member-three@admin-lists.test' },
+          {
+            name: 'Team Role Member',
+            email: 'team-role-member@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Team Role Member Two',
+            email: 'team-role-member-two@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Team Role Member Three',
+            email: 'team-role-member-three@admin-lists.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
