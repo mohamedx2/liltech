@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { Role } from 'api-contracts';
 import { getRoleLabel, getRoleNavItems } from '@/lib/auth/route-access';
 import { SiteHeader } from '../navigation/site-header';
@@ -22,13 +22,26 @@ export interface DashboardShellProps {
 export function DashboardShell({ role, children }: DashboardShellProps) {
   const pathname = usePathname();
   const navItems = getRoleNavItems(role);
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // On phones the nav is a sideways-scrolling tab bar: keep the current tab visible.
+  useEffect(() => {
+    const current = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    const bar = navRef.current;
+    if (!current || !bar || bar.scrollWidth <= bar.clientWidth) return;
+    bar.scrollLeft = current.offsetLeft - (bar.clientWidth - current.offsetWidth) / 2;
+  }, [pathname]);
 
   return (
     <div className={styles.shell}>
       <SiteHeader />
       <PageContainer>
         <div className={styles.body}>
-          <aside className={styles.sidebar} aria-label={`${getRoleLabel(role)} navigation`}>
+          <aside
+            ref={navRef}
+            className={styles.sidebar}
+            aria-label={`${getRoleLabel(role)} navigation`}
+          >
             <p className={styles.roleHeading}>{getRoleLabel(role)} portal</p>
             <nav aria-label={`${getRoleLabel(role)} sections`}>
               <ul className={styles.navList}>

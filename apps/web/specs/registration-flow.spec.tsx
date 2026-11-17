@@ -203,9 +203,12 @@ describe('TeamRegistrationForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('b'.repeat(43)));
-    expect(
-      screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }).textContent,
-    ).toBe('Copied');
+    // The label flips after the clipboard promise resolves, on a later render.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }).textContent,
+      ).toBe('Copied'),
+    );
   });
 
   it('surfaces backend errors clearly when registration fails', async () => {
