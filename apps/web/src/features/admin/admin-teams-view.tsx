@@ -360,7 +360,11 @@ export function AdminTeamsView() {
                 key: 'open',
                 header: 'Actions',
                 render: (team) => (
-                  <Link className={styles.link} href={`/admin/teams/${team.id}`}>
+                  <Link
+                    className={`${styles.link} ${styles.nowrap} ${styles.touchLink}`}
+                    href={`/admin/teams/${team.id}`}
+                    aria-label={`Manage ${team.name}`}
+                  >
                     Manage
                   </Link>
                 ),

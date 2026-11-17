@@ -296,7 +296,7 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
   return (
     <div className={styles.container}>
       <nav aria-label="Breadcrumb">
-        <Link className={styles.link} href="/admin/teams">
+        <Link className={`${styles.link} ${styles.touchLink}`} href="/admin/teams">
           ← All teams
         </Link>
       </nav>
