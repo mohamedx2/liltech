@@ -77,6 +77,8 @@ export const updateChallengeRequestSchema = z
     deliverables: challengeContentShape.deliverables.optional(),
     resources: challengeContentShape.resources.optional(),
     publicDelayMinutes: challengeContentShape.publicDelayMinutes.optional(),
+    /** `null` clears an organizer-set cutoff. */
+    submissionDeadline: isoTimestampSchema.nullable().optional(),
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: 'Provide at least one field to update.',
@@ -100,6 +102,8 @@ export const challengeScheduleSchema = z.strictObject({
   /** When every team can read the description; set when the challenge starts. */
   publicAt: isoTimestampSchema.nullable(),
   publicDelayMinutes: z.number().int(),
+  /** Organizer-set submission cutoff (`null`: only the phase / challenge end apply). */
+  submissionDeadline: isoTimestampSchema.nullable(),
 });
 
 export type ChallengeSchedule = z.infer<typeof challengeScheduleSchema>;
@@ -118,6 +122,8 @@ export const challengeAdminDetailSchema = challengeScheduleSchema.extend({
   ...challengeContentSchema.shape,
   /** Teams that solved this challenge's Mini-CTF. */
   ctfSolvedTeams: z.number().int().nonnegative(),
+  /** Set when an administrator force-opened the challenge to every team. */
+  forceOpenedAt: isoTimestampSchema.nullable(),
   createdAt: isoTimestampSchema,
   updatedAt: isoTimestampSchema,
 });
@@ -146,6 +152,12 @@ export const teamChallengeViewSchema = z.strictObject({
   challenge: challengeScheduleSchema,
   access: challengeAccessSchema,
   ctfSolved: z.boolean(),
+  /** When the challenge opens to every team (fallback / public reveal); null if never. */
+  unlocksAt: isoTimestampSchema.nullable(),
+  /** True when an administrator force-opened this challenge. */
+  forcedOpen: z.boolean(),
+  /** Server decision: may this team submit right now? */
+  submissionOpen: z.boolean(),
   /** Present only when `access` is not `locked`. */
   content: challengeContentSchema.nullable(),
 });

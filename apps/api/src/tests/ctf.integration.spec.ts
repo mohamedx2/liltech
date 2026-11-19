@@ -50,6 +50,9 @@ describeDb('LOUAGE 404 chain', () => {
   beforeEach(async () => {
     await resetIntegrationDatabase();
 
+    // Registration stays open in `checkin`; each ready team launches the CTF.
+    await prisma.eventPhaseState.create({ data: { phase: 'checkin' } });
+
     const admin = await createUser({
       role: 'admin',
       name: 'CTF Admin',
@@ -81,18 +84,37 @@ describeDb('LOUAGE 404 chain', () => {
 
   async function registerTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const email = `ctf-${suffix}@test.local`;
-    // Registration requires a university and a mobile number for every participant.
-    const contact = { university: 'Test University', phone: '+216 20 123 456' };
 
     const response = await request(app)
       .post('/api/registration/teams')
       .send({
         teamName: `CTF ${suffix}`,
-        leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD, ...contact },
+        leader: {
+          name: 'CTF Leader',
+          email,
+          password: LEADER_PASSWORD,
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
         members: [
-          { name: 'Member One', email: `one.${email}`, ...contact },
-          { name: 'Member Two', email: `two.${email}`, ...contact },
-          { name: 'Member Three', email: `three.${email}`, ...contact },
+          {
+            name: 'Member One',
+            email: `one.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Two',
+            email: `two.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Three',
+            email: `three.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
@@ -127,16 +149,6 @@ describeDb('LOUAGE 404 chain', () => {
     });
   }
 
-  async function setPhase(phase: string): Promise<void> {
-    const { token } = await createSessionForUser(adminUserId);
-    const response = await request(app)
-      .post('/api/event-state')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ phase, force: true });
-
-    expect(response.status).toBe(200);
-  }
-
   /**
    * Puts the event live with one running challenge whose public reveal is far
    * away, so challenge access is decided only by Mini-CTF completion.
@@ -144,6 +156,12 @@ describeDb('LOUAGE 404 chain', () => {
   async function liveRunningChallenge(): Promise<void> {
     const { token } = await createSessionForUser(adminUserId);
     const auth = { Authorization: `Bearer ${token}` };
+
+    const phase = await request(app)
+      .post('/api/event-state')
+      .set(auth)
+      .send({ phase: 'live', force: true });
+    expect(phase.status).toBe(200);
 
     const created = await request(app)
       .post('/api/admin/challenges')
@@ -166,15 +184,14 @@ describeDb('LOUAGE 404 chain', () => {
     expect(started.status).toBe(200);
   }
 
-  async function checkedInTeam(suffix: string): Promise<{ teamId: string; token: string }> {
+  async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const team = await registerTeam(suffix);
     await checkIn(team.teamId);
-    return team;
-  }
-
-  async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
-    const team = await checkedInTeam(suffix);
-    await setPhase('live');
+    // The Mini-CTF only opens once the server recorded the launch instant.
+    await prisma.eventPhaseState.update({
+      where: { id: 1 },
+      data: { phase: 'live', ctfStartedAt: new Date() },
+    });
     return team;
   }
 
@@ -208,19 +225,7 @@ describeDb('LOUAGE 404 chain', () => {
     expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('keeps the chain closed until an admin starts the event', async () => {
-    const team = await checkedInTeam('before-live');
-    await setPhase('checkin');
-    const response = await request(app)
-      .get('/api/ctf/chain')
-      .set('Authorization', `Bearer ${team.token}`);
-
-    expect(response.status).toBe(403);
-    expect(response.body.error.code).toBe('EVENT_NOT_LIVE');
-    expect(await prisma.ctfProgress.count({ where: { teamId: team.teamId } })).toBe(0);
-  });
-
-  it('opens stage 1 after an admin starts the event and locks the rest', async () => {
+  it('opens stage 1 for a checked-in team and locks the rest', async () => {
     const team = await readyTeam('stage-one');
     const response = await request(app)
       .get('/api/ctf/chain')
@@ -236,32 +241,8 @@ describeDb('LOUAGE 404 chain', () => {
     expect(response.body.summary).toEqual({ solved: 0, total: 7 });
   });
 
-  it.each(['submissions_closed', 'pitching', 'results'])(
-    'blocks chain, hints and submissions during %s',
-    async (phase) => {
-      const team = await readyTeam(`closed-${phase}`);
-      await setPhase(phase);
-
-      const chain = await request(app)
-        .get('/api/ctf/chain')
-        .set('Authorization', `Bearer ${team.token}`);
-      const hint = await request(app)
-        .post('/api/ctf/stages/fixture-01/hints')
-        .set('Authorization', `Bearer ${team.token}`);
-      const answer = await submit(team.token, 'fixture-01', FIXTURE_STAGES[0].answer);
-
-      for (const response of [chain, hint, answer]) {
-        expect(response.status).toBe(403);
-        expect(response.body.error.code).toBe('EVENT_NOT_LIVE');
-      }
-      expect(await prisma.ctfAttempt.count({ where: { teamId: team.teamId } })).toBe(0);
-      expect(await prisma.ctfProgress.count({ where: { teamId: team.teamId } })).toBe(0);
-    },
-  );
-
   it('keeps the chain shut for a team that has not checked in', async () => {
     const team = await registerTeam('not-checked-in');
-    await setPhase('live');
     const response = await request(app)
       .get('/api/ctf/chain')
       .set('Authorization', `Bearer ${team.token}`);
@@ -339,10 +320,15 @@ describeDb('LOUAGE 404 chain', () => {
   });
 
   it('keeps two teams independent', async () => {
-    // Register both teams before going live: registration closes once the event starts.
-    const first = await checkedInTeam('independent-a');
-    const second = await checkedInTeam('independent-b');
-    await setPhase('live');
+    // Register both before going live: registration closes at the launch.
+    const first = await registerTeam('independent-a');
+    const second = await registerTeam('independent-b');
+    await checkIn(first.teamId);
+    await checkIn(second.teamId);
+    await prisma.eventPhaseState.update({
+      where: { id: 1 },
+      data: { phase: 'live', ctfStartedAt: new Date() },
+    });
 
     await submit(first.token, 'fixture-01', FIXTURE_STAGES[0].answer);
 

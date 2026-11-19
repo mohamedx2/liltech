@@ -160,6 +160,8 @@ export function MiniCtfView() {
   const chainComplete = chain.current === null && chain.summary.solved === chain.summary.total;
   const stageUnavailable = current !== null && current.stage.status !== 'live';
   const driveUrl = current?.stage.assetDriveUrl ?? null;
+  const ctfOpen = chain.timing.open;
+  const ctfClosed = chain.timing.closed;
 
   return (
     <div className={styles.container}>
@@ -174,12 +176,19 @@ export function MiniCtfView() {
         </div>
 
         <div className={styles.badgeGroup}>
-          <Badge tone={chainComplete ? 'success' : chain.eligible ? 'info' : 'warning'} showDot>
+          <Badge
+            tone={chainComplete ? 'success' : ctfClosed ? 'neutral' : ctfOpen ? 'info' : 'warning'}
+            showDot
+          >
             {chainComplete
               ? 'Investigation complete'
-              : chain.eligible
-                ? 'In progress'
-                : 'Not checked in'}
+              : ctfClosed
+                ? 'Window closed'
+                : ctfOpen
+                  ? 'Open'
+                  : chain.eligible
+                    ? 'Not launched'
+                    : 'Not checked in'}
           </Badge>
           <Badge tone="neutral">
             {chain.summary.solved}/{chain.summary.total} solved
@@ -213,6 +222,31 @@ export function MiniCtfView() {
         </Card>
       )}
 
+      {chain.eligible && !ctfOpen && (
+        <Card surface="default" className={styles.lockedCard}>
+          <CardHeader>
+            <div className={styles.lockedTitle}>
+              <LockIcon size={22} />
+              <CardTitle as="h2">
+                {ctfClosed ? 'The Mini-CTF window is over' : 'The Mini-CTF has not started yet'}
+              </CardTitle>
+            </div>
+            <CardDescription>
+              {ctfClosed
+                ? 'Flag submissions are closed. The main challenge is decided by the 60-minute rule.'
+                : 'The investigation opens when the organizers launch the event.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert tone={ctfClosed ? 'warning' : 'info'} title={ctfClosed ? 'Closed' : 'Stand by'}>
+              {ctfClosed
+                ? 'Your solved stages stay recorded. Keep an eye on the announcements for the main challenge.'
+                : 'Wait for the opening ceremony. This page refreshes as soon as the Mini-CTF opens.'}
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
+
       {!chain.eligible && (
         <Card surface="default" className={styles.lockedCard}>
           <CardHeader>
@@ -233,7 +267,7 @@ export function MiniCtfView() {
         </Card>
       )}
 
-      {chain.eligible && current && (
+      {chain.eligible && ctfOpen && current && (
         <>
           <Card surface="raised" className={styles.formCard}>
             <CardHeader>

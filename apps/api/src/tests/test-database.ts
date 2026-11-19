@@ -36,8 +36,9 @@ export async function resetIntegrationDatabase(): Promise<void> {
     throw new Error('Integration test database not initialized.');
   }
   await prisma.$transaction([
-    // CTF first: stages cascade to hints, progress and attempts, and deleting
-    // them keeps fixtures from leaking into the next test.
+    // Submissions and CTF first: stages cascade to hints, progress and
+    // attempts, and deleting them keeps fixtures from leaking into the next test.
+    prisma.submission.deleteMany(),
     prisma.ctfStage.deleteMany(),
     prisma.challengeCtfSolve.deleteMany(),
     prisma.challenge.deleteMany(),

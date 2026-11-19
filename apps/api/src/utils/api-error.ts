@@ -20,6 +20,10 @@ export const ApiErrorCode = {
   STAGE_LOCKED: 'STAGE_LOCKED',
   STAGE_NOT_PUBLISHED: 'STAGE_NOT_PUBLISHED',
   STAGE_NOT_CONFIGURED: 'STAGE_NOT_CONFIGURED',
+  CTF_NOT_OPEN: 'CTF_NOT_OPEN',
+  CTF_CLOSED: 'CTF_CLOSED',
+  CHALLENGE_LOCKED: 'CHALLENGE_LOCKED',
+  SUBMISSIONS_CLOSED: 'SUBMISSIONS_CLOSED',
 } as const;
 
 export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
@@ -70,6 +74,30 @@ export class ApiError extends Error {
 
   static ctfNotSolved(): ApiError {
     return new ApiError(ApiErrorCode.CTF_NOT_SOLVED, 'Solve the Mini-CTF first.', 403);
+  }
+
+  static ctfNotOpen(): ApiError {
+    return new ApiError(
+      ApiErrorCode.CTF_NOT_OPEN,
+      'The Mini-CTF has not been launched yet. Wait for the organizers to start the event.',
+      403,
+    );
+  }
+
+  static ctfClosed(): ApiError {
+    return new ApiError(
+      ApiErrorCode.CTF_CLOSED,
+      'The Mini-CTF window is over. Flag submissions are closed.',
+      403,
+    );
+  }
+
+  static submissionsClosed(message = 'Submissions are closed.'): ApiError {
+    return new ApiError(ApiErrorCode.SUBMISSIONS_CLOSED, message, 403);
+  }
+
+  static challengeLocked(message = 'This challenge is not open for your team yet.'): ApiError {
+    return new ApiError(ApiErrorCode.CHALLENGE_LOCKED, message, 403);
   }
 }
 

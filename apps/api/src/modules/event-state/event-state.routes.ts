@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { updateEventStateRequestSchema, type EventStateResponse } from 'api-contracts';
 import { ApiError } from '../../utils/api-error';
 import { requireAuth, requireRole } from '../../middleware/auth';
+import { ctfClosesAt } from '../ctf/ctf-scoring';
 import { getEventState, setEventPhase } from './event-state.service';
 
 /**
@@ -15,18 +16,21 @@ export const eventStateRouter: Router = Router();
 function eventStateBody(
   phase: EventStateResponse['phase'],
   phaseChangedAt: Date,
+  ctfStartedAt: Date | null,
 ): EventStateResponse {
   return {
     phase,
     phaseChangedAt: phaseChangedAt.toISOString(),
     serverTime: new Date().toISOString(),
+    ctfStartedAt: ctfStartedAt?.toISOString() ?? null,
+    ctfClosesAt: ctfStartedAt ? ctfClosesAt(ctfStartedAt).toISOString() : null,
   };
 }
 
 eventStateRouter.get('/event-state', async (_req, res, next) => {
   try {
     const state = await getEventState();
-    res.status(200).json(eventStateBody(state.phase, state.phaseChangedAt));
+    res.status(200).json(eventStateBody(state.phase, state.phaseChangedAt, state.ctfStartedAt));
   } catch (error) {
     next(error);
   }
@@ -56,7 +60,7 @@ eventStateRouter.post('/event-state', requireAuth, requireRole('admin'), async (
     const state = await setEventPhase(input.data.phase, adminUserId, {
       force: input.data.force,
     });
-    res.status(200).json(eventStateBody(state.phase, state.phaseChangedAt));
+    res.status(200).json(eventStateBody(state.phase, state.phaseChangedAt, state.ctfStartedAt));
   } catch (error) {
     next(error);
   }

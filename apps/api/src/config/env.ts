@@ -54,6 +54,9 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value === undefined ? undefined : value === 'true')),
 
+  /** Wrong-flag submissions accepted per team per minute (per stage). */
+  CTF_SUBMIT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(60).default(5),
+
   /**
    * 32-byte key (base64) encrypting stored QR badge tokens so a team can see
    * its badges again. Generate with:

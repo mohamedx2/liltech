@@ -104,13 +104,21 @@ The backend is the single writer of event phase state; clients only read. Phase 
 
 #### `GET /api/event-state`
 
-Public. Returns the current phase, when it was entered, and the authoritative server time (used by clients for countdowns).
+Public. Returns the current phase, when it was entered, the authoritative server time (used by clients for countdowns) and the Mini-CTF clock.
 
 **Response `200`:**
 
 ```json
-{ "phase": "registration|checkin|...", "phaseChangedAt": "ISO 8601 UTC", "serverTime": "ISO 8601 UTC" }
+{
+  "phase": "registration|checkin|...",
+  "phaseChangedAt": "ISO 8601 UTC",
+  "serverTime": "ISO 8601 UTC",
+  "ctfStartedAt": "ISO 8601 UTC | null",
+  "ctfClosesAt": "ISO 8601 UTC | null"
+}
 ```
+
+`ctfStartedAt` is written once, when the event first enters `live`; `ctfClosesAt` is that instant + 60 minutes. Both are `null` before the launch and are never reset by a forced phase change.
 
 Schema: `eventStateResponseSchema`.
 
@@ -118,11 +126,13 @@ Schema: `eventStateResponseSchema`.
 
 Phases advance one step at a time (`registration → checkin → live → submissions_closed → pitching → results`). Skipping ahead or going back needs `{ "phase": "…", "force": true }`; the audit entry records `from -> to` and marks overrides. The admin dashboard sends `force` only after the admin confirms.
 
-Admin only. Atomically transitions the phase and records an audit entry (`event_phase_transition`).
+Repeating the current phase is an idempotent no-op: `200` with the unchanged state and no audit entry. One exception: posting `live` while `ctfStartedAt` is still `null` records the Mini-CTF launch (audit `ctf.launched`).
+
+Admin only. Atomically transitions the phase and records an audit entry `event.phase_changed`.
 
 **Request body:** `{ "phase": "checkin|live|..." }`
 
-**Response `200`:** the new event state shape (same as GET). Errors: `CONFLICT` when the requested phase equals the current phase; `FORBIDDEN` for non-admin. Audit entry `event.phase_changed` recorded.
+**Response `200`:** the new event state shape (same as GET). Errors: `CONFLICT` when jumping or going back without `force`; `FORBIDDEN` for non-admin.
 
 Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
@@ -184,18 +194,21 @@ Resends one member's badge email, **at most once per hour per participant**. The
 
 The event runs two challenges one after the other. An administrator starts and ends each one; both actions are refused (`CONFLICT`, 409) unless the event phase is `live`. Only one challenge can be live at a time (service check plus a partial unique index), challenges start in `position` order, and an ended challenge cannot start again. Starting sets `publicAt = startedAt + publicDelayMinutes` (60 by default).
 
-A team reads a running challenge's description before `publicAt` only if it solved **that challenge's** Mini-CTF (`access: "early"`); from `publicAt`, or once the challenge has ended, every team can (`access: "public"`). Otherwise `access` is `"locked"` and `content` is `null` (title, teaser and `publicAt` stay visible). The Mini-CTF module records a solve with `recordMiniCtfSolve(teamId, challengeId)` (challenges service); that is the only integration point.
+Challenge 01 unlocks early for a team that cleared the Mini-CTF chain (`access: "early"`) and to every team once `ctfStartedAt + 60 min` has passed, an administrator force-opens it, or `publicAt` is reached (`access: "public"`). Challenge 02 opens to everyone as soon as administrators start it. Otherwise `access` is `"locked"`, `content` is `null`, and `unlocksAt` carries the instant it opens to everyone (for the participant countdown).
+
+Each view also reports `submissionOpen` (the server's answer to "may this team submit right now?"), `forcedOpen`, and the organizer-set `challenge.submissionDeadline`. Submissions stop when the event leaves `live`, when the challenge ends, or at the deadline. The phase gate lives in `apps/api/src/modules/event-state/phase-gate.ts` and is shared by the CTF, challenge and submission modules.
 
 #### `GET /api/challenges` · `GET /api/challenges/current` (team)
 
-Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. A team with no member checked in at the entrance: `reason: "NOT_CHECKED_IN"` (challenges are for teams present at the venue). Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
+Before the event (`registration`, `checkin`): `200 { available: false, reason: "EVENT_NOT_STARTED", phase, message }`. A team with no member checked in at the entrance: `reason: "NOT_CHECKED_IN"` (challenges are for teams present at the venue). Live with no challenge started yet: `current` answers `reason: "NO_CHALLENGE_STARTED"`. Otherwise `{ available: true, phase, serverTime, items | current }` where each view is `{ challenge (schedule), access, ctfSolved, content | null }`. `current` is the running challenge, else the last ended one. Each item is `{ challenge (schedule incl. submissionDeadline), access, ctfSolved, unlocksAt, forcedOpen, submissionOpen, content | null }`. Schemas: `teamChallengeListResponseSchema`, `currentChallengeResponseSchema`.
 
 #### Admin (audited)
 
 - `GET /api/admin/challenges` — full content, status, timing, Mini-CTF solve count.
 - `POST /api/admin/challenges` — `{ position, title, summary?, description, problemStatement?, deliverables?, resources?: [{ name, url }], publicDelayMinutes? }`; duplicate position → 409.
-- `PATCH /api/admin/challenges/:id` — content and delay (a delay change moves `publicAt` of a running challenge).
+- `PATCH /api/admin/challenges/:id` — content, delay (a delay change moves `publicAt` of a running challenge) and `submissionDeadline` (`null` clears it).
 - `POST /api/admin/challenges/:id/start`, `POST /api/admin/challenges/:id/end` — event must be `live`.
+- `POST /api/admin/challenges/:id/force-open` — opens a started challenge to every checked-in team now (idempotent, audited `challenge.force_opened`); 409 while the challenge is still `upcoming`.
 
 ### Check-in (staff)
 
@@ -259,6 +272,11 @@ Seven sequential stages. Every decision (which stage is current, whether a
 submission is accepted, when the main challenge unlocks) is made server-side;
 the client only renders `/ctf/chain`.
 
+The CTF only runs while the event is `live` **and** within 60 minutes of the
+launch instant the server recorded (`ctfStartedAt`). Before the launch every
+action answers `403 CTF_NOT_OPEN`; after the window (or once the event reaches
+`submissions_closed` or later) every action answers `403 CTF_CLOSED`.
+
 All endpoints require `Authorization: Bearer <token>` with the `team` role.
 They also require the authoritative event phase to be exactly `live`. An admin
 opens the Mini-CTF by moving the event to `live`; every other phase returns
@@ -291,13 +309,22 @@ Returns the team, the seven-stage tracker and the stage the team may work on.
     "hints": []
   },
   "summary": { "solved": 0, "total": 7 },
-  "eligible": true
+  "eligible": true,
+  "timing": {
+    "startedAt": "2026-11-21T20:00:00.000Z",
+    "closesAt": "2026-11-21T21:00:00.000Z",
+    "open": true,
+    "closed": false,
+    "serverTime": "2026-11-21T20:10:00.000Z"
+  }
 }
 ```
 
-`current` is `null` when the team has solved everything (or is not eligible).
-`eligible` is false until the team has checked in. No answer, digest or pepper
-is ever part of this payload.
+`current` is `null` when the team has solved everything, is not eligible, or the
+CTF is not open. `eligible` is false until the team has checked in; `timing.open`
+is the server's answer to "can this team play right now?". `team.points` and
+`team.solvedAt` are filled when the chain is completed. No answer, digest or
+pepper is ever part of this payload.
 
 #### `GET /api/ctf/stages/:slug`
 
@@ -328,28 +355,111 @@ Reveals the next hint.
   "nextStageUnlocked": true,
   "nextStagePosition": 2,
   "completedChain": false,
+  "points": null,
+  "solvedAt": null,
   "message": "Correct flag. The next stage is unlocked."
 }
 ```
 
-Replaying a solved stage returns the same success without a new solve.
+Replaying a solved stage returns the same success without a new solve. The final
+correct flag sets `completedChain: true` and fills `points` / `solvedAt`:
+
+| Solve time since the launch | Points |
+|---|---|
+| `0 ≤ t < 15 min` | 10 |
+| `15 ≤ t < 30 min` | 7 |
+| `30 ≤ t < 45 min` | 4.5 |
+| `45 ≤ t < 60 min` | 2.5 |
+| `t ≥ 60 min` (window closed) | 0 |
+
+Bands live in `apps/api/src/modules/ctf/ctf-scoring.ts`. The score and solve
+instant are stored on the team (`ctfPoints`, `ctfSolvedAt`) and made permanent
+when the chain completes; a replay never changes them.
 
 | Status | Code | Meaning |
 |---|---|---|
 | 400 | `CTF_NOT_SOLVED` | Incorrect flag (attempt recorded) |
-| 403 | `EVENT_NOT_LIVE` | Admin has not started the event, or the CTF is closed |
+| 403 | `CTF_NOT_OPEN` | Event not `live`, or the launch instant not recorded |
+| 403 | `CTF_CLOSED` | 60-minute window over, or event left `live` |
 | 403 | `FORBIDDEN` | Stage is locked |
 | 403 | `STAGE_NOT_PUBLISHED` | Stage is `draft`/`closed` |
 | 409 | `STAGE_NOT_CONFIGURED` | Stage has no answer provisioned |
-| 429 | `RATE_LIMITED` | More than 5 attempts per minute for this stage |
+| 429 | `RATE_LIMITED` | More than `CTF_SUBMIT_RATE_LIMIT_PER_MINUTE` (5) attempts per minute for this stage |
 
 #### Interaction with the main challenge
 
 The chain is the single source of truth for Mini-CTF completion: solving the
-last required stage sets the team to `challenge_unlocked`. `GET /api/challenges`
-and `GET /api/challenges/current` then report every running challenge as
-`access: "early"` (or `"public"` once its reveal delay passes); before that they
-report `access: "locked"` with `content: null`. See the challenge section below.
+last required stage sets the team to `challenge_unlocked` and stores the
+automatic score. `GET /api/challenges` and `GET /api/challenges/current` then
+report Challenge 01 as `access: "early"`. Teams that did not solve it get it at
+`ctfStartedAt + 60 min` (evaluated lazily on every request), or when an
+administrator force-opens it. See the challenge section above.
+
+---
+
+### Team submissions
+
+Team role only; a team only ever sees its own submissions (resolved from the
+authenticated account, never from the request). Contract in
+`libs/api-contracts/src/lib/submissions-contracts.ts`.
+
+There is no file upload: Challenge 01 takes one Google Drive link (poster, logo,
+teaser video); Challenge 02 takes a GitHub repository plus a technical report
+link and a presentation link.
+
+#### `GET /api/submissions`
+
+```json
+{
+  "phase": "live",
+  "serverTime": "ISO 8601 UTC",
+  "items": [
+    {
+      "challenge": { "id": "…", "position": 1, "title": "…", "submissionDeadline": "ISO 8601 UTC | null", "…": "…" },
+      "access": "locked|early|public",
+      "canSubmit": true,
+      "blockedReason": null,
+      "current": { "id": "…", "driveUrl": "https://drive.google.com/…", "isCurrent": true, "…": "…" },
+      "history": [ { "…": "newest first" } ]
+    }
+  ]
+}
+```
+
+`blockedReason` is one of `EVENT_NOT_LIVE`, `CHALLENGE_NOT_STARTED`,
+`CHALLENGE_LOCKED`, `SUBMISSIONS_CLOSED`, `DEADLINE_PASSED`. Schema:
+`submissionsOverviewResponseSchema`.
+
+#### `POST /api/submissions`
+
+```json
+{ "challengePosition": 1, "driveUrl": "https://drive.google.com/…" }
+```
+
+```json
+{
+  "challengePosition": 2,
+  "githubUrl": "https://github.com/owner/repo",
+  "reportUrl": "https://drive.google.com/…",
+  "presentationUrl": "https://docs.google.com/presentation/…"
+}
+```
+
+Links are validated server-side: https only, no embedded credentials, Drive/Docs
+hosts for the Drive fields, and `https://github.com/<owner>/<repo>` for the
+repository. Anything else is `400 VALIDATION_ERROR`. Resubmission is allowed
+until the deadline; every submission inserts an append-only row and the newest
+one counts. For Challenge 02 the server also pins the GitHub default-branch HEAD
+(`commitSha`) on a best-effort basis: if the GitHub API fails, times out or rate
+limits, the submission is still accepted with `commitSha: null`.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Malformed link or payload |
+| 403 | `CHALLENGE_LOCKED` | Challenge not started / not unlocked for this team |
+| 403 | `SUBMISSIONS_CLOSED` | Event not `live`, challenge ended, or deadline passed |
+
+Audit entry `submission.created` (target: the challenge).
 
 ---
 

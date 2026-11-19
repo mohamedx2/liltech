@@ -21,9 +21,13 @@ export function handleGetCurrentChallenge(): CurrentChallengeResponse {
         endedAt: null,
         publicAt: '2026-11-21T20:00:00.000Z',
         publicDelayMinutes: 60,
+        submissionDeadline: null,
       },
       access: solved ? 'early' : 'locked',
       ctfSolved: solved,
+      unlocksAt: solved ? null : '2026-11-21T20:00:00.000Z',
+      forcedOpen: false,
+      submissionOpen: solved,
       content: solved
         ? {
             description: mock.description,

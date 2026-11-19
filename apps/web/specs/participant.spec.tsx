@@ -144,6 +144,7 @@ describe('Participant / Team Features', () => {
       endedAt: null,
       publicAt: '2026-11-21T20:00:00.000Z',
       publicDelayMinutes: 60,
+      submissionDeadline: null,
     };
 
     it('displays the challenge brief when the team has access', async () => {
@@ -155,6 +156,9 @@ describe('Participant / Team Features', () => {
           challenge: schedule,
           access: 'early',
           ctfSolved: true,
+          unlocksAt: null,
+          forcedOpen: false,
+          submissionOpen: true,
           content: {
             description: 'Build an intelligent dispatching engine.',
             problemStatement: 'Routing delays hurt emergency response teams.',
@@ -179,14 +183,22 @@ describe('Participant / Team Features', () => {
         available: true,
         phase: EventPhase.Live,
         serverTime: '2026-11-21T19:10:00.000Z',
-        current: { challenge: schedule, access: 'locked', ctfSolved: false, content: null },
+        current: {
+          challenge: schedule,
+          access: 'locked',
+          ctfSolved: false,
+          unlocksAt: '2026-11-21T20:00:00.000Z',
+          forcedOpen: false,
+          submissionOpen: false,
+          content: null,
+        },
       });
 
       render(<ChallengeView />);
 
       await waitFor(() => {
         expect(screen.getByText(/Challenge Locked/i)).toBeTruthy();
-        expect(screen.getByText(/opens for every team at/i)).toBeTruthy();
+        expect(screen.getByText(/opens to every team at/i)).toBeTruthy();
       });
     });
 
@@ -207,53 +219,99 @@ describe('Participant / Team Features', () => {
   });
 
   describe('SubmissionsView', () => {
-    it('displays deliverable submission form and records a new version', async () => {
-      const versionOne = {
-        id: 'sub-001',
-        teamId: 'dev-team-01',
-        track: ChallengeTrack.TrackA,
-        title: 'Initial Architecture Draft & Prototype',
-        description: 'First version of the dispatch engine.',
-        repoUrl: 'https://github.com/sample-builders/liltech-dispatcher',
-        fileName: 'prototype-v1.zip',
-        fileSizeBytes: 1048576,
-        submittedAt: '2026-11-21T21:15:00.000Z',
-        version: 1,
-      };
+    const challengeOne = {
+      id: '00000000-0000-4000-8000-0000000000c1',
+      position: 1,
+      title: 'Poster, logo and teaser',
+      summary: 'One Drive link with your visual identity.',
+      status: 'live' as const,
+      startedAt: '2026-11-21T19:00:00.000Z',
+      endedAt: null,
+      publicAt: '2026-11-21T19:00:00.000Z',
+      publicDelayMinutes: 60,
+      submissionDeadline: '2026-11-22T08:00:00.000Z',
+    };
 
-      vi.spyOn(api.events, 'getEventState').mockResolvedValue(LIVE_EVENT_STATE);
-      vi.spyOn(api.submissions, 'getMyTeamSubmissions').mockResolvedValue({
-        submissions: [versionOne],
-        current: versionOne,
-        isLocked: false,
-        deadline: '2026-11-22T08:00:00.000Z',
+    const challengeTwo = {
+      ...challengeOne,
+      id: '00000000-0000-4000-8000-0000000000c2',
+      position: 2,
+      title: 'Technical project',
+      status: 'upcoming' as const,
+      startedAt: null,
+      publicAt: null,
+      submissionDeadline: null,
+    };
+
+    const submission = {
+      id: '00000000-0000-4000-8000-00000000aa01',
+      challengeId: challengeOne.id,
+      challengePosition: 1,
+      driveUrl: 'https://drive.google.com/file/d/first/view',
+      githubUrl: null,
+      reportUrl: null,
+      presentationUrl: null,
+      commitSha: null,
+      submittedAt: '2026-11-21T21:15:00.000Z',
+      isCurrent: true,
+    };
+
+    it('submits a Drive link for challenge 01 and shows its history', async () => {
+      const getOverview = vi.spyOn(api.submissions, 'getOverview').mockResolvedValue({
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T21:20:00.000Z',
+        items: [
+          {
+            challenge: challengeOne,
+            access: 'public',
+            canSubmit: true,
+            blockedReason: null,
+            current: submission,
+            history: [submission],
+          },
+          {
+            challenge: challengeTwo,
+            access: 'locked',
+            canSubmit: false,
+            blockedReason: 'CHALLENGE_NOT_STARTED',
+            current: null,
+            history: [],
+          },
+        ],
       });
-      vi.spyOn(api.submissions, 'createSubmission').mockResolvedValue({
-        ...versionOne,
-        id: 'sub-002',
-        title: 'Autonomous Dispatch Engine v2',
+      const create = vi.spyOn(api.submissions, 'create').mockResolvedValue({
+        ...submission,
+        id: '00000000-0000-4000-8000-00000000aa02',
+        driveUrl: 'https://drive.google.com/file/d/second/view',
         submittedAt: '2026-11-21T22:15:00.000Z',
-        version: 2,
       });
 
       render(<SubmissionsView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Project Submissions/i)).toBeTruthy();
+        expect(screen.getByText(/Challenge submissions/i)).toBeTruthy();
       });
 
-      const titleInput = screen.getByLabelText(/Deliverable Title/i);
-      fireEvent.change(titleInput, { target: { value: 'Autonomous Dispatch Engine v2' } });
+      expect(screen.getByRole('heading', { name: /Technical project/i })).toBeTruthy();
+      expect(screen.getByText(/has not started yet/i)).toBeTruthy();
 
-      const repoInput = screen.getByLabelText(/Git Repository URL/i);
-      fireEvent.change(repoInput, { target: { value: 'https://github.com/myteam/dispatcher' } });
+      const driveInput = screen.getByLabelText(/Google Drive link/i);
+      fireEvent.change(driveInput, {
+        target: { value: 'https://drive.google.com/file/d/second/view' },
+      });
 
-      const submitBtn = screen.getByRole('button', { name: /Submit Deliverables/i });
-      fireEvent.click(submitBtn);
+      fireEvent.click(screen.getByRole('button', { name: /Submit a new version/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Deliverable submission v2 recorded successfully!/i)).toBeTruthy();
+        expect(create).toHaveBeenCalledWith({
+          challengePosition: 1,
+          driveUrl: 'https://drive.google.com/file/d/second/view',
+        });
       });
+      await waitFor(() => {
+        expect(screen.getByText(/Submission recorded/i)).toBeTruthy();
+      });
+      expect(getOverview).toHaveBeenCalled();
     });
   });
 

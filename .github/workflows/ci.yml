@@ -187,7 +187,7 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL || 'https://liltechsousse.com' }}
         run: |
-          # The API refuses to start without QR_TOKEN_KEY: fail the deploy early instead.
+          # The API refuses to start without these: fail the deploy early instead.
           if [ -z "$QR_TOKEN_KEY" ]; then
             echo '::error::The QR_TOKEN_KEY repository secret is required.'
             exit 1
