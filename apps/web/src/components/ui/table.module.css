@@ -47,3 +47,79 @@
 .table tbody tr:last-child th {
   border-block-end: none;
 }
+
+/*
+ * Phones: each row becomes a card of label / value pairs, so nothing scrolls
+ * sideways and no column gets squeezed. Column headers move into the cells
+ * (`data-label`); the explicit ARIA roles in the markup keep table semantics.
+ */
+@media (max-width: 640px) {
+  .wrapper {
+    overflow-x: visible;
+    max-block-size: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    inline-size: 100%;
+    box-sizing: border-box;
+  }
+
+  .caption {
+    display: block;
+    inline-size: 100%;
+    box-sizing: border-box;
+  }
+
+  .table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-block-start: 12px;
+  }
+
+  .table tbody tr {
+    padding: 4px 16px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .table td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 12px 0;
+    overflow-wrap: anywhere;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding-block-start: 2px;
+  }
+
+  .table tbody tr td:last-child {
+    border-block-end: none;
+  }
+
+  /* Row actions get the full card width so their buttons sit side by side. */
+  .table td[data-label='Actions'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}

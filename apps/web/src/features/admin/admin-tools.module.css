@@ -141,6 +141,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Dates and other long values in a stat tile: readable, never a giant wrap. */
+.stat dd.small {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .statDetail {
   font-size: var(--text-xs);
   font-weight: 500;
@@ -423,4 +430,89 @@
   font-size: var(--text-sm);
   color: var(--color-text);
   min-height: 44px;
+}
+
+/* Collapsible reference content (e.g. the event-night playbook). */
+.disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.disclosureSummary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.disclosureSummary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.disclosure[open] > .disclosureSummary {
+  margin-bottom: var(--space-3);
+}
+
+/* A link or button label that must stay on one line (e.g. "Manage"). */
+.nowrap {
+  white-space: nowrap;
+}
+
+/* A text link that is also a comfortable touch target. */
+.touchLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* ── Phones ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .container {
+    gap: var(--space-4);
+  }
+
+  .hero,
+  .panel {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .statGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .stat {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .stat dd {
+    font-size: var(--text-lg);
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar > * {
+    flex: 1 1 100%;
+  }
+
+  .actions > * {
+    flex: 1 1 auto;
+  }
+
+  .listItem {
+    flex-wrap: wrap;
+  }
+
+  .phaseStepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

@@ -81,7 +81,9 @@ export function matchesSearch(team: AdminTeam, query: string): boolean {
     team.participants.some(
       (participant) =>
         participant.name.toLowerCase().includes(needle) ||
-        (participant.email ?? '').toLowerCase().includes(needle),
+        (participant.email ?? '').toLowerCase().includes(needle) ||
+        (participant.university ?? '').toLowerCase().includes(needle) ||
+        (participant.phone ?? '').includes(needle),
     )
   );
 }
@@ -100,6 +102,8 @@ export function rosterToCsv(teams: readonly AdminTeam[]): string {
     'Participant',
     'Role',
     'Email',
+    'University',
+    'Mobile number',
     'Badge color',
     'Checked in at',
     'Badge email',
@@ -113,6 +117,8 @@ export function rosterToCsv(teams: readonly AdminTeam[]): string {
       participant.name,
       participant.isLeader ? 'leader' : 'member',
       participant.email ?? '',
+      participant.university ?? '',
+      participant.phone ?? '',
       participant.color ?? '',
       participant.checkedInAt ?? '',
       participant.badge?.emailStatus ?? '',
@@ -354,7 +360,11 @@ export function AdminTeamsView() {
                 key: 'open',
                 header: 'Actions',
                 render: (team) => (
-                  <Link className={styles.link} href={`/admin/teams/${team.id}`}>
+                  <Link
+                    className={`${styles.link} ${styles.nowrap} ${styles.touchLink}`}
+                    href={`/admin/teams/${team.id}`}
+                    aria-label={`Manage ${team.name}`}
+                  >
                     Manage
                   </Link>
                 ),

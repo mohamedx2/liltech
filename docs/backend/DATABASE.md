@@ -33,6 +33,8 @@ Three migrations applied to both dev (`liltech`) and test (`liltech_test`) datab
 4. `20261115130000_badge_colors_email_delivery_jury_passwords` — badge colors, badge email delivery state, readable jury passwords.
 5. `20261115140000_challenges_and_ctf_solves` — `Challenge`, `ChallengeCtfSolve`.
 6. `20261115160000_team_status` — `Team.status` (`team_status` enum, default `active`), `statusReason`, `statusChangedAt`, index on `status`. A non-active team cannot be checked in or read challenges.
+7. `20261115190000_audit_log_summary` — `AuditLog.summary`.
+8. `20261117090000_participant_university_phone` — `Participant.university` (`VarChar(120)`) and `Participant.phone` (`VarChar(20)`). Nullable for participants registered before they existed; required by the registration and admin add-member contracts.
 
 Commands (Windows notes: this Prisma version does not support `--env-file`; pass `DATABASE_URL` inline):
 

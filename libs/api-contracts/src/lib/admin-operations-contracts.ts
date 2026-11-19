@@ -3,7 +3,12 @@ import { isoTimestampSchema } from './common.js';
 import { eventPhaseSchema, teamProgressStateSchema } from './event-state.js';
 import { challengeStatusSchema } from './challenges-contracts.js';
 import { badgeColorSchema, badgeEmailStatusSchema } from './participants-contracts.js';
-import { participantNameSchema, teamMemberInputSchema } from './registration-contracts.js';
+import {
+  participantNameSchema,
+  participantPhoneSchema,
+  participantUniversitySchema,
+  teamMemberInputSchema,
+} from './registration-contracts.js';
 
 /**
  * Contract for the admin operations toolkit (admin role only, every write is
@@ -84,6 +89,10 @@ export const adminParticipantSchema = z.strictObject({
   name: z.string(),
   isLeader: z.boolean(),
   email: z.string().nullable(),
+  /** `null` for participants registered before it was required. */
+  university: z.string().nullable(),
+  /** `null` for participants registered before it was required. */
+  phone: z.string().nullable(),
   color: badgeColorSchema.nullable(),
   checkedInAt: isoTimestampSchema.nullable(),
   /** Staff member who recorded the check-in. */
@@ -160,8 +169,10 @@ export const updateParticipantRequestSchema = z
   .strictObject({
     name: participantNameSchema.optional(),
     email: z.email().optional(),
+    university: participantUniversitySchema.optional(),
+    phone: participantPhoneSchema.optional(),
   })
-  .refine((value) => value.name !== undefined || value.email !== undefined, {
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: 'Provide at least one field to update.',
   });
 

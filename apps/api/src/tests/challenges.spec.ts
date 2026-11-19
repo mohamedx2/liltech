@@ -115,8 +115,19 @@ describeDb('challenges', () => {
       .post('/api/registration/teams')
       .send({
         teamName: `Team ${slug}`,
-        leader: { name: `${slug} Leader`, email: `leader@${slug}.test`, password: PASSWORD },
-        members: [1, 2, 3].map((n) => ({ name: `${slug} ${n}`, email: `m${n}@${slug}.test` })),
+        leader: {
+          name: `${slug} Leader`,
+          email: `leader@${slug}.test`,
+          password: PASSWORD,
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
+        members: [1, 2, 3].map((n) => ({
+          name: `${slug} ${n}`,
+          email: `m${n}@${slug}.test`,
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        })),
       });
     expect(response.status).toBe(201);
     if (checkedIn) {

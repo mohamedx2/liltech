@@ -120,10 +120,18 @@ describeDb('team portal, badges and jury management', () => {
   function teamPayload(slug: string, memberCount = 3) {
     return {
       teamName: `Team ${slug}`,
-      leader: { name: `${slug} Leader`, email: `leader@${slug}.test`, password: PASSWORD },
+      leader: {
+        name: `${slug} Leader`,
+        email: `leader@${slug}.test`,
+        password: PASSWORD,
+        university: 'Test University',
+        phone: '+216 20 123 456',
+      },
       members: Array.from({ length: memberCount }, (_, index) => ({
         name: `${slug} Member ${index + 1}`,
         email: `member${index + 1}@${slug}.test`,
+        university: 'Test University',
+        phone: '+216 20 123 456',
       })),
     };
   }
@@ -262,6 +270,35 @@ describeDb('team portal, badges and jury management', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error.details[0].path).toBe('members.0.email');
+    });
+
+    it('requires a university and a mobile number for every participant', async () => {
+      const payload = teamPayload('kilo') as {
+        leader: { phone?: string };
+        members: Array<{ university?: string }>;
+      };
+      delete payload.leader.phone;
+      delete payload.members[2].university;
+
+      const response = await request(app).post('/api/registration/teams').send(payload);
+
+      expect(response.status).toBe(400);
+      const paths = response.body.error.details.map((detail: { path: string }) => detail.path);
+      expect(paths).toEqual(expect.arrayContaining(['leader.phone', 'members.2.university']));
+    });
+
+    it('stores the university and mobile number of each participant', async () => {
+      const payload = teamPayload('lima');
+      payload.members[0].university = 'ISITCom';
+      payload.members[0].phone = '+216 98 765 432';
+
+      const response = await request(app).post('/api/registration/teams').send(payload);
+
+      expect(response.status).toBe(201);
+      const stored = await prisma.participant.findFirstOrThrow({
+        where: { email: 'member1@lima.test' },
+      });
+      expect(stored).toMatchObject({ university: 'ISITCom', phone: '+216 98 765 432' });
     });
 
     it('answers malformed JSON with a 400 validation error, not a 500', async () => {

@@ -7,6 +7,8 @@ import {
   EventPhase,
   TEAM_MEMBERS_TOTAL_MAX,
   TEAM_MEMBERS_TOTAL_MIN,
+  participantPhoneSchema,
+  participantUniversitySchema,
   type AdminParticipant,
   type AdminTeam,
   type ChallengeAdminDetail,
@@ -90,6 +92,8 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
   // Form fields used by the dialogs.
   const [nameField, setNameField] = useState('');
   const [emailField, setEmailField] = useState('');
+  const [universityField, setUniversityField] = useState('');
+  const [phoneField, setPhoneField] = useState('');
   const [reasonField, setReasonField] = useState('');
 
   const loadData = useCallback(async () => {
@@ -122,11 +126,15 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
     } else if (action.kind === 'edit') {
       setNameField(action.participant.name);
       setEmailField(action.participant.email ?? '');
+      setUniversityField(action.participant.university ?? '');
+      setPhoneField(action.participant.phone ?? '');
     } else if (action.kind === 'delete') {
       setNameField('');
     } else if (action.kind === 'add-member') {
       setNameField('');
       setEmailField('');
+      setUniversityField('');
+      setPhoneField('');
     } else if (action.kind === 'status') {
       setReasonField('');
     }
@@ -170,7 +178,12 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
         return;
       case 'add-member':
         return applyTeamUpdate(
-          api.admin.addParticipant(team.id, { name: nameField.trim(), email: emailField.trim() }),
+          api.admin.addParticipant(team.id, {
+            name: nameField.trim(),
+            email: emailField.trim(),
+            university: universityField.trim(),
+            phone: phoneField.trim(),
+          }),
           `${nameField.trim()} added. Their badge is being emailed.`,
         );
       case 'edit': {
@@ -178,6 +191,14 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
           ...(nameField.trim() !== pending.participant.name ? { name: nameField.trim() } : {}),
           ...(emailField.trim() !== (pending.participant.email ?? '')
             ? { email: emailField.trim() }
+            : {}),
+          // Empty stays unchanged: older registrations have no university or phone yet.
+          ...(universityField.trim() &&
+          universityField.trim() !== (pending.participant.university ?? '')
+            ? { university: universityField.trim() }
+            : {}),
+          ...(phoneField.trim() && phoneField.trim() !== (pending.participant.phone ?? '')
+            ? { phone: phoneField.trim() }
             : {}),
         };
         return applyTeamUpdate(
@@ -275,7 +296,7 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
   return (
     <div className={styles.container}>
       <nav aria-label="Breadcrumb">
-        <Link className={styles.link} href="/admin/teams">
+        <Link className={`${styles.link} ${styles.touchLink}`} href="/admin/teams">
           ← All teams
         </Link>
       </nav>
@@ -396,6 +417,17 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
                     {participant.isLeader ? ' (leader)' : ''}
                   </span>
                   <span className={styles.small}>{participant.email ?? 'No email on file'}</span>
+                  <span className={styles.small}>
+                    {participant.university ?? 'No university on file'}
+                    {' · '}
+                    {participant.phone ? (
+                      <a href={`tel:${participant.phone.replace(/[^0-9+]/g, '')}`}>
+                        {participant.phone}
+                      </a>
+                    ) : (
+                      'No mobile number on file'
+                    )}
+                  </span>
                 </div>
               ),
             },
@@ -568,9 +600,13 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
           team={team}
           nameField={nameField}
           emailField={emailField}
+          universityField={universityField}
+          phoneField={phoneField}
           reasonField={reasonField}
           onNameChange={setNameField}
           onEmailChange={setEmailField}
+          onUniversityChange={setUniversityField}
+          onPhoneChange={setPhoneField}
           onReasonChange={setReasonField}
           onConfirm={runPending}
           onClose={() => setPending(null)}
@@ -608,9 +644,13 @@ interface PendingActionDialogProps {
   team: AdminTeam;
   nameField: string;
   emailField: string;
+  universityField: string;
+  phoneField: string;
   reasonField: string;
   onNameChange: (value: string) => void;
   onEmailChange: (value: string) => void;
+  onUniversityChange: (value: string) => void;
+  onPhoneChange: (value: string) => void;
   onReasonChange: (value: string) => void;
   onConfirm: () => Promise<void>;
   onClose: () => void;
@@ -618,14 +658,21 @@ interface PendingActionDialogProps {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const isValidUniversity = (value: string) => participantUniversitySchema.safeParse(value).success;
+const isValidPhone = (value: string) => participantPhoneSchema.safeParse(value).success;
+
 function PendingActionDialog({
   action,
   team,
   nameField,
   emailField,
+  universityField,
+  phoneField,
   reasonField,
   onNameChange,
   onEmailChange,
+  onUniversityChange,
+  onPhoneChange,
   onReasonChange,
   onConfirm,
   onClose,
@@ -656,6 +703,36 @@ function PendingActionDialog({
           type="email"
           value={emailField}
           onChange={(event) => onEmailChange(event.target.value)}
+        />
+      )}
+    </FormField>
+  );
+
+  const universityInput = (required: boolean) => (
+    <FormField label="University" required={required} hint="University or school.">
+      {({ id, describedBy }) => (
+        <TextInput
+          id={id}
+          aria-describedby={describedBy}
+          value={universityField}
+          onChange={(event) => onUniversityChange(event.target.value)}
+          maxLength={120}
+        />
+      )}
+    </FormField>
+  );
+
+  const phoneInput = (required: boolean) => (
+    <FormField label="Mobile number" required={required} hint="For example +216 20 123 456.">
+      {({ id, describedBy }) => (
+        <TextInput
+          id={id}
+          aria-describedby={describedBy}
+          type="tel"
+          inputMode="tel"
+          value={phoneField}
+          onChange={(event) => onPhoneChange(event.target.value)}
+          maxLength={20}
         />
       )}
     </FormField>
@@ -753,10 +830,17 @@ function PendingActionDialog({
           {...common}
           title="Add member"
           confirmLabel="Add and email badge"
-          confirmDisabled={!nameField.trim() || !EMAIL_PATTERN.test(emailField.trim())}
+          confirmDisabled={
+            !nameField.trim() ||
+            !EMAIL_PATTERN.test(emailField.trim()) ||
+            !isValidUniversity(universityField) ||
+            !isValidPhone(phoneField)
+          }
         >
           {nameInput('Full name')}
           {emailInput}
+          {universityInput(true)}
+          {phoneInput(true)}
           <p className={styles.hint}>
             The new member gets a balanced badge color and a QR badge by email.
           </p>
@@ -765,16 +849,28 @@ function PendingActionDialog({
     case 'edit': {
       const unchanged =
         nameField.trim() === action.participant.name &&
-        emailField.trim() === (action.participant.email ?? '');
+        emailField.trim() === (action.participant.email ?? '') &&
+        universityField.trim() === (action.participant.university ?? '') &&
+        phoneField.trim() === (action.participant.phone ?? '');
+      const invalidOptional =
+        (universityField.trim() !== '' && !isValidUniversity(universityField)) ||
+        (phoneField.trim() !== '' && !isValidPhone(phoneField));
       return (
         <ConfirmActionDialog
           {...common}
           title={`Edit ${action.participant.name}`}
           confirmLabel="Save"
-          confirmDisabled={unchanged || !nameField.trim() || !EMAIL_PATTERN.test(emailField.trim())}
+          confirmDisabled={
+            unchanged ||
+            invalidOptional ||
+            !nameField.trim() ||
+            !EMAIL_PATTERN.test(emailField.trim())
+          }
         >
           {nameInput('Full name')}
           {emailInput}
+          {universityInput(false)}
+          {phoneInput(false)}
           {action.participant.isLeader ? (
             <Alert tone="warning" title="Team leader">
               Changing this email also changes the team login.

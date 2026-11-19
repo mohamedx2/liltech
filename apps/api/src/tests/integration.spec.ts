@@ -89,11 +89,32 @@ describeDb('api foundation modules', () => {
       .post('/api/registration/teams')
       .send({
         teamName: name,
-        leader: { name: 'Team Leader', email: leaderEmail, password: LEADER_PASSWORD },
+        leader: {
+          name: 'Team Leader',
+          email: leaderEmail,
+          password: LEADER_PASSWORD,
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
         members: [
-          { name: 'Member One', email: `one.${leaderEmail}` },
-          { name: 'Member Two', email: `two.${leaderEmail}` },
-          { name: 'Member Three', email: `three.${leaderEmail}` },
+          {
+            name: 'Member One',
+            email: `one.${leaderEmail}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Two',
+            email: `two.${leaderEmail}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Three',
+            email: `three.${leaderEmail}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
@@ -294,9 +315,18 @@ describeDb('api foundation modules', () => {
           leader: {
             name: 'Leader',
             email: 'invalid-size-leader@test.local',
+            university: 'Test University',
+            phone: '+216 20 123 456',
             password: LEADER_PASSWORD,
           },
-          members: [{ name: 'Only One', email: 'only-one@integration.test' }],
+          members: [
+            {
+              name: 'Only One',
+              email: 'only-one@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+          ],
         });
 
       expect(response.status).toBe(400);
@@ -311,15 +341,47 @@ describeDb('api foundation modules', () => {
           leader: {
             name: 'Full Leader',
             email: 'full-house-leader@test.local',
+            university: 'Test University',
+            phone: '+216 20 123 456',
             password: LEADER_PASSWORD,
           },
           members: [
-            { name: 'Member One', email: 'member-one@integration.test' },
-            { name: 'Member Two', email: 'member-two@integration.test' },
-            { name: 'Member Three', email: 'member-three@integration.test' },
-            { name: 'Member Four', email: 'member-four@integration.test' },
-            { name: 'Member Five', email: 'member-five@integration.test' },
-            { name: 'Member Six', email: 'member-six@integration.test' },
+            {
+              name: 'Member One',
+              email: 'member-one@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Member Two',
+              email: 'member-two@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Member Three',
+              email: 'member-three@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Member Four',
+              email: 'member-four@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Member Five',
+              email: 'member-five@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Member Six',
+              email: 'member-six@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
           ],
         });
 
@@ -337,12 +399,29 @@ describeDb('api foundation modules', () => {
           leader: {
             name: 'Echo Leader',
             email: 'echo-leader@test.local',
+            university: 'Test University',
+            phone: '+216 20 123 456',
             password: LEADER_PASSWORD,
           },
           members: [
-            { name: 'Echo One', email: 'ECHO-LEADER@test.local' },
-            { name: 'Echo Two', email: 'echo-two@integration.test' },
-            { name: 'Echo Three', email: 'echo-three@integration.test' },
+            {
+              name: 'Echo One',
+              email: 'ECHO-LEADER@test.local',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Echo Two',
+              email: 'echo-two@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'Echo Three',
+              email: 'echo-three@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
           ],
         });
 
@@ -356,11 +435,23 @@ describeDb('api foundation modules', () => {
         leader: {
           name: 'Small Leader',
           email: 'too-small-leader@test.local',
+          university: 'Test University',
+          phone: '+216 20 123 456',
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'Only Member', email: 'only-member@integration.test' },
-          { name: 'Second Member', email: 'second-member@integration.test' },
+          {
+            name: 'Only Member',
+            email: 'only-member@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Second Member',
+            email: 'second-member@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       };
       await expect(registerTeamWithBadges(tooSmall)).rejects.toMatchObject({
@@ -373,16 +464,53 @@ describeDb('api foundation modules', () => {
         leader: {
           name: 'Large Leader',
           email: 'too-large-leader@test.local',
+          university: 'Test University',
+          phone: '+216 20 123 456',
           password: LEADER_PASSWORD,
         },
         members: [
-          { name: 'One', email: 'one@integration.test' },
-          { name: 'Two', email: 'two@integration.test' },
-          { name: 'Three', email: 'three@integration.test' },
-          { name: 'Four', email: 'four@integration.test' },
-          { name: 'Five', email: 'five@integration.test' },
-          { name: 'Six', email: 'six@integration.test' },
-          { name: 'Seven', email: 'seven@integration.test' },
+          {
+            name: 'One',
+            email: 'one@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Two',
+            email: 'two@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Three',
+            email: 'three@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Four',
+            email: 'four@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Five',
+            email: 'five@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Six',
+            email: 'six@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Seven',
+            email: 'seven@integration.test',
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       };
       await expect(registerTeamWithBadges(tooLarge)).rejects.toMatchObject({
@@ -407,12 +535,29 @@ describeDb('api foundation modules', () => {
           leader: {
             name: 'Other Leader',
             email: 'other-leader@test.local',
+            university: 'Test University',
+            phone: '+216 20 123 456',
             password: LEADER_PASSWORD,
           },
           members: [
-            { name: 'M1', email: 'm1@integration.test' },
-            { name: 'M2', email: 'm2@integration.test' },
-            { name: 'M3', email: 'm3@integration.test' },
+            {
+              name: 'M1',
+              email: 'm1@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'M2',
+              email: 'm2@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'M3',
+              email: 'm3@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
           ],
         });
       expect(sameName.status).toBe(409);
@@ -425,12 +570,29 @@ describeDb('api foundation modules', () => {
           leader: {
             name: 'Same Leader',
             email: 'probe-leader@test.local',
+            university: 'Test University',
+            phone: '+216 20 123 456',
             password: LEADER_PASSWORD,
           },
           members: [
-            { name: 'M1', email: 'm1@integration.test' },
-            { name: 'M2', email: 'm2@integration.test' },
-            { name: 'M3', email: 'm3@integration.test' },
+            {
+              name: 'M1',
+              email: 'm1@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'M2',
+              email: 'm2@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
+            {
+              name: 'M3',
+              email: 'm3@integration.test',
+              university: 'Test University',
+              phone: '+216 20 123 456',
+            },
           ],
         });
       expect(sameEmail.status).toBe(409);

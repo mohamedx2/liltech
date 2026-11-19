@@ -94,6 +94,8 @@ function buildMockAdminTeam(): AdminTeam {
       name: member.fullName,
       isLeader: member.roleInTeam === 'leader',
       email: member.email,
+      university: 'Mock University',
+      phone: '+216 20 000 000',
       color: member.color,
       checkedInAt: member.isCheckedIn ? devMockState.phaseChangedAt : null,
       checkedInByName: member.isCheckedIn ? 'Mock Organizer Admin' : null,

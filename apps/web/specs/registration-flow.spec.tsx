@@ -25,9 +25,13 @@ function fillForm(teamName: string, leader: Person, teammates: Person[] = TEAMMA
   change(/team account password/i, 'strongpass1234');
   change(/leader full name/i, leader.fullName);
   change(/leader email/i, leader.email);
+  change(/leader university/i, 'Université de Sousse');
+  change(/leader mobile number/i, '+216 20 123 456');
   teammates.forEach((teammate, index) => {
     change(new RegExp(`teammate ${index + 1} full name`, 'i'), teammate.fullName);
     change(new RegExp(`teammate ${index + 1} email`, 'i'), teammate.email);
+    change(new RegExp(`teammate ${index + 1} university`, 'i'), 'ISITCom');
+    change(new RegExp(`teammate ${index + 1} mobile number`, 'i'), `2${index}123456`);
   });
 }
 
@@ -43,6 +47,21 @@ describe('TeamRegistrationForm', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it('requires a university and a valid mobile number for every participant', async () => {
+    const registerTeam = vi.spyOn(api.registrations, 'registerTeam');
+    render(<TeamRegistrationForm />);
+
+    fillForm('Contact Crew', { fullName: 'Lina Haddad', email: 'lina@example.com' });
+    change(/leader mobile number/i, 'call me');
+    change(/teammate 2 university/i, '');
+    submit();
+
+    const summary = await screen.findByRole('alert');
+    expect(summary.textContent).toMatch(/Leader: Enter a valid mobile number/);
+    expect(summary.textContent).toMatch(/Teammate 2: Enter the university or school/);
+    expect(registerTeam).not.toHaveBeenCalled();
   });
 
   it('shows every section on a single page with one submit button', () => {
@@ -184,9 +203,12 @@ describe('TeamRegistrationForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('b'.repeat(43)));
-    expect(
-      screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }).textContent,
-    ).toBe('Copied');
+    // The label flips after the clipboard promise resolves, on a later render.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Copy badge code for Karim Mansour' }).textContent,
+      ).toBe('Copied'),
+    );
   });
 
   it('surfaces backend errors clearly when registration fails', async () => {
