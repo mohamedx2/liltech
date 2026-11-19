@@ -38,7 +38,7 @@ jobs:
       # so the integration tests run against the same provisioned test database.
       DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
       # Test-only pepper: Mini-CTF answer digests are HMAC'd, never unkeyed.
-      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789abcdef
+      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789abcdef-0123456789
 
     steps:
       - name: Checkout
