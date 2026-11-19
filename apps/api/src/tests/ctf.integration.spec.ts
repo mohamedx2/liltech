@@ -81,16 +81,18 @@ describeDb('LOUAGE 404 chain', () => {
 
   async function registerTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const email = `ctf-${suffix}@test.local`;
+    // Registration requires a university and a mobile number for every participant.
+    const contact = { university: 'Test University', phone: '+216 20 123 456' };
 
     const response = await request(app)
       .post('/api/registration/teams')
       .send({
         teamName: `CTF ${suffix}`,
-        leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD },
+        leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD, ...contact },
         members: [
-          { name: 'Member One', email: `one.${email}` },
-          { name: 'Member Two', email: `two.${email}` },
-          { name: 'Member Three', email: `three.${email}` },
+          { name: 'Member One', email: `one.${email}`, ...contact },
+          { name: 'Member Two', email: `two.${email}`, ...contact },
+          { name: 'Member Three', email: `three.${email}`, ...contact },
         ],
       });
 
