@@ -12,6 +12,7 @@ import { hashPassword } from '../modules/auth/password.service';
 import { createSessionForUser, createUser } from '../modules/auth/auth.service';
 import { setBadgeMailTransport } from '../modules/badges/badge-mailer';
 import { challengeAccessFor, recordMiniCtfSolve } from '../modules/challenges/challenges.service';
+import { phaseGateFor } from '../modules/event-state/phase-gate';
 import {
   destroyIntegrationDatabase,
   INTEGRATION_DB_AVAILABLE,
@@ -34,18 +35,46 @@ describe('challengeAccessFor', () => {
   const later = new Date('2026-11-21T20:00:00Z');
   const earlier = new Date('2026-11-21T19:00:00Z');
 
+  const gate = phaseGateFor('live', new Date('2026-11-21T19:30:00Z'), now);
+  const context = (ctfSolved: boolean) => ({ gate, ctfSolved, now });
+  const first = { status: 'live' as const, publicAt: later, position: 1, forceOpenedAt: null };
+
   it('locks an upcoming challenge even for a team that solved its Mini-CTF', () => {
-    expect(challengeAccessFor({ status: 'upcoming', publicAt: null }, true, now)).toBe('locked');
+    expect(
+      challengeAccessFor(
+        { status: 'upcoming', publicAt: null, position: 1, forceOpenedAt: null },
+        context(true),
+      ),
+    ).toBe('locked');
   });
 
   it('gives early access to Mini-CTF solvers before the public time', () => {
-    expect(challengeAccessFor({ status: 'live', publicAt: later }, true, now)).toBe('early');
-    expect(challengeAccessFor({ status: 'live', publicAt: later }, false, now)).toBe('locked');
+    expect(challengeAccessFor(first, context(true))).toBe('early');
+    expect(challengeAccessFor(first, context(false))).toBe('locked');
   });
 
   it('opens to everyone at the public time and after the end', () => {
-    expect(challengeAccessFor({ status: 'live', publicAt: earlier }, false, now)).toBe('public');
-    expect(challengeAccessFor({ status: 'ended', publicAt: later }, false, now)).toBe('public');
+    expect(challengeAccessFor({ ...first, publicAt: earlier }, context(false))).toBe('public');
+    expect(challengeAccessFor({ ...first, status: 'ended', publicAt: later }, context(false))).toBe(
+      'public',
+    );
+  });
+
+  it('opens the first challenge once the 60-minute fallback passed or it was force-opened', () => {
+    const fallbackGate = phaseGateFor('live', new Date('2026-11-21T18:00:00Z'), now);
+    expect(challengeAccessFor(first, { gate: fallbackGate, ctfSolved: false, now })).toBe('public');
+
+    const forced = { ...first, forceOpenedAt: now };
+    expect(challengeAccessFor(forced, context(false))).toBe('public');
+  });
+
+  it('opens the second challenge to everyone as soon as it runs', () => {
+    expect(
+      challengeAccessFor(
+        { status: 'live', publicAt: later, position: 2, forceOpenedAt: null },
+        context(false),
+      ),
+    ).toBe('public');
   });
 });
 

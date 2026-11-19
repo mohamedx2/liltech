@@ -284,15 +284,19 @@ describeDb('api foundation modules', () => {
       ).toBe(true);
     });
 
-    it('rejects transitioning to the current phase', async () => {
+    it('is idempotent when asked for the current phase', async () => {
       const token = await tokenFor(admin);
 
+      const before = await request(app).get('/api/event-state');
       const response = await request(app)
         .post('/api/event-state')
         .set('Authorization', `Bearer ${token}`)
         .send({ phase: 'registration' });
 
-      expect(response.status).toBe(400);
+      // No transition, no second audit entry: the same phase is a no-op.
+      expect(response.status).toBe(200);
+      expect(response.body.phase).toBe('registration');
+      expect(response.body.phaseChangedAt).toBe(before.body.phaseChangedAt);
     });
 
     it('requires authentication for transitions', async () => {

@@ -38,6 +38,9 @@ export const AuditAction = {
   BadgeEmailBulkResent: 'badge.email_bulk_resent',
   CtfSolveGranted: 'ctf.solve_granted',
   CtfSolveRevoked: 'ctf.solve_revoked',
+  CtfLaunched: 'ctf.launched',
+  ChallengeForceOpened: 'challenge.force_opened',
+  SubmissionCreated: 'submission.created',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

@@ -30,6 +30,10 @@ export const apiErrorCodeSchema = z.enum([
   'STAGE_LOCKED',
   'STAGE_NOT_PUBLISHED',
   'STAGE_NOT_CONFIGURED',
+  'CTF_NOT_OPEN',
+  'CTF_CLOSED',
+  'CHALLENGE_LOCKED',
+  'SUBMISSIONS_CLOSED',
 ]);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;

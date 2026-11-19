@@ -23,6 +23,8 @@ export default defineConfig(() => ({
         process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/vitest_placeholder',
       // Test-only key (32 zero bytes); real keys come from the environment.
       QR_TOKEN_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      // Test-only pepper; the real one is a server-only secret (AGENTS.md §9).
+      CTF_ANSWER_PEPPER: process.env.CTF_ANSWER_PEPPER ?? 'vitest-test-pepper-0123456789',
       // Suites register many teams from one IP; the limiter itself is unit-tested.
       REGISTRATION_RATE_LIMIT_PER_HOUR: '10000',
       // Never reach a real mailbox from tests, even when a local .env has SMTP

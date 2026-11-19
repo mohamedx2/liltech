@@ -52,6 +52,9 @@ describeDb('LOUAGE 404 chain', () => {
   beforeEach(async () => {
     await resetIntegrationDatabase();
 
+    // Registration stays open in `checkin`; each ready team launches the CTF.
+    await prisma.eventPhaseState.create({ data: { phase: 'checkin' } });
+
     const admin = await createUser({
       role: 'admin',
       name: 'CTF Admin',
@@ -88,11 +91,32 @@ describeDb('LOUAGE 404 chain', () => {
       .post('/api/registration/teams')
       .send({
         teamName: `CTF ${suffix}`,
-        leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD },
+        leader: {
+          name: 'CTF Leader',
+          email,
+          password: LEADER_PASSWORD,
+          university: 'Test University',
+          phone: '+216 20 123 456',
+        },
         members: [
-          { name: 'Member One', email: `one.${email}` },
-          { name: 'Member Two', email: `two.${email}` },
-          { name: 'Member Three', email: `three.${email}` },
+          {
+            name: 'Member One',
+            email: `one.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Two',
+            email: `two.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
+          {
+            name: 'Member Three',
+            email: `three.${email}`,
+            university: 'Test University',
+            phone: '+216 20 123 456',
+          },
         ],
       });
 
@@ -165,6 +189,11 @@ describeDb('LOUAGE 404 chain', () => {
   async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const team = await registerTeam(suffix);
     await checkIn(team.teamId);
+    // The Mini-CTF only opens once the server recorded the launch instant.
+    await prisma.eventPhaseState.update({
+      where: { id: 1 },
+      data: { phase: 'live', ctfStartedAt: new Date() },
+    });
     return team;
   }
 
@@ -293,8 +322,15 @@ describeDb('LOUAGE 404 chain', () => {
   });
 
   it('keeps two teams independent', async () => {
-    const first = await readyTeam('independent-a');
-    const second = await readyTeam('independent-b');
+    // Register both before going live: registration closes at the launch.
+    const first = await registerTeam('independent-a');
+    const second = await registerTeam('independent-b');
+    await checkIn(first.teamId);
+    await checkIn(second.teamId);
+    await prisma.eventPhaseState.update({
+      where: { id: 1 },
+      data: { phase: 'live', ctfStartedAt: new Date() },
+    });
 
     await submit(first.token, 'fixture-01', FIXTURE_STAGES[0].answer);
 

@@ -61,6 +61,7 @@ model User {
   checkInRecords    CheckInRecord[]
   auditLogs         AuditLog[]
   announcements     Announcement[]
+  submissions       Submission[]
 
   @@map("users")
 }
@@ -94,14 +95,23 @@ model Team {
   /// Why the team was withdrawn or disqualified (shown to administrators).
   statusReason    String?             @db.VarChar(300)
   statusChangedAt DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  participants    Participant[]
+    createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  /// When the team cleared the Mini-CTF chain (server time). Null until then.
+  ctfSolvedAt       DateTime?
+  /// Automatic Mini-CTF score (10/7/4.5/2.5/0 by solve window). Null until solved.
+  ctfPoints         Float?
+  /// Challenge 01 jury score. Filled by the jury module (later task); no logic here.
+  c1JuryScore       Float?
+  /// Challenge 02 jury score. Filled by the jury module (later task); no logic here.
+  c2JuryScore       Float?
+  participants      Participant[]
   /// LOUAGE 404 chain: per-stage state and the timestamped attempt log.
-  ctfProgress     CtfProgress[]
-  ctfAttempts     CtfAttempt[]
+  ctfProgress       CtfProgress[]
+  ctfAttempts       CtfAttempt[]
   /// Per-challenge Mini-CTF solves (early access to a running challenge).
-  ctfSolves       ChallengeCtfSolve[]
+  ctfSolves         ChallengeCtfSolve[]
+  submissions       Submission[]
 
   @@index([progressState])
   @@index([status])
@@ -218,6 +228,10 @@ model EventPhaseState {
   phase           EventPhase @default(registration)
   phaseChangedAt  DateTime   @default(now())
   changedByUserId String?    @db.Uuid
+  /// When administrators launched the Mini-CTF (entering `live`). Server time —
+  /// drives the 60-minute scoring window and the Challenge 01 fallback. Never
+  /// cleared, so a forced phase change cannot silently reset the clock.
+  ctfStartedAt    DateTime?
 
   @@map("event_phase_state")
 }
@@ -281,9 +295,15 @@ model Challenge {
   startedAt          DateTime?
   endedAt            DateTime?
   publicAt           DateTime?
+  /// Organizer-set submission cutoff (server-enforced). Null means no extra
+  /// cutoff beyond the event phase / challenge end.
+  submissionDeadline DateTime?
+  /// Administrative override that opens the challenge to every checked-in team.
+  forceOpenedAt      DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   ctfSolves          ChallengeCtfSolve[]
+  submissions        Submission[]
 
   @@index([status])
   @@map("challenges")
@@ -303,6 +323,31 @@ model ChallengeCtfSolve {
   @@unique([challengeId, teamId])
   @@index([teamId])
   @@map("challenge_ctf_solves")
+}
+
+/// One team submission for one challenge. Append-only: every resubmission
+/// inserts a row and the newest row is the one that counts.
+model Submission {
+  id                String    @id @default(uuid()) @db.Uuid
+  team              Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId            String    @db.Uuid
+  challenge         Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId       String    @db.Uuid
+  /// Challenge 01 deliverable: one Google Drive link (poster, logo, teaser).
+  driveUrl          String?   @db.VarChar(2000)
+  /// Challenge 02 deliverable: GitHub repository, technical report and slides.
+  githubUrl         String?   @db.VarChar(2000)
+  reportUrl         String?   @db.VarChar(2000)
+  presentationUrl   String?   @db.VarChar(2000)
+  /// Best-effort GitHub default-branch HEAD commit at submission time.
+  commitSha         String?   @db.VarChar(64)
+  submittedBy       User      @relation(fields: [submittedByUserId], references: [id])
+  submittedByUserId String    @db.Uuid
+  submittedAt       DateTime  @default(now())
+
+  @@index([teamId, challengeId, submittedAt])
+  @@index([challengeId])
+  @@map("submissions")
 }
 
 /// Live announcement feed.

@@ -1,6 +1,9 @@
 import { getPrismaClient } from '../../config/database';
+import { env } from '../../config/env';
 import { ApiError, ApiErrorCode } from '../../utils/api-error';
 import { createRateLimiter } from '../../utils/rate-limiter';
+import { assertCtfOpen, loadPhaseGate, type ParticipantPhaseGate } from '../event-state/phase-gate';
+import { ctfPointsSince } from './ctf-scoring';
 import type {
   CtfChainResponse,
   CtfCurrentStage,
@@ -9,6 +12,7 @@ import type {
   CtfStageProgress,
   CtfStageState,
   CtfSubmitResponse,
+  CtfTiming,
   CtfTrackItem,
 } from 'api-contracts';
 import { matchesAnswerHash } from './ctf-answer';
@@ -35,16 +39,22 @@ const PROGRESS_ORDER = [
 type ProgressState = (typeof PROGRESS_ORDER)[number];
 
 /**
- * Five submissions per minute per team **per stage**. Per-stage windows keep
+ * Wrong-flag submissions per minute per team **per stage** (configurable through
+ * `CTF_SUBMIT_RATE_LIMIT_PER_MINUTE`, default 5). Per-stage windows keep
  * guessing hostile while still letting a fast team solve several stages in a
  * row — a shared budget would reject a legitimately correct sixth answer.
  */
-const submitLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
+const submitLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: env.CTF_SUBMIT_RATE_LIMIT_PER_MINUTE,
+});
 
 interface TeamContext {
   id: string;
   name: string;
   progressState: ProgressState;
+  ctfSolvedAt: Date | null;
+  ctfPoints: number | null;
 }
 
 interface StageRow {
@@ -72,7 +82,13 @@ async function requireTeamForUser(userId: string): Promise<TeamContext> {
   const prisma = getPrismaClient();
   const team = await prisma.team.findUnique({
     where: { leaderId: userId },
-    select: { id: true, name: true, progressState: true },
+    select: {
+      id: true,
+      name: true,
+      progressState: true,
+      ctfSolvedAt: true,
+      ctfPoints: true,
+    },
   });
 
   if (!team) {
@@ -83,6 +99,8 @@ async function requireTeamForUser(userId: string): Promise<TeamContext> {
     id: team.id,
     name: team.name,
     progressState: team.progressState as ProgressState,
+    ctfSolvedAt: team.ctfSolvedAt,
+    ctfPoints: team.ctfPoints,
   };
 }
 
@@ -230,13 +248,27 @@ function buildTrack(
   }));
 }
 
+function timingView(gate: ParticipantPhaseGate): CtfTiming {
+  return {
+    startedAt: gate.ctfStartedAt?.toISOString() ?? null,
+    closesAt: gate.ctfClosesAt?.toISOString() ?? null,
+    open: gate.ctfOpen,
+    closed: gate.ctfClosed,
+    serverTime: gate.serverTime.toISOString(),
+  };
+}
+
 export async function getChain(userId: string): Promise<CtfChainResponse> {
   const team = await requireTeamForUser(userId);
+  const gate = await loadPhaseGate();
   const eligible = teamIsEligible(team.progressState);
+  // The server decides whether the chain is playable at all: checked in AND
+  // launched AND still inside the 60-minute window.
+  const playable = eligible && gate.ctfOpen;
   const chain = await loadChain();
   const progress = await loadProgress(team.id);
 
-  const currentIndex = findCurrentIndex(chain, progress, eligible);
+  const currentIndex = playable ? findCurrentIndex(chain, progress, eligible) : -1;
   const currentStage = currentIndex >= 0 ? chain[currentIndex] : undefined;
 
   if (currentStage && !progress.has(currentStage.id)) {
@@ -250,11 +282,15 @@ export async function getChain(userId: string): Promise<CtfChainResponse> {
     });
   }
 
-  const stages = buildTrack(chain, progress, eligible);
+  const stages = buildTrack(chain, progress, playable);
   const solvedCount = stages.filter((stage) => stage.state === 'solved').length;
 
   return {
-    team: { name: team.name },
+    team: {
+      name: team.name,
+      points: team.ctfPoints,
+      solvedAt: team.ctfSolvedAt?.toISOString() ?? null,
+    },
     stages,
     current:
       currentStage && currentIndex >= 0
@@ -262,6 +298,7 @@ export async function getChain(userId: string): Promise<CtfChainResponse> {
         : null,
     summary: { solved: solvedCount, total: stages.length },
     eligible,
+    timing: timingView(gate),
   };
 }
 
@@ -270,6 +307,7 @@ async function loadStageForTeam(
   slug: string,
 ): Promise<{
   team: TeamContext;
+  gate: ParticipantPhaseGate;
   chain: StageRow[];
   index: number;
   stage: StageRow;
@@ -278,6 +316,10 @@ async function loadStageForTeam(
   eligible: boolean;
 }> {
   const team = await requireTeamForUser(userId);
+  // Phase gate first: before the launch there is no stage 1, no hint and no
+  // submission, whatever the team's check-in state says.
+  const gate = await loadPhaseGate();
+  assertCtfOpen(gate);
   const chain = await loadChain();
   const index = chain.findIndex((stage) => stage.slug === slug);
 
@@ -296,6 +338,7 @@ async function loadStageForTeam(
 
   return {
     team,
+    gate,
     chain,
     index,
     stage,
@@ -380,7 +423,7 @@ export async function submitAnswer(
   answer: string,
 ): Promise<CtfSubmitResponse> {
   const prisma = getPrismaClient();
-  const { stage, team, chain, index, progress } = await loadStageForTeam(userId, slug);
+  const { stage, team, gate, chain, index, progress } = await loadStageForTeam(userId, slug);
 
   if (stage.status !== 'live') {
     throw new ApiError(
@@ -409,6 +452,8 @@ export async function submitAnswer(
       nextStageUnlocked: Boolean(nextStage),
       nextStagePosition: nextStage?.position ?? null,
       completedChain: await chainCompleted(team.id),
+      points: team.ctfPoints,
+      solvedAt: team.ctfSolvedAt?.toISOString() ?? null,
       message: `Stage ${stage.position} is already solved.`,
     };
   }
@@ -462,7 +507,7 @@ export async function submitAnswer(
     });
 
     if (claimed.count === 0) {
-      return false;
+      return null;
     }
 
     if (nextStage) {
@@ -502,14 +547,34 @@ export async function submitAnswer(
       },
     });
 
-    if (required.length > 0 && solvedCount === required.length) {
-      await tx.team.updateMany({
-        where: { id: team.id, progressState: { notIn: ['challenge_unlocked', 'submitted'] } },
-        data: { progressState: 'challenge_unlocked' },
-      });
+    if (required.length === 0 || solvedCount !== required.length) {
+      return { points: null as number | null, solvedAt: null as Date | null };
     }
 
-    return true;
+    // Chain complete: the solve time is the server instant of this final flag
+    // minus the launch instant, and the points come from the scoring bands.
+    const points = gate.ctfStartedAt ? ctfPointsSince(gate.ctfStartedAt, now) : null;
+
+    await tx.team.updateMany({
+      where: { id: team.id, ctfSolvedAt: null },
+      data: { ctfSolvedAt: now, ctfPoints: points },
+    });
+    await tx.team.updateMany({
+      where: { id: team.id, progressState: { notIn: ['challenge_unlocked', 'submitted'] } },
+      data: { progressState: 'challenge_unlocked' },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: 'ctf.chain_completed',
+        actorId: userId,
+        targetType: 'team',
+        targetId: team.id,
+        summary: points === null ? 'chain completed' : `chain completed (${points} points)`,
+      },
+    });
+
+    return { points, solvedAt: now };
   });
 
   if (!solvedNow) {
@@ -520,11 +585,13 @@ export async function submitAnswer(
       nextStageUnlocked: Boolean(nextStage),
       nextStagePosition: nextStage?.position ?? null,
       completedChain: await chainCompleted(team.id),
+      points: null,
+      solvedAt: null,
       message: `Stage ${stage.position} is already solved.`,
     };
   }
 
-  const completed = await chainCompleted(team.id);
+  const completed = solvedNow.solvedAt !== null;
 
   return {
     correct: true,
@@ -533,17 +600,27 @@ export async function submitAnswer(
     nextStageUnlocked: Boolean(nextStage),
     nextStagePosition: nextStage?.position ?? null,
     completedChain: completed,
+    points: solvedNow.points,
+    solvedAt: solvedNow.solvedAt?.toISOString() ?? null,
     message: completed
       ? 'Investigation complete. You were the missing passenger all along.'
       : 'Correct flag. The next stage is unlocked.',
   };
 }
 
-/** The main challenge opens only when every required stage is solved. */
+/**
+ * The main challenge opens when every required stage is solved, or once the
+ * 60-minute fallback has passed (whatever the chain state).
+ */
 export async function hasUnlockedMainChallenge(userId: string): Promise<boolean> {
   const team = await requireTeamForUser(userId);
+  const gate = await loadPhaseGate();
 
   if (PROGRESS_ORDER.indexOf(team.progressState) >= PROGRESS_ORDER.indexOf('challenge_unlocked')) {
+    return true;
+  }
+
+  if (gate.ctfFallbackUnlocked) {
     return true;
   }
 

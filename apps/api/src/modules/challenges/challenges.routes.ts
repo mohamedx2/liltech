@@ -13,6 +13,7 @@ import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
 import {
   createChallenge,
   endChallenge,
+  forceOpenChallenge,
   getCurrentChallengeForTeam,
   listChallengesForAdmin,
   listChallengesForTeam,
@@ -71,5 +72,11 @@ challengesRouter.post('/admin/challenges/:id/start', ...adminOnly, async (req, r
 challengesRouter.post('/admin/challenges/:id/end', ...adminOnly, async (req, res) => {
   const { id } = parseOrThrow(challengeIdParamsSchema, req.params);
   const body: ChallengeAdminDetail = await endChallenge(id, authenticatedUserId(req));
+  res.status(200).json(body);
+});
+
+challengesRouter.post('/admin/challenges/:id/force-open', ...adminOnly, async (req, res) => {
+  const { id } = parseOrThrow(challengeIdParamsSchema, req.params);
+  const body: ChallengeAdminDetail = await forceOpenChallenge(id, authenticatedUserId(req));
   res.status(200).json(body);
 });

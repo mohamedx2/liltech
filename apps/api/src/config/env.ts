@@ -52,6 +52,18 @@ const envSchema = z.object({
     .transform((value) => (value === undefined ? undefined : value === 'true')),
 
   /**
+   * Server-only pepper for HMAC-SHA256 Mini-CTF answer digests. Required: the
+   * API must not start able to hash answers unkeyed. Rotating it invalidates
+   * every provisioned answer digest.
+   */
+  CTF_ANSWER_PEPPER: z.string().min(16, {
+    message: 'CTF_ANSWER_PEPPER must be at least 16 characters',
+  }),
+
+  /** Wrong-flag submissions accepted per team per minute (per stage). */
+  CTF_SUBMIT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(60).default(5),
+
+  /**
    * 32-byte key (base64) encrypting stored QR badge tokens so a team can see
    * its badges again. Generate with:
    * `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
