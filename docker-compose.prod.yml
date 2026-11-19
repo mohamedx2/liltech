@@ -70,7 +70,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-liltech}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-liltech}?schema=public
-      CTF_PROVISION_FILE: /run/secrets/ctf-answers.json
+      # Compose mounts the `ctf_answers` secret at /run/secrets/<secret name>.
+      CTF_PROVISION_FILE: /run/secrets/ctf_answers
     secrets:
       - ctf_answers
     depends_on:
