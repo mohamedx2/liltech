@@ -738,5 +738,34 @@ describeDb('participant challenges', () => {
       const stored = await prisma.team.findUniqueOrThrow({ where: { id: team.teamId } });
       expect(stored.progressState).toBe('submitted');
     });
+
+    it('does not count a fallback Challenge 01 submission as a Mini-CTF solve', async () => {
+      // `readyChallengeOne` opens Challenge 01 through the 60-minute fallback;
+      // the team never submitted a Mini-CTF flag.
+      const { team } = await readyChallengeOne();
+
+      const submitted = await request(app)
+        .post('/api/submissions')
+        .set(auth(team.token))
+        .send({ challengePosition: 1, driveUrl: 'https://drive.google.com/file/d/fallback/view' });
+      expect(submitted.status).toBe(201);
+
+      const stored = await prisma.team.findUniqueOrThrow({ where: { id: team.teamId } });
+      expect(stored.progressState).toBe('submitted');
+      expect(stored.ctfSolvedAt).toBeNull();
+      expect(stored.ctfPoints).toBeNull();
+
+      const challenges = await request(app).get('/api/challenges').set(auth(team.token));
+      expect(challenges.body.items[0]).toMatchObject({ access: 'public', ctfSolved: false });
+
+      const overview = await request(app).get('/api/submissions').set(auth(team.token));
+      expect(overview.body.items[0]).toMatchObject({ access: 'public', canSubmit: true });
+
+      // The Mini-CTF itself is still untouched for this team.
+      const ctf = await request(app).get('/api/ctf/chain').set(auth(team.token));
+      expect(ctf.status).toBe(200);
+      expect(ctf.body.team).toMatchObject({ points: null, solvedAt: null });
+      expect(ctf.body.summary.solved).toBe(0);
+    });
   });
 });

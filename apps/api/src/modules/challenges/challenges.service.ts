@@ -44,8 +44,13 @@ const PRE_EVENT_PHASES: readonly EventPhase[] = ['registration', 'checkin'];
  * Team progress states that mean the LOUAGE 404 chain is finished. `modules/ctf`
  * writes these once every required stage is solved; from then on the team counts
  * as Mini-CTF solved for every challenge.
+ *
+ * `submitted` is deliberately absent: `modules/submissions` writes it for any
+ * deliverable, including Challenge 01 opened through the 60-minute fallback, and
+ * such a team has not solved the Mini-CTF. The authoritative signal is
+ * `Team.ctfSolvedAt`, written only when the chain completes.
  */
-const CHAIN_COMPLETED_STATES: ReadonlySet<string> = new Set(['challenge_unlocked', 'submitted']);
+const CHAIN_COMPLETED_STATES: ReadonlySet<string> = new Set(['challenge_unlocked']);
 
 const resourcesSchema = z.array(challengeResourceLinkSchema);
 
@@ -525,6 +530,7 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
     select: {
       status: true,
       progressState: true,
+      ctfSolvedAt: true,
       ctfSolves: { select: { challengeId: true } },
       participants: { where: { checkIn: { isNot: null } }, select: { id: true }, take: 1 },
     },
@@ -555,10 +561,12 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
   const challenges = await prisma.challenge.findMany({ orderBy: { position: 'asc' } });
 
   // Single source of truth for the Mini-CTF is the LOUAGE 404 chain: a team that
-  // cleared every required stage has `challenge_unlocked`/`submitted` progress,
-  // which unlocks every challenge it can see, whatever the per-challenge solve
-  // rows say. The chain is what writes those states (see `modules/ctf`).
-  const chainCompleted = CHAIN_COMPLETED_STATES.has(team.progressState);
+  // cleared every required stage has `ctfSolvedAt` set (and legacy
+  // `challenge_unlocked` progress), which unlocks every challenge it can see,
+  // whatever the per-challenge solve rows say. Submitting a deliverable marks the
+  // team `submitted` without implying a CTF solve.
+  const chainCompleted =
+    team.ctfSolvedAt !== null || CHAIN_COMPLETED_STATES.has(team.progressState);
 
   return {
     available: true,

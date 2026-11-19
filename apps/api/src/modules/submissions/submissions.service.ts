@@ -32,8 +32,12 @@ import { fetchGithubHeadCommit } from './github-commit';
  * is a GitHub repository plus a report link and a presentation link.
  */
 
-/** Progress states that mean the Mini-CTF chain is finished. */
-const CHAIN_COMPLETED_STATES: ReadonlySet<string> = new Set(['challenge_unlocked', 'submitted']);
+/**
+ * Legacy progress states that mean the Mini-CTF chain is finished. The
+ * authoritative signal is `Team.ctfSolvedAt`; `submitted` is only a deliverable
+ * state (a fallback Challenge 01 submission sets it) and never implies a solve.
+ */
+const CHAIN_COMPLETED_STATES: ReadonlySet<string> = new Set(['challenge_unlocked']);
 
 interface TeamForSubmissions {
   id: string;
