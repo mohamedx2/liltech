@@ -117,15 +117,24 @@ Do not print the production `.env` file or the pepper during verification.
 
 ## 5. Provision the Mini-CTF
 
-Provisioning is intentionally separate from normal deployments. Run the
-operator-only Compose profile:
+Provisioning is intentionally separate from normal deployments. The
+recommended path needs no SSH: update the `CTF_ANSWERS_JSON` repository secret
+with the complete answers file, then run the manual **Provision Mini-CTF**
+workflow (`.github/workflows/ctf-provision.yml`). It writes
+`/opt/liltech/secrets/ctf-answers.json` (`700`/`600`) and runs the profile
+below. See `docs/ctf/README.md`.
+
+To run the operator-only Compose profile by hand on the VPS:
 
 ```bash
 cd /opt/liltech
 docker compose -f docker-compose.prod.yml \
   --profile ctf-operations \
-  run --rm ctf-provision
+  run --rm --user "$(id -u):$(id -g)" ctf-provision
 ```
+
+`--user` is required: Compose mounts the secret with the host file's owner and
+mode, so the image's `appuser` cannot read a `600` file it does not own.
 
 The operation is idempotent and may be rerun after correcting the private JSON
 file.

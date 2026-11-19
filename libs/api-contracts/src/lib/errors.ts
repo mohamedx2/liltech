@@ -26,6 +26,7 @@ export const apiErrorCodeSchema = z.enum([
   'NOT_FOUND',
   'CONFLICT',
   'RATE_LIMITED',
+  'EVENT_NOT_LIVE',
   'CTF_NOT_SOLVED',
   'STAGE_LOCKED',
   'STAGE_NOT_PUBLISHED',

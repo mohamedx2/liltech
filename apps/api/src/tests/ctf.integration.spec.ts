@@ -5,7 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app';
 import { createSessionForUser, createUser } from '../modules/auth/auth.service';
 import { hashPassword } from '../modules/auth/password.service';
-import { hashAnswer } from '../modules/ctf/ctf-answer';
+import { getAnswerPepper, hashAnswer } from '../modules/ctf/ctf-answer';
 import {
   destroyIntegrationDatabase,
   INTEGRATION_DB_AVAILABLE,
@@ -22,7 +22,6 @@ import {
 
 const describeDb = INTEGRATION_DB_AVAILABLE() ? describe : describe.skip;
 
-const TEST_PEPPER = 'integration-test-pepper-0123456789';
 const LEADER_PASSWORD = 'leader-password-2026';
 
 /** Fixture stages 01..07 with test-only answers. */
@@ -40,7 +39,6 @@ describeDb('LOUAGE 404 chain', () => {
   let adminUserId: string;
 
   beforeAll(async () => {
-    process.env.CTF_ANSWER_PEPPER = TEST_PEPPER;
     prisma = await initIntegrationDatabase();
     app = createApp();
   });
@@ -71,7 +69,7 @@ describeDb('LOUAGE 404 chain', () => {
           title: stage.title,
           description: `Description for ${stage.title}`,
           status: 'live',
-          answerHash: hashAnswer(stage.answer, TEST_PEPPER),
+          answerHash: hashAnswer(stage.answer),
           requiredForUnlock: true,
           hints: {
             create: [
@@ -86,37 +84,18 @@ describeDb('LOUAGE 404 chain', () => {
 
   async function registerTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const email = `ctf-${suffix}@test.local`;
+    // Registration requires a university and a mobile number for every participant.
+    const contact = { university: 'Test University', phone: '+216 20 123 456' };
 
     const response = await request(app)
       .post('/api/registration/teams')
       .send({
         teamName: `CTF ${suffix}`,
-        leader: {
-          name: 'CTF Leader',
-          email,
-          password: LEADER_PASSWORD,
-          university: 'Test University',
-          phone: '+216 20 123 456',
-        },
+        leader: { name: 'CTF Leader', email, password: LEADER_PASSWORD, ...contact },
         members: [
-          {
-            name: 'Member One',
-            email: `one.${email}`,
-            university: 'Test University',
-            phone: '+216 20 123 456',
-          },
-          {
-            name: 'Member Two',
-            email: `two.${email}`,
-            university: 'Test University',
-            phone: '+216 20 123 456',
-          },
-          {
-            name: 'Member Three',
-            email: `three.${email}`,
-            university: 'Test University',
-            phone: '+216 20 123 456',
-          },
+          { name: 'Member One', email: `one.${email}`, ...contact },
+          { name: 'Member Two', email: `two.${email}`, ...contact },
+          { name: 'Member Three', email: `three.${email}`, ...contact },
         ],
       });
 
@@ -151,6 +130,16 @@ describeDb('LOUAGE 404 chain', () => {
     });
   }
 
+  async function setPhase(phase: string): Promise<void> {
+    const { token } = await createSessionForUser(adminUserId);
+    const response = await request(app)
+      .post('/api/event-state')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ phase, force: true });
+
+    expect(response.status).toBe(200);
+  }
+
   /**
    * Puts the event live with one running challenge whose public reveal is far
    * away, so challenge access is decided only by Mini-CTF completion.
@@ -158,12 +147,6 @@ describeDb('LOUAGE 404 chain', () => {
   async function liveRunningChallenge(): Promise<void> {
     const { token } = await createSessionForUser(adminUserId);
     const auth = { Authorization: `Bearer ${token}` };
-
-    const phase = await request(app)
-      .post('/api/event-state')
-      .set(auth)
-      .send({ phase: 'live', force: true });
-    expect(phase.status).toBe(200);
 
     const created = await request(app)
       .post('/api/admin/challenges')
@@ -186,7 +169,7 @@ describeDb('LOUAGE 404 chain', () => {
     expect(started.status).toBe(200);
   }
 
-  async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
+  async function checkedInTeam(suffix: string): Promise<{ teamId: string; token: string }> {
     const team = await registerTeam(suffix);
     await checkIn(team.teamId);
     // The Mini-CTF only opens once the server recorded the launch instant.
@@ -194,6 +177,12 @@ describeDb('LOUAGE 404 chain', () => {
       where: { id: 1 },
       data: { phase: 'live', ctfStartedAt: new Date() },
     });
+    return team;
+  }
+
+  async function readyTeam(suffix: string): Promise<{ teamId: string; token: string }> {
+    const team = await checkedInTeam(suffix);
+    await setPhase('live');
     return team;
   }
 
@@ -227,7 +216,19 @@ describeDb('LOUAGE 404 chain', () => {
     expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('opens stage 1 for a checked-in team and locks the rest', async () => {
+  it('keeps the chain closed until an admin starts the event', async () => {
+    const team = await checkedInTeam('before-live');
+    await setPhase('checkin');
+    const response = await request(app)
+      .get('/api/ctf/chain')
+      .set('Authorization', `Bearer ${team.token}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('EVENT_NOT_LIVE');
+    expect(await prisma.ctfProgress.count({ where: { teamId: team.teamId } })).toBe(0);
+  });
+
+  it('opens stage 1 after an admin starts the event and locks the rest', async () => {
     const team = await readyTeam('stage-one');
     const response = await request(app)
       .get('/api/ctf/chain')
@@ -243,8 +244,32 @@ describeDb('LOUAGE 404 chain', () => {
     expect(response.body.summary).toEqual({ solved: 0, total: 7 });
   });
 
+  it.each(['submissions_closed', 'pitching', 'results'])(
+    'blocks chain, hints and submissions during %s',
+    async (phase) => {
+      const team = await readyTeam(`closed-${phase}`);
+      await setPhase(phase);
+
+      const chain = await request(app)
+        .get('/api/ctf/chain')
+        .set('Authorization', `Bearer ${team.token}`);
+      const hint = await request(app)
+        .post('/api/ctf/stages/fixture-01/hints')
+        .set('Authorization', `Bearer ${team.token}`);
+      const answer = await submit(team.token, 'fixture-01', FIXTURE_STAGES[0].answer);
+
+      for (const response of [chain, hint, answer]) {
+        expect(response.status).toBe(403);
+        expect(response.body.error.code).toBe('EVENT_NOT_LIVE');
+      }
+      expect(await prisma.ctfAttempt.count({ where: { teamId: team.teamId } })).toBe(0);
+      expect(await prisma.ctfProgress.count({ where: { teamId: team.teamId } })).toBe(0);
+    },
+  );
+
   it('keeps the chain shut for a team that has not checked in', async () => {
     const team = await registerTeam('not-checked-in');
+    await setPhase('live');
     const response = await request(app)
       .get('/api/ctf/chain')
       .set('Authorization', `Bearer ${team.token}`);
@@ -536,7 +561,7 @@ describeDb('LOUAGE 404 chain', () => {
       const serialized = JSON.stringify(body);
       expect(serialized).not.toContain('FIXTURE{stage-1-answer}');
       expect(serialized).not.toContain('fixture{stage-1-answer}');
-      expect(serialized).not.toContain(TEST_PEPPER);
+      expect(serialized).not.toContain(getAnswerPepper());
       expect(serialized).not.toMatch(/[0-9a-f]{64}/);
       expect(serialized).not.toContain('answerHash');
     }

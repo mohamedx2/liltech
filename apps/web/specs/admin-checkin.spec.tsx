@@ -343,14 +343,17 @@ describe('Admin & Check-In Portal Features', () => {
         expect(screen.getByText('Admin Control Panel')).toBeTruthy();
       });
 
-      const advanceBtn = screen.getByRole('button', { name: /advance to live/i });
+      const advanceBtn = screen.getByRole('button', { name: /start event & open mini-ctf/i });
       fireEvent.click(advanceBtn);
       expect(updateSpy).not.toHaveBeenCalled();
-      fireEvent.click(await screen.findByRole('button', { name: /confirm phase transition/i }));
+      expect(
+        await screen.findByText(/checked-in teams will immediately gain access to stage 1/i),
+      ).toBeTruthy();
+      fireEvent.click(await screen.findByRole('button', { name: /^start event$/i }));
 
       await waitFor(() => {
         expect(updateSpy).toHaveBeenCalledWith(EventPhase.Live);
-        expect(screen.getByText(/Event phase transitioned to LIVE successfully/i)).toBeTruthy();
+        expect(screen.getByText(/Mini-CTF is now open for checked-in teams/i)).toBeTruthy();
       });
     });
 

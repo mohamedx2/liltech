@@ -1,0 +1,67 @@
+name: Provision Mini-CTF
+
+# Operator-only: writes the private answers file to the VPS and runs the
+# idempotent `ctf-provision` Compose service. It never runs on push, never
+# changes the event phase, and never prints answers or the pepper.
+# See docs/ctf/README.md → Provisioning.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Shares the deploy lock so provisioning never races a deployment.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    name: Provision LOUAGE 404 stages
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate the answers secret
+        env:
+          CTF_ANSWERS_JSON: ${{ secrets.CTF_ANSWERS_JSON }}
+        run: |
+          if [ -z "$CTF_ANSWERS_JSON" ]; then
+            echo '::error::The CTF_ANSWERS_JSON repository secret is required.'
+            exit 1
+          fi
+          if ! printf '%s' "$CTF_ANSWERS_JSON" | jq -e '.stages | type == "object"' > /dev/null 2>&1; then
+            echo '::error::CTF_ANSWERS_JSON must be JSON with a "stages" object keyed by stage slug.'
+            exit 1
+          fi
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.DEPLOY_SSH_PORT }} ${{ secrets.DEPLOY_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Write the answers file on the VPS
+        env:
+          CTF_ANSWERS_JSON: ${{ secrets.CTF_ANSWERS_JSON }}
+        run: |
+          # Streamed over SSH stdin: no copy is written on the runner.
+          printf '%s' "$CTF_ANSWERS_JSON" | ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'umask 077 \
+              && mkdir -p /opt/liltech/secrets \
+              && chmod 700 /opt/liltech/secrets \
+              && cat > /opt/liltech/secrets/ctf-answers.json \
+              && chmod 600 /opt/liltech/secrets/ctf-answers.json'
+
+      - name: Run the provisioner
+        run: |
+          # Compose (non-Swarm) bind-mounts secrets with the host file's owner and
+          # mode, so the 0600 file is only readable by the deploy user. Run the
+          # one-shot container as that user instead of the image's appuser.
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_SSH_PORT }} \
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }} \
+            'cd /opt/liltech \
+              && docker compose -f docker-compose.prod.yml --profile ctf-operations \
+                run --rm --user "$(id -u):$(id -g)" ctf-provision'

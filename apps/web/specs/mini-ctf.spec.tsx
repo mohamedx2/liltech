@@ -86,6 +86,23 @@ describe('MiniCtfView (LOUAGE 404)', () => {
     expect(screen.getByText(/Network unreachable\./i)).toBeTruthy();
   });
 
+  it('explains that an admin must start the event before the chain opens', async () => {
+    vi.spyOn(api.ctf, 'getChain').mockRejectedValue(
+      new ApiClientError({
+        message:
+          'The Mini-CTF has not started yet. An administrator opens it when the event goes live.',
+        status: 403,
+        code: 'EVENT_NOT_LIVE',
+      }),
+    );
+
+    render(<MiniCtfView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/administrator opens it when the event goes live/i)).toBeTruthy();
+    });
+  });
+
   it('renders the tracker and the current stage with its Drive resources', async () => {
     vi.spyOn(api.ctf, 'getChain').mockResolvedValue(CHAIN);
 

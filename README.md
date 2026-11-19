@@ -193,10 +193,16 @@ Every push to `main` (and every manual **Run workflow** on the CI workflow) runs
 
 Required GitHub configuration:
 
-- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`, and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` to provision an administrator on deploy (see `.env.example`). `QR_TOKEN_KEY` is **required** (the API refuses to start without it); `SMTP_USER` / `SMTP_PASS` (Gmail app password) and optionally `MAIL_FROM` enable badge emails. `CTF_ANSWER_PEPPER` is **required** too: without it the API refuses to start, and every provisioned Mini-CTF answer digest is keyed by it.
+- **Secrets** (`Settings → Secrets and variables → Actions`): `DEPLOY_SSH_KEY`, `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `DB_PASSWORD`, and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` to provision an administrator on deploy (see `.env.example`). `QR_TOKEN_KEY` and `CTF_ANSWER_PEPPER` are **required** (the API refuses to start without them); generate the CTF pepper with `openssl rand -base64 48` and never rotate it without re-provisioning every CTF answer. `CTF_ANSWERS_JSON` (the complete private answers file) feeds the manual **Provision Mini-CTF** workflow — see `docs/ctf/README.md`. `SMTP_USER` / `SMTP_PASS` (Gmail app password) and optionally `MAIL_FROM` enable badge emails.
 - **Variables**: `DEPLOY_ENABLED` — deploy runs **only** when this is `true`, so the VPS is never touched before it is ready. Optional overrides: `NEXT_PUBLIC_API_URL`, `CORS_ORIGIN` (defaults use `http://<DEPLOY_SSH_HOST>:3000` / `:4000`).
 
 On the VPS the workflow assumes only Docker + the compose plugin (`docker compose version`) — nothing else is provisioned by hand. To harden host-key verification later, replace the workflow's runtime `ssh-keyscan` step with a pinned `known_hosts` entry (a `SSH_KNOWN_HOSTS` secret) — see the comment in `.github/workflows/ci.yml`.
+
+Mini-CTF answers are provisioned separately from deployments. Place the private
+file at `/opt/liltech/secrets/ctf-answers.json`, keep it outside Git, and run
+`docker compose -f docker-compose.prod.yml --profile ctf-operations run --rm ctf-provision`
+from `/opt/liltech`. Normal deployments never run the provisioner. See
+`docs/ctf/README.md` for the complete operations and rotation procedure.
 
 ## Git Workflow
 

@@ -278,6 +278,9 @@ action answers `403 CTF_NOT_OPEN`; after the window (or once the event reaches
 `submissions_closed` or later) every action answers `403 CTF_CLOSED`.
 
 All endpoints require `Authorization: Bearer <token>` with the `team` role.
+They also require the authoritative event phase to be exactly `live`. An admin
+opens the Mini-CTF by moving the event to `live`; every other phase returns
+`403 EVENT_NOT_LIVE` without revealing stage data or recording a write.
 
 #### `GET /api/ctf/chain`
 

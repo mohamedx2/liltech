@@ -34,13 +34,11 @@ jobs:
     env:
       # Used by apps/api integration tests (see docs/backend/DEVELOPMENT.md).
       TEST_DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
-      # Test-only pepper: the API validates CTF_ANSWER_PEPPER at startup.
-      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789
       # The API validates configuration at startup and services use DATABASE_URL,
       # so the integration tests run against the same provisioned test database.
       DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
       # Test-only pepper: Mini-CTF answer digests are HMAC'd, never unkeyed.
-      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789abcdef
+      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789abcdef-0123456789
 
     steps:
       - name: Checkout
@@ -118,17 +116,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & push API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/api/Dockerfile
@@ -138,7 +136,7 @@ jobs:
             ${{ env.IMAGE_API }}:sha-${{ github.sha }}
 
       - name: Build & push Web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/web/Dockerfile
@@ -194,10 +192,11 @@ jobs:
             echo '::error::The QR_TOKEN_KEY repository secret is required.'
             exit 1
           fi
-          if [ -z "$CTF_ANSWER_PEPPER" ]; then
-            echo '::error::The CTF_ANSWER_PEPPER repository secret is required.'
+          if [ "${#CTF_ANSWER_PEPPER}" -lt 32 ]; then
+            echo '::error::The CTF_ANSWER_PEPPER repository secret must contain at least 32 characters.'
             exit 1
           fi
+          umask 077
           cat > /tmp/liltech.env <<EOF
           NODE_ENV=production
           POSTGRES_USER=liltech
