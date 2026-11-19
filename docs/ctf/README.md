@@ -102,6 +102,22 @@ docker compose -f docker-compose.prod.yml --profile ctf-operations run --rm ctf-
 
 The normal `docker compose up` path never starts this service.
 
+Without SSH access, use the **Provision Mini-CTF** workflow
+(`.github/workflows/ctf-provision.yml`, manual "Run workflow" only). It reads
+the complete answers file from the `CTF_ANSWERS_JSON` repository secret, streams
+it to `/opt/liltech/secrets/ctf-answers.json` (directory `700`, file `600`) and
+runs the same Compose service. Update the secret, then re-run the workflow:
+
+```bash
+gh secret set CTF_ANSWERS_JSON --repo mohamedx2/liltech < ctf-answers.json
+gh workflow run ctf-provision.yml --repo mohamedx2/liltech
+```
+
+Compose mounts the secret with the host file's owner and mode, so the one-shot
+container runs as the deploy user (`--user "$(id -u):$(id -g)"`); the image's
+`appuser` cannot read a `600` file it does not own. Do the same when running the
+command above by hand.
+
 Stage content (titles, descriptions, hints) lives in
 `apps/api/prisma/ctf/stages.content.ts` and contains no answers.
 
