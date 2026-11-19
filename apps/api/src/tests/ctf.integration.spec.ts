@@ -5,7 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app';
 import { createSessionForUser, createUser } from '../modules/auth/auth.service';
 import { hashPassword } from '../modules/auth/password.service';
-import { hashAnswer } from '../modules/ctf/ctf-answer';
+import { getAnswerPepper, hashAnswer } from '../modules/ctf/ctf-answer';
 import {
   destroyIntegrationDatabase,
   INTEGRATION_DB_AVAILABLE,
@@ -544,7 +544,7 @@ describeDb('LOUAGE 404 chain', () => {
       const serialized = JSON.stringify(body);
       expect(serialized).not.toContain('FIXTURE{stage-1-answer}');
       expect(serialized).not.toContain('fixture{stage-1-answer}');
-      expect(serialized).not.toContain(TEST_PEPPER);
+      expect(serialized).not.toContain(getAnswerPepper());
       expect(serialized).not.toMatch(/[0-9a-f]{64}/);
       expect(serialized).not.toContain('answerHash');
     }
