@@ -15,7 +15,6 @@ import type {
   CtfTiming,
   CtfTrackItem,
 } from 'api-contracts';
-import { getEventState } from '../event-state/event-state.service';
 import { matchesAnswerHash } from './ctf-answer';
 
 /**
@@ -77,24 +76,6 @@ interface ProgressRow {
   attempts: number;
   hintsUsed: number;
   solvedAt: Date | null;
-}
-
-/**
- * The admin-owned event phase is the only Mini-CTF switch. A published stage
- * is content configuration, not permission to play before or after `live`.
- */
-async function assertCtfIsLive(): Promise<void> {
-  const state = await getEventState();
-
-  if (state.phase !== 'live') {
-    throw new ApiError(
-      ApiErrorCode.EVENT_NOT_LIVE,
-      state.phase === 'registration' || state.phase === 'checkin'
-        ? 'The Mini-CTF has not started yet. An administrator opens it when the event goes live.'
-        : 'The Mini-CTF is closed.',
-      403,
-    );
-  }
 }
 
 async function requireTeamForUser(userId: string): Promise<TeamContext> {
@@ -278,7 +259,6 @@ function timingView(gate: ParticipantPhaseGate): CtfTiming {
 }
 
 export async function getChain(userId: string): Promise<CtfChainResponse> {
-  await assertCtfIsLive();
   const team = await requireTeamForUser(userId);
   const gate = await loadPhaseGate();
   const eligible = teamIsEligible(team.progressState);
@@ -335,7 +315,6 @@ async function loadStageForTeam(
   progress: ProgressRow | undefined;
   eligible: boolean;
 }> {
-  await assertCtfIsLive();
   const team = await requireTeamForUser(userId);
   // Phase gate first: before the launch there is no stage 1, no hint and no
   // submission, whatever the team's check-in state says.
@@ -397,10 +376,6 @@ export async function revealNextHint(userId: string, slug: string): Promise<CtfH
   if (!next) {
     throw ApiError.conflict('All hints for this stage are already revealed.');
   }
-
-  // Re-check immediately before writing so a phase closed during validation
-  // cannot create a new hint reveal.
-  await assertCtfIsLive();
 
   await prisma.ctfProgress.createMany({
     data: [{ teamId: team.id, stageId: stage.id, state: 'unlocked' }],
@@ -482,10 +457,6 @@ export async function submitAnswer(
       message: `Stage ${stage.position} is already solved.`,
     };
   }
-
-  // Re-check immediately before rate limiting or recording an attempt. A
-  // request that arrived after the admin closed the phase must be write-free.
-  await assertCtfIsLive();
 
   const limit = submitLimiter.check(`ctf-submit:${team.id}:${stage.id}`);
 

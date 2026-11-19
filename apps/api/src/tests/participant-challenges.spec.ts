@@ -24,7 +24,6 @@ import {
 
 const describeDb = INTEGRATION_DB_AVAILABLE() ? describe : describe.skip;
 
-const TEST_PEPPER = 'participant-challenges-pepper-0123456789';
 const PASSWORD = 'participant-password-2026';
 const MINUTE = 60_000;
 
@@ -42,7 +41,6 @@ describeDb('participant challenges', () => {
   let adminUserId: string;
 
   beforeAll(async () => {
-    process.env.CTF_ANSWER_PEPPER = TEST_PEPPER;
     prisma = await initIntegrationDatabase();
     app = createApp();
   });
@@ -75,7 +73,7 @@ describeDb('participant challenges', () => {
           title: stage.title,
           description: `Description for ${stage.title}`,
           status: 'live',
-          answerHash: hashAnswer(stage.answer, TEST_PEPPER),
+          answerHash: hashAnswer(stage.answer),
           requiredForUnlock: true,
           hints: { create: [{ position: 1, body: `Hint for ${stage.slug}` }] },
         },
