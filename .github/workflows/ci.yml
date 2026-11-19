@@ -34,6 +34,8 @@ jobs:
     env:
       # Used by apps/api integration tests (see docs/backend/DEVELOPMENT.md).
       TEST_DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
+      # Test-only pepper: the API validates CTF_ANSWER_PEPPER at startup.
+      CTF_ANSWER_PEPPER: ci-test-pepper-0123456789
       # The API validates configuration at startup and services use DATABASE_URL,
       # so the integration tests run against the same provisioned test database.
       DATABASE_URL: postgresql://liltech_test:test_password@localhost:5433/liltech_test?schema=public
@@ -181,14 +183,19 @@ jobs:
           SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
           SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
           QR_TOKEN_KEY: ${{ secrets.QR_TOKEN_KEY }}
+          CTF_ANSWER_PEPPER: ${{ secrets.CTF_ANSWER_PEPPER }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL || 'https://liltechsousse.com' }}
         run: |
-          # The API refuses to start without QR_TOKEN_KEY: fail the deploy early instead.
+          # The API refuses to start without these: fail the deploy early instead.
           if [ -z "$QR_TOKEN_KEY" ]; then
             echo '::error::The QR_TOKEN_KEY repository secret is required.'
+            exit 1
+          fi
+          if [ -z "$CTF_ANSWER_PEPPER" ]; then
+            echo '::error::The CTF_ANSWER_PEPPER repository secret is required.'
             exit 1
           fi
           cat > /tmp/liltech.env <<EOF
@@ -206,6 +213,7 @@ jobs:
           API_IMAGE=${{ env.IMAGE_API }}:latest
           WEB_IMAGE=${{ env.IMAGE_WEB }}:latest
           QR_TOKEN_KEY=${QR_TOKEN_KEY}
+          CTF_ANSWER_PEPPER=${CTF_ANSWER_PEPPER}
           SMTP_HOST=smtp.gmail.com
           SMTP_PORT=465
           SMTP_USER=${SMTP_USER}

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button';
 import { LockIcon } from '@/components/icons/lock-icon';
 import { ErrorState, LoadingState } from '@/components/feedback/state-panel';
+import { ServerCountdown } from '@/components/events/server-countdown';
 import styles from './challenge-view.module.css';
 
 function formatTime(iso: string | null): string {
@@ -109,21 +110,29 @@ export function ChallengeView() {
     );
   }
 
-  const { challenge: schedule, access, content } = response.current;
+  const { challenge: schedule, access, content, unlocksAt } = response.current;
 
   if (access === 'locked' || !content) {
-    const opensAt = schedule.status === 'live' ? formatTime(schedule.publicAt) : '';
+    const opensAt = unlocksAt ? formatTime(unlocksAt) : '';
     return (
       <NoticeCard
         badge="Challenge Locked"
         title={schedule.title}
         description={
           opensAt
-            ? `The description opens for every team at ${opensAt}. Solve this challenge's Mini-CTF to read it now.`
+            ? `This challenge opens to every team at ${opensAt}. Clear the Mini-CTF to read it now.`
             : 'This challenge has not started yet.'
         }
       >
         {schedule.summary ? <p className={styles.overview}>{schedule.summary}</p> : null}
+        {unlocksAt ? (
+          <ServerCountdown
+            serverTime={response.serverTime}
+            targetTime={unlocksAt}
+            label="Opens for everyone in"
+            expiredLabel="Opening now"
+          />
+        ) : null}
         {opensAt ? (
           <div className={styles.actionRow}>
             <Link href="/team/ctf" className={buttonClassName({ variant: 'primary', size: 'lg' })}>
@@ -156,6 +165,12 @@ export function ChallengeView() {
             </Badge>
             {access === 'early' ? (
               <Badge tone="warning">Early access (Mini-CTF solved)</Badge>
+            ) : null}
+            {response.current.forcedOpen ? <Badge tone="info">Opened by organizers</Badge> : null}
+            {schedule.submissionDeadline ? (
+              <Badge tone="neutral">
+                Submission deadline {formatTime(schedule.submissionDeadline)}
+              </Badge>
             ) : null}
           </div>
           <h1 className={styles.title}>{challenge.title}</h1>

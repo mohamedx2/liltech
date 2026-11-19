@@ -37,11 +37,18 @@ const CURRENT: CtfCurrentStage = {
 };
 
 const CHAIN: CtfChainResponse = {
-  team: { name: 'Fixture Builders' },
+  team: { name: 'Fixture Builders', points: null, solvedAt: null },
   stages: TRACK(['unlocked', 'locked', 'locked', 'locked', 'locked', 'locked', 'locked']),
   current: CURRENT,
   summary: { solved: 0, total: 7 },
   eligible: true,
+  timing: {
+    startedAt: '2026-11-21T20:00:00.000Z',
+    closesAt: '2026-11-21T21:00:00.000Z',
+    open: true,
+    closed: false,
+    serverTime: '2026-11-21T20:10:00.000Z',
+  },
 };
 
 function withCurrent(patch: Partial<CtfCurrentStage>, chainPatch: Partial<CtfChainResponse> = {}) {

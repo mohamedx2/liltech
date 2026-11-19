@@ -117,16 +117,32 @@ function findStageOrThrow(slug: string): { index: number } {
   return { index };
 }
 
+/** The dev mock pretends the CTF was launched a few minutes ago. */
+const MOCK_STARTED_AT = new Date(Date.now() - 5 * 60_000).toISOString();
+const MOCK_CLOSES_AT = new Date(Date.now() + 55 * 60_000).toISOString();
+
 export function handleGetCtfChain(): CtfChainResponse {
   const index = firstUnsolvedIndex();
   const solved = MOCK_STAGES.filter((stage) => state.solved.has(stage.slug)).length;
+  const completed = index < 0;
 
   return {
-    team: { name: 'Sample Builders (Dev Mock)' },
+    team: {
+      name: 'Sample Builders (Dev Mock)',
+      points: completed ? 7 : null,
+      solvedAt: completed ? new Date().toISOString() : null,
+    },
     stages: MOCK_STAGES.map((_, stageIndex) => trackItem(stageIndex)),
     current: index >= 0 ? currentStage(index) : null,
     summary: { solved, total: MOCK_STAGES.length },
     eligible: true,
+    timing: {
+      startedAt: MOCK_STARTED_AT,
+      closesAt: MOCK_CLOSES_AT,
+      open: true,
+      closed: false,
+      serverTime: new Date().toISOString(),
+    },
   };
 }
 
@@ -168,6 +184,8 @@ export function handleSubmitCtfAnswer(slug: string, payload: CtfSubmitRequest): 
       nextStageUnlocked: index + 1 < MOCK_STAGES.length,
       nextStagePosition: MOCK_STAGES[index + 1]?.position ?? null,
       completedChain: state.solved.size === MOCK_STAGES.length,
+      points: state.solved.size === MOCK_STAGES.length ? 7 : null,
+      solvedAt: state.solved.size === MOCK_STAGES.length ? new Date().toISOString() : null,
       message: `Stage ${stage.position} is already solved.`,
     };
   }
@@ -191,6 +209,8 @@ export function handleSubmitCtfAnswer(slug: string, payload: CtfSubmitRequest): 
     nextStageUnlocked: index + 1 < MOCK_STAGES.length,
     nextStagePosition: MOCK_STAGES[index + 1]?.position ?? null,
     completedChain: completed,
+    points: completed ? 7 : null,
+    solvedAt: completed ? new Date().toISOString() : null,
     message: completed
       ? 'Investigation complete. You were the missing passenger all along.'
       : 'Correct flag. The next stage is unlocked.',

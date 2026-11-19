@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import {
+  type ChallengeSubmissionState,
+  type SubmissionBlockedReason,
+  type SubmissionItem,
+  type SubmissionsOverviewResponse,
+} from 'api-contracts';
 import { api, ApiClientError } from '@/lib/api';
-import type { SubmissionHistoryResponse } from '@/lib/api/contracts/pending';
 import { formatUtcTimestamp } from '@/lib/format';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormField, TextInput, Textarea } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { FormField, TextInput } from '@/components/ui/input';
+import { Button, buttonClassName } from '@/components/ui/button';
 import { Alert } from '@/components/feedback/alert';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/table';
@@ -15,371 +21,401 @@ import { ServerCountdown } from '@/components/events/server-countdown';
 import { LockIcon } from '@/components/icons/lock-icon';
 import styles from './submissions-view.module.css';
 
-/** Matches the documented server-side upload limit (see docs/api). */
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const BLOCKED_COPY: Record<SubmissionBlockedReason, string> = {
+  EVENT_NOT_LIVE: 'Submissions open when the organizers launch the event.',
+  SUBMISSIONS_CLOSED: 'The submission window is closed for this challenge.',
+  CHALLENGE_NOT_STARTED: 'This challenge has not started yet.',
+  CHALLENGE_LOCKED:
+    'This challenge unlocks once your team clears the Mini-CTF, or when it opens to everyone.',
+  DEADLINE_PASSED: 'The submission deadline has passed. The last submission counts.',
+};
 
-export function SubmissionsView() {
-  const [history, setHistory] = useState<SubmissionHistoryResponse | null>(null);
-  const [serverTime, setServerTime] = useState<string>(new Date().toISOString());
-  const [isLoading, setIsLoading] = useState(true);
+interface LinkField {
+  key: 'driveUrl' | 'githubUrl' | 'reportUrl' | 'presentationUrl';
+  label: string;
+  placeholder: string;
+  hint: string;
+}
+
+function linkFields(position: number): LinkField[] {
+  if (position === 1) {
+    return [
+      {
+        key: 'driveUrl',
+        label: 'Google Drive link',
+        placeholder: 'https://drive.google.com/…',
+        hint: 'One Drive link holding your poster, logo and teaser video.',
+      },
+    ];
+  }
+
+  return [
+    {
+      key: 'githubUrl',
+      label: 'GitHub repository',
+      placeholder: 'https://github.com/owner/repo',
+      hint: 'The public repository the jury reviews.',
+    },
+    {
+      key: 'reportUrl',
+      label: 'Technical report',
+      placeholder: 'https://drive.google.com/…',
+      hint: 'A Drive or Docs link to the short technical report.',
+    },
+    {
+      key: 'presentationUrl',
+      label: 'Presentation',
+      placeholder: 'https://docs.google.com/presentation/…',
+      hint: 'A Drive, Docs or Slides link to your pitch deck.',
+    },
+  ];
+}
+
+function shortSha(sha: string | null): string {
+  return sha ? sha.slice(0, 10) : '—';
+}
+
+function SubmissionDetails({ submission }: { submission: SubmissionItem }) {
+  const links: { label: string; href: string }[] = [];
+
+  if (submission.driveUrl) links.push({ label: 'Drive', href: submission.driveUrl });
+  if (submission.githubUrl) links.push({ label: 'GitHub', href: submission.githubUrl });
+  if (submission.reportUrl) links.push({ label: 'Report', href: submission.reportUrl });
+  if (submission.presentationUrl) {
+    links.push({ label: 'Presentation', href: submission.presentationUrl });
+  }
+
+  return (
+    <div className={styles.receiptGrid}>
+      <div className={styles.receiptItem}>
+        <span className={styles.receiptLabel}>Submitted</span>
+        <span className={styles.receiptValue}>{formatUtcTimestamp(submission.submittedAt)}</span>
+      </div>
+      {submission.githubUrl ? (
+        <div className={styles.receiptItem}>
+          <span className={styles.receiptLabel}>Pinned commit</span>
+          <span className={styles.receiptValue}>
+            {submission.commitSha ? shortSha(submission.commitSha) : 'Not available'}
+          </span>
+        </div>
+      ) : null}
+      <div className={styles.receiptItemFull}>
+        <span className={styles.receiptLabel}>Links</span>
+        <div className={styles.receiptGrid}>
+          {links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className={styles.repoLink}
+            >
+              {link.label} ↗
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionForm({
+  item,
+  onSubmitted,
+}: {
+  item: ChallengeSubmissionState;
+  onSubmitted: () => Promise<void>;
+}) {
+  const fields = linkFields(item.challenge.position);
+  const [values, setValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Form states
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [repoUrl, setRepoUrl] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const canSubmit = fields.every((field) => (values[field.key] ?? '').trim().length > 0);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const loadSubmissions = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const [historyData, eventData] = await Promise.all([
-        api.submissions.getMyTeamSubmissions(),
-        api.events.getEventState(),
-      ]);
-      setHistory(historyData);
-      setServerTime(eventData.serverTime);
-    } catch (err) {
-      if (err instanceof ApiClientError) {
-        setErrorMessage(err.message);
-      } else {
-        setErrorMessage('Failed to load submission history.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSubmissions();
-  }, [loadSubmissions]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || isSubmitting) return;
-
-    if (selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      setErrorMessage('The selected file exceeds the 50MB limit. Please compress it and retry.');
-      return;
-    }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit || isSubmitting) return;
 
     setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const payload =
+      item.challenge.position === 1
+        ? { challengePosition: 1 as const, driveUrl: values.driveUrl.trim() }
+        : {
+            challengePosition: 2 as const,
+            githubUrl: values.githubUrl.trim(),
+            reportUrl: values.reportUrl.trim(),
+            presentationUrl: values.presentationUrl.trim(),
+          };
+
     try {
-      const formData = new FormData();
-      formData.append('title', title.trim());
-      if (description.trim()) formData.append('description', description.trim());
-      if (repoUrl.trim()) formData.append('repoUrl', repoUrl.trim());
-      if (selectedFile) formData.append('file', selectedFile);
-
-      const newSubmission = await api.submissions.createSubmission(formData);
-      setSuccessMessage(`Deliverable submission v${newSubmission.version} recorded successfully!`);
-
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setRepoUrl('');
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-
-      // Reload list
-      const updated = await api.submissions.getMyTeamSubmissions();
-      setHistory(updated);
+      await api.submissions.create(payload);
+      setSuccessMessage('Submission recorded. Only your latest submission is judged.');
+      setValues({});
+      await onSubmitted();
     } catch (err) {
-      if (err instanceof ApiClientError) {
-        setErrorMessage(err.message);
-      } else {
-        setErrorMessage('Failed to upload submission. Please check connection and try again.');
-      }
+      setErrorMessage(
+        err instanceof ApiClientError
+          ? err.message
+          : 'The submission could not be recorded. Please retry.',
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return <LoadingState message="Retrieving submission history..." />;
-  }
+  return (
+    <form onSubmit={handleSubmit} className={styles.form}>
+      {errorMessage ? (
+        <Alert tone="error" title="Submission rejected">
+          {errorMessage}
+        </Alert>
+      ) : null}
+      {successMessage ? (
+        <Alert tone="success" title="Submission confirmed">
+          {successMessage}
+        </Alert>
+      ) : null}
 
-  if (errorMessage && !history) {
-    return (
-      <ErrorState
-        title="Submissions Unavailable"
-        message={errorMessage}
-        onRetry={() => {
-          loadSubmissions();
-        }}
-      />
-    );
-  }
+      {fields.map((field) => (
+        <FormField key={field.key} label={field.label} hint={field.hint} required>
+          {({ id, describedBy }) => (
+            <TextInput
+              id={id}
+              type="url"
+              inputMode="url"
+              value={values[field.key] ?? ''}
+              onChange={(event) =>
+                setValues((current) => ({ ...current, [field.key]: event.target.value }))
+              }
+              placeholder={field.placeholder}
+              disabled={isSubmitting}
+              aria-describedby={describedBy}
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          )}
+        </FormField>
+      ))}
 
-  const isLocked = history?.isLocked ?? false;
-  const currentSubmission = history?.current;
-  const submissionsList = history?.submissions ?? [];
+      <div className={styles.submitRow}>
+        <Button type="submit" variant="primary" loading={isSubmitting} disabled={!canSubmit}>
+          {item.current ? 'Submit a new version' : 'Submit deliverables'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ChallengeCard({
+  item,
+  serverTime,
+  onSubmitted,
+}: {
+  item: ChallengeSubmissionState;
+  serverTime: string;
+  onSubmitted: () => Promise<void>;
+}) {
+  const deadline = item.challenge.submissionDeadline;
+  const blocked = item.blockedReason;
 
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerTitles}>
-          <span className={styles.subHeading}>Deliverable Portal</span>
-          <h1 className={styles.title}>Project Submissions</h1>
-          <p className={styles.description}>
-            Upload your project deliverables, codebase repository, and presentation assets. All
-            submissions are versioned and timestamped on the server.
-          </p>
+    <Card surface="raised" className={styles.formCard}>
+      <CardHeader>
+        <div className={styles.receiptHeaderRow}>
+          <div>
+            <CardTitle as="h2">
+              Challenge {String(item.challenge.position).padStart(2, '0')} · {item.challenge.title}
+            </CardTitle>
+            <CardDescription>{item.challenge.summary}</CardDescription>
+          </div>
+          <Badge
+            tone={item.canSubmit ? 'success' : item.access === 'locked' ? 'warning' : 'neutral'}
+            showDot
+          >
+            {item.canSubmit
+              ? 'Submissions open'
+              : blocked === 'CHALLENGE_LOCKED'
+                ? 'Locked'
+                : 'Closed'}
+          </Badge>
         </div>
+      </CardHeader>
 
-        {history?.deadline && !isLocked && (
+      <CardContent className={styles.receiptContent}>
+        {deadline && item.canSubmit ? (
           <div className={styles.countdownBox}>
             <ServerCountdown
               serverTime={serverTime}
-              targetTime={history.deadline}
-              label="Submission Window Closes In"
+              targetTime={deadline}
+              label="Deadline in"
+              expiredLabel="Deadline reached"
             />
           </div>
+        ) : null}
+
+        {!item.canSubmit ? (
+          <Alert tone="warning" title="Submissions closed">
+            <span className={styles.lockedNotice}>
+              <LockIcon size={16} /> {blocked ? BLOCKED_COPY[blocked] : 'You cannot submit now.'}
+            </span>
+          </Alert>
+        ) : null}
+
+        {item.access === 'locked' ? (
+          <div className={styles.submitRow}>
+            <Link href="/team/challenge" className={buttonClassName({ variant: 'outline' })}>
+              See the challenge →
+            </Link>
+          </div>
+        ) : null}
+
+        {item.current ? (
+          <div>
+            <h3 className={styles.description}>Current submission (the one judged)</h3>
+            <SubmissionDetails submission={item.current} />
+          </div>
+        ) : (
+          <p className={styles.description}>Nothing submitted for this challenge yet.</p>
         )}
-      </header>
 
-      {/* Lock Notice if Closed */}
-      {isLocked && (
-        <Alert tone="warning" title="Submissions Closed">
-          <span className={styles.lockedNotice}>
-            <LockIcon />
-            Unlock condition: only an administrator can reopen submissions after the 08:00 UTC
-            deadline. Deliverables are now locked for jury review and scoring.
-          </span>
-        </Alert>
-      )}
+        {item.canSubmit ? <SubmissionForm item={item} onSubmitted={onSubmitted} /> : null}
 
-      {/* Success Notification */}
-      {successMessage && (
-        <Alert tone="success" title="Submission Confirmed">
-          {successMessage}
-        </Alert>
-      )}
-
-      {/* Current Active Submission Receipt */}
-      {currentSubmission && (
-        <Card surface="raised" className={styles.receiptCard}>
-          <CardHeader>
-            <div className={styles.receiptHeaderRow}>
-              <div>
-                <CardTitle as="h2">
-                  Current Active Submission (Version {currentSubmission.version})
-                </CardTitle>
-                <CardDescription>
-                  Submitted on {formatUtcTimestamp(currentSubmission.submittedAt)}
-                </CardDescription>
-              </div>
-              <Badge tone="success" showDot>
-                Recorded by Server
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className={styles.receiptContent}>
-            <div className={styles.receiptGrid}>
-              <div className={styles.receiptItem}>
-                <span className={styles.receiptLabel}>Title</span>
-                <span className={styles.receiptValue}>{currentSubmission.title}</span>
-              </div>
-              {currentSubmission.repoUrl && (
-                <div className={styles.receiptItem}>
-                  <span className={styles.receiptLabel}>Repository</span>
-                  <a
-                    href={currentSubmission.repoUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className={styles.repoLink}
-                  >
-                    {currentSubmission.repoUrl} ↗
-                  </a>
-                </div>
-              )}
-              {currentSubmission.fileName && (
-                <div className={styles.receiptItem}>
-                  <span className={styles.receiptLabel}>Uploaded File</span>
-                  <span className={styles.receiptValue}>
-                    📄 {currentSubmission.fileName} (
-                    {Math.round((currentSubmission.fileSizeBytes ?? 0) / 1024)} KB)
-                  </span>
-                </div>
-              )}
-              {currentSubmission.description && (
-                <div className={styles.receiptItemFull}>
-                  <span className={styles.receiptLabel}>Notes / Description</span>
-                  <p className={styles.receiptNotes}>{currentSubmission.description}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Submission Form (Only if not locked) */}
-      {!isLocked && (
-        <Card surface="default" className={styles.formCard}>
-          <CardHeader>
-            <CardTitle as="h2">
-              {currentSubmission ? 'Submit Updated Deliverables' : 'New Deliverable Submission'}
-            </CardTitle>
-            <CardDescription>
-              Submitting again creates a new version while archiving previous versions. Only the
-              latest version is judged.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {errorMessage && (
-              <Alert tone="error" title="Submission Error">
-                {errorMessage}
-              </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className={styles.form}>
-              <FormField label="Deliverable Title" required hint="e.g. LilTech Dispatcher v1.0">
-                {({ id, describedBy }) => (
-                  <TextInput
-                    id={id}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="LilTech Project Solution"
-                    disabled={isSubmitting}
-                    aria-describedby={describedBy}
-                    required
-                  />
-                )}
-              </FormField>
-
-              <FormField
-                label="Git Repository URL"
-                hint="Public or shared GitHub / GitLab repository URL"
-              >
-                {({ id, describedBy }) => (
-                  <TextInput
-                    id={id}
-                    type="url"
-                    value={repoUrl}
-                    onChange={(e) => setRepoUrl(e.target.value)}
-                    placeholder="https://github.com/organization/repo"
-                    disabled={isSubmitting}
-                    aria-describedby={describedBy}
-                  />
-                )}
-              </FormField>
-
-              <FormField
-                label="Project Archive / Slide Deck (.zip, .pdf, .tar.gz)"
-                hint="Upload code bundle or presentation deck (maximum 50MB)"
-              >
-                {({ id, describedBy }) => (
-                  <input
-                    ref={fileInputRef}
-                    id={id}
-                    type="file"
-                    className={styles.fileInput}
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-                    disabled={isSubmitting}
-                    aria-describedby={describedBy}
-                    accept=".zip,.tar.gz,.pdf,.tgz"
-                  />
-                )}
-              </FormField>
-
-              <FormField
-                label="Technical Notes / Setup Instructions"
-                hint="Provide instructions for the jury to execute or test your prototype"
-              >
-                {({ id, describedBy }) => (
-                  <Textarea
-                    id={id}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Docker compose up command, demo credentials, or architecture overview..."
-                    disabled={isSubmitting}
-                    aria-describedby={describedBy}
-                  />
-                )}
-              </FormField>
-
-              <div className={styles.submitRow}>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={isSubmitting}
-                  disabled={!title.trim()}
-                >
-                  {isSubmitting ? 'Uploading Deliverable...' : 'Submit Deliverables'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Submission Version History Table */}
-      {submissionsList.length > 0 ? (
-        <Card surface="default" className={styles.historyCard}>
-          <CardHeader>
-            <CardTitle as="h2">Submission History</CardTitle>
-            <CardDescription>Server-timestamped record of all team iterations</CardDescription>
-          </CardHeader>
-          <CardContent>
+        {item.history.length > 0 ? (
+          <div>
+            <h3 className={styles.description}>History</h3>
             <DataTable
-              caption="List of past submissions by your team"
+              caption={`Submissions for challenge ${item.challenge.position}`}
               columns={[
                 {
-                  key: 'version',
-                  header: 'Version',
-                  render: (sub) => (
-                    <Badge tone={sub.version === currentSubmission?.version ? 'info' : 'neutral'}>
-                      v{sub.version}
-                    </Badge>
-                  ),
+                  key: 'submittedAt',
+                  header: 'Submitted (UTC)',
+                  render: (submission) => formatUtcTimestamp(submission.submittedAt),
                 },
                 {
-                  key: 'title',
-                  header: 'Title',
-                  render: (sub) => <strong>{sub.title}</strong>,
+                  key: 'current',
+                  header: 'Counts',
+                  render: (submission) =>
+                    submission.isCurrent ? <Badge tone="success">Judged</Badge> : '—',
                 },
-                { key: 'fileName', header: 'File', render: (sub) => sub.fileName ?? '—' },
                 {
-                  key: 'repoUrl',
-                  header: 'Repository',
-                  render: (sub) =>
-                    sub.repoUrl ? (
+                  key: 'drive',
+                  header: 'Drive',
+                  render: (submission) =>
+                    submission.driveUrl ? (
                       <a
-                        href={sub.repoUrl}
+                        href={submission.driveUrl}
                         target="_blank"
                         rel="noreferrer noopener"
                         className={styles.repoLink}
                       >
-                        Repository ↗
+                        Open ↗
                       </a>
                     ) : (
                       '—'
                     ),
                 },
                 {
-                  key: 'submittedAt',
-                  header: 'Submitted At (UTC)',
-                  render: (sub) => formatUtcTimestamp(sub.submittedAt),
+                  key: 'github',
+                  header: 'GitHub',
+                  render: (submission) =>
+                    submission.githubUrl ? (
+                      <a
+                        href={submission.githubUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className={styles.repoLink}
+                      >
+                        {shortSha(submission.commitSha)} ↗
+                      </a>
+                    ) : (
+                      '—'
+                    ),
                 },
               ]}
-              rows={submissionsList}
-              getRowKey={(sub) => sub.id}
+              rows={item.history}
+              getRowKey={(submission) => submission.id}
             />
-          </CardContent>
-        </Card>
-      ) : (
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function SubmissionsView() {
+  const [overview, setOverview] = useState<SubmissionsOverviewResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadOverview = useCallback(async () => {
+    setErrorMessage(null);
+
+    try {
+      setOverview(await api.submissions.getOverview());
+    } catch (err) {
+      setErrorMessage(
+        err instanceof ApiClientError ? err.message : 'Failed to load the submission state.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
+
+  if (isLoading) {
+    return <LoadingState message="Loading the challenge submissions..." />;
+  }
+
+  if (errorMessage || !overview) {
+    return (
+      <ErrorState
+        title="Submissions unavailable"
+        message={errorMessage ?? 'Could not retrieve the submission state.'}
+        onRetry={() => {
+          setIsLoading(true);
+          void loadOverview();
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <div className={styles.headerTitles}>
+          <span className={styles.subHeading}>Deliverables</span>
+          <h1 className={styles.title}>Challenge submissions</h1>
+          <p className={styles.description}>
+            Challenge 01 takes one Google Drive link with your poster, logo and teaser video.
+            Challenge 02 takes your GitHub repository, technical report and presentation. You can
+            resubmit until the deadline: only the latest submission is judged.
+          </p>
+        </div>
+      </header>
+
+      {overview.items.length === 0 ? (
         <EmptyState
-          title="No Deliverables Yet"
-          message="Your team has not submitted anything so far. Use the form above to record your first deliverable before the 08:00 UTC deadline."
+          title="No challenge yet"
+          message="The organizers have not published the challenges. Watch the announcements."
         />
+      ) : (
+        overview.items.map((item) => (
+          <ChallengeCard
+            key={item.challenge.id}
+            item={item}
+            serverTime={overview.serverTime}
+            onSubmitted={loadOverview}
+          />
+        ))
       )}
     </div>
   );

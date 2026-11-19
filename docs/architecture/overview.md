@@ -50,31 +50,32 @@
 
 ## Future Module Boundaries
 
-Planned backend feature modules (not yet implemented — this documents the intended seams so early code doesn't block them):
+Backend feature modules and the seams still to be filled:
 
 ```text
 apps/api/src/modules/
-├── auth/            # login, sessions/tokens, password handling
-├── registration/    # team creation, participant invites, email delivery hook
-├── participants/    # participant profiles, QR badge data
-├── checkin/         # QR token verification, check-in state
-├── event-state/     # phase machine, server time, launch/close controls
-├── mini-ctf/        # flag validation, attempt log, rate limiting, unlock
-├── challenges/      # challenge briefs & resources per track
-├── submissions/     # deliverable upload, deadline enforcement
-├── announcements/   # live announcements feed
-├── jury/            # jury accounts, challenge scoping
-├── scoring/         # score submission & validation
-├── leaderboards/    # aggregated views
-├── admin/           # team management, overrides (audited)
-└── results/         # podiums & publication
+├── auth/            # login, sessions/tokens, password handling        (implemented)
+├── registration/    # team creation, badges, email delivery            (implemented)
+├── participants/    # participant profiles, QR badge data              (implemented)
+├── checkin/         # QR token verification, check-in state            (implemented)
+├── event-state/     # phase machine, server time, phase gate           (implemented)
+├── ctf/             # LOUAGE 404 chain, scoring, attempt log           (implemented)
+├── challenges/      # challenge briefs, unlock, deadlines              (implemented)
+├── submissions/     # link deliverables, append-only history           (implemented)
+├── announcements/   # live announcements feed                         (implemented)
+├── admin/           # team management, overrides (audited)            (implemented)
+├── jury/            # jury accounts, challenge scoping                (planned)
+├── scoring/         # C01/C02 jury scores (fields exist on Team)       (planned)
+├── leaderboards/    # aggregated views                                (planned)
+└── results/         # podiums & publication                           (planned)
 ```
 
 Rules for module growth:
 
 - Each module owns its routes and services; cross-module reads go through services, never direct Prisma reach-around.
 - The event-state module is the only writer of event phase state.
-- The mini-ctf module is the only holder of flag material.
+- The ctf module is the only holder of flag material.
+- Every participant-facing module asks `event-state/phase-gate.ts` whether an action is allowed; phase rules are never duplicated.
 - Admin overrides are recorded in an audit log.
 
 ## Real-Time Readiness (Decision Pending)
@@ -125,9 +126,17 @@ Client  ── POST /api/ctf/stages/:slug/submit ─▶ ctf.service.submitAnswer
 
 Rules that live only on the server:
 
+- The chain is playable only while the event is `live` **and** inside the
+  60-minute window opened when the event first enters `live`
+  (`EventPhaseState.ctfStartedAt`). Before the launch: `CTF_NOT_OPEN`; after the
+  window or outside `live`: `CTF_CLOSED`. A slow team is never punished: the
+  Challenge 01 fallback opens at `ctfStartedAt + 60 min`.
 - A stage is visible only when `CtfProgress.state = 'unlocked'`; stage 1 is
   unlocked implicitly for a checked-in team, everything else by solving the
   previous stage.
+- The final correct flag stores `Team.ctfSolvedAt` and the automatic
+  `Team.ctfPoints` (10 / 7 / 4.5 / 2.5 / 0 by solve window, in
+  `modules/ctf/ctf-scoring.ts`). A replay never changes either.
 - Answers are HMAC-SHA256 digests keyed by `CTF_ANSWER_PEPPER`; the plaintext
   answer never exists in the database, the API or the client bundle.
 - A `live` stage must have a digest (database `CHECK` constraint); an
@@ -138,5 +147,21 @@ Rules that live only on the server:
 
 Assets are not hosted by the platform: each stage stores a `assetDriveUrl`
 validated against `drive.google.com` / `docs.google.com`.
+
+## Participant gating and submissions
+
+One helper — `apps/api/src/modules/event-state/phase-gate.ts` — derives every
+time rule from server state: CTF open/closed (launch + 60 minutes), challenge
+and submission availability (only `live`), and the Challenge 01 fallback
+(`ctfStartedAt + 60 min`, evaluated on every request). The CTF, challenge and
+submission modules all call it, so the rules cannot drift apart.
+
+`modules/submissions` stores **links**, not files: Challenge 01 is one Google
+Drive link, Challenge 02 is a GitHub repository plus a report link and a
+presentation link. Each submission inserts a `Submission` row; the newest row
+counts, older rows stay as history. The GitHub HEAD is pinned best-effort and a
+failure never blocks a submission. Jury scores (`Team.c1JuryScore`,
+`Team.c2JuryScore`) exist as nullable columns for the next task; no scoring
+logic lives here yet.
 
 See `docs/ctf/README.md` for provisioning, stage content and playtesting.

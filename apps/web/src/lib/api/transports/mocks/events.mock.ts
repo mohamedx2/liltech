@@ -9,12 +9,18 @@ import type { MockRouteMap } from './types';
  * helpers like `nextPhase` are derived in `contracts/pending.ts`, never stored
  * in the mock payload.
  */
+/** Dev mock: the Mini-CTF opened five minutes ago and closes in 55 minutes. */
+const MOCK_CTF_STARTED_AT = new Date(Date.now() - 5 * 60_000).toISOString();
+const MOCK_CTF_CLOSES_AT = new Date(Date.now() + 55 * 60_000).toISOString();
+
 export function createEventsMockRoutes(): MockRouteMap {
   return {
     [`GET ${PLANNED_ENDPOINTS.EVENT_STATE}`]: (): EventStateResponse => ({
       phase: devMockState.phase,
       phaseChangedAt: devMockState.phaseChangedAt,
       serverTime: new Date().toISOString(),
+      ctfStartedAt: MOCK_CTF_STARTED_AT,
+      ctfClosesAt: MOCK_CTF_CLOSES_AT,
     }),
 
     [`POST ${PLANNED_ENDPOINTS.EVENT_STATE}`]: (config): EventStateResponse => {
@@ -33,6 +39,8 @@ export function createEventsMockRoutes(): MockRouteMap {
         phase: devMockState.phase,
         phaseChangedAt: devMockState.phaseChangedAt,
         serverTime: new Date().toISOString(),
+        ctfStartedAt: MOCK_CTF_STARTED_AT,
+        ctfClosesAt: MOCK_CTF_CLOSES_AT,
       };
     },
   };

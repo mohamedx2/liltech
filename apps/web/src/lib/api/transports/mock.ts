@@ -30,10 +30,13 @@ import {
   handleSubmitCtfAnswer,
 } from './mocks/ctf.mock';
 import { handleGetMyBadge, handleGetMyTeam } from './mocks/participants.mock';
-import { handleCreateSubmission, handleGetMySubmissions } from './mocks/submissions.mock';
+import { handleCreateSubmission, handleGetSubmissionsOverview } from './mocks/submissions.mock';
 import type { MockRouteMap } from './mocks/types';
 import { PLANNED_ENDPOINTS } from '../endpoints';
-import type { CtfSubmitRequest as CtfSubmitAnswerRequest } from 'api-contracts';
+import type {
+  CreateSubmissionRequest,
+  CtfSubmitRequest as CtfSubmitAnswerRequest,
+} from 'api-contracts';
 import type { MiniCtfSubmitRequest, SubmitEvaluationRequest } from '../contracts/pending';
 
 export interface MockTransportOptions {
@@ -68,8 +71,9 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
 
     [`GET ${PLANNED_ENDPOINTS.CHALLENGES_CURRENT}`]: () => handleGetCurrentChallenge(),
 
-    [`GET ${PLANNED_ENDPOINTS.SUBMISSIONS_MY_TEAM}`]: () => handleGetMySubmissions(),
-    [`POST ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: (config) => handleCreateSubmission(config.body),
+    [`GET ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: () => handleGetSubmissionsOverview(),
+    [`POST ${PLANNED_ENDPOINTS.SUBMISSIONS}`]: (config) =>
+      handleCreateSubmission((config.body ?? {}) as CreateSubmissionRequest),
 
     [`GET ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: () => handleGetAnnouncements(),
     [`POST ${PLANNED_ENDPOINTS.ANNOUNCEMENTS}`]: (config) => {

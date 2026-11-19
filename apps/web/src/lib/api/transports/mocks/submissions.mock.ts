@@ -1,73 +1,97 @@
-import { EventPhase, TeamProgressState } from 'api-contracts';
+import type {
+  ChallengeSchedule,
+  ChallengeSubmissionState,
+  CreateSubmissionRequest,
+  SubmissionItem,
+  SubmissionsOverviewResponse,
+} from 'api-contracts';
 import { devMockState } from './dev-state';
-import { ApiClientError } from '../../errors';
-import type { SubmissionHistoryResponse, SubmissionItem } from '../../contracts/pending';
 
-function isSubmissionWindowClosed(): boolean {
-  return (
-    devMockState.phase === EventPhase.SubmissionsClosed ||
-    devMockState.phase === EventPhase.Pitching ||
-    devMockState.phase === EventPhase.Results
-  );
+/**
+ * DEV-ONLY mock for the link submissions.
+ *
+ * It exists so the participant UI can be developed without a backend. It never
+ * decides business rules: the real API does. It only fakes an open challenge 01
+ * and a not-yet-open challenge 02.
+ */
+
+const CHALLENGE_01_ID = '11111111-1111-4111-8111-111111111111';
+const CHALLENGE_02_ID = '22222222-2222-4222-8222-222222222222';
+
+const history: SubmissionItem[] = [];
+
+function isoNow(): string {
+  return new Date().toISOString();
 }
 
-export function handleGetMySubmissions(): SubmissionHistoryResponse {
-  const current = devMockState.submissions[devMockState.submissions.length - 1] ?? null;
+function schedule(position: number, title: string, id: string): ChallengeSchedule {
+  return {
+    id,
+    position,
+    title,
+    summary: `Mock teaser for challenge ${position}.`,
+    status: position === 1 ? 'live' : 'upcoming',
+    startedAt: position === 1 ? isoNow() : null,
+    endedAt: null,
+    publicAt: null,
+    publicDelayMinutes: 60,
+    submissionDeadline: null,
+  };
+}
+
+function stateFor(position: number, title: string, id: string): ChallengeSubmissionState {
+  const own = history.filter((item) => item.challengePosition === position);
+  const current = own[0] ?? null;
 
   return {
-    submissions: devMockState.submissions,
+    challenge: schedule(position, title, id),
+    access: position === 1 ? 'public' : 'locked',
+    canSubmit: position === 1,
+    blockedReason: position === 1 ? null : 'CHALLENGE_LOCKED',
     current,
-    isLocked: isSubmissionWindowClosed(),
-    deadline: devMockState.phase === EventPhase.Live ? '2026-11-22T08:00:00.000Z' : null,
+    history: own,
   };
 }
 
-export function handleCreateSubmission(body: unknown): SubmissionItem {
-  if (isSubmissionWindowClosed()) {
-    throw new ApiClientError({
-      message: 'Submissions are closed. The deadline has passed.',
-      status: 403,
-      code: 'FORBIDDEN',
-    });
+export function handleGetSubmissionsOverview(): SubmissionsOverviewResponse {
+  // Both challenges are always listed, whatever the mock phase.
+  void devMockState.phase;
+
+  return {
+    phase: devMockState.phase,
+    serverTime: isoNow(),
+    items: [
+      stateFor(1, 'Challenge 01 — Poster, logo, teaser', CHALLENGE_01_ID),
+      stateFor(2, 'Challenge 02 — Technical project', CHALLENGE_02_ID),
+    ],
+  };
+}
+
+export function handleCreateSubmission(payload: CreateSubmissionRequest): SubmissionItem {
+  const isFirst = payload.challengePosition === 1;
+
+  if (!isFirst) {
+    // Challenge 02 is closed in the mock so the blocked state stays visible.
+    throw new Error('Challenge 02 is not open in the dev mock.');
   }
 
-  let title = 'Final Project Deliverable';
-  let description = '';
-  let repoUrl = '';
-  let fileName = 'deliverables.zip';
-  let fileSizeBytes = 2048000;
-
-  if (typeof FormData !== 'undefined' && body instanceof FormData) {
-    title = (body.get('title') as string) || title;
-    description = (body.get('description') as string) || description;
-    repoUrl = (body.get('repoUrl') as string) || repoUrl;
-    const file = body.get('file');
-    if (file && typeof file === 'object' && 'name' in file) {
-      fileName = (file as File).name;
-      fileSizeBytes = (file as File).size;
-    }
-  } else if (body && typeof body === 'object') {
-    const record = body as Record<string, unknown>;
-    if (typeof record.title === 'string') title = record.title;
-    if (typeof record.description === 'string') description = record.description;
-    if (typeof record.repoUrl === 'string') repoUrl = record.repoUrl;
-  }
-
-  const newSubmission: SubmissionItem = {
-    id: `sub-${Date.now().toString(36)}`,
-    teamId: devMockState.team.id,
-    track: 'track_a',
-    title,
-    description: description || undefined,
-    repoUrl: repoUrl || undefined,
-    fileName,
-    fileSizeBytes,
-    submittedAt: new Date().toISOString(),
-    version: devMockState.submissions.length + 1,
+  const created: SubmissionItem = {
+    id: `55555555-5555-4555-8555-${String(history.length + 1).padStart(12, '0')}`,
+    challengeId: CHALLENGE_01_ID,
+    challengePosition: 1,
+    driveUrl: payload.driveUrl,
+    githubUrl: null,
+    reportUrl: null,
+    presentationUrl: null,
+    commitSha: null,
+    submittedAt: isoNow(),
+    isCurrent: true,
   };
 
-  devMockState.submissions.push(newSubmission);
-  devMockState.team.progress = TeamProgressState.Submitted;
+  for (const item of history) {
+    item.isCurrent = false;
+  }
+  history.unshift(created);
 
-  return newSubmission;
+  return created;
 }
