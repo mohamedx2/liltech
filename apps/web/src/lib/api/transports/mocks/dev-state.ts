@@ -94,6 +94,7 @@ function createPortalState() {
       id: '7d1c2f3e-0000-4000-8000-000000000001',
       name: 'Sample Builders (Dev Mock)',
       progress: TeamProgressState.CheckedIn,
+      ctfSolved: false,
       isCheckedIn: true,
       members: [
         {

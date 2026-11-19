@@ -59,6 +59,13 @@ export const teamPortalSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   progress: teamProgressStateSchema,
+  /**
+   * True once the LOUAGE 404 chain is finished (`Team.ctfSolvedAt`). The
+   * authoritative Mini-CTF signal: `progress` alone cannot carry it, because
+   * `submitted` is also reached by teams that opened Challenge 01 through the
+   * 60-minute fallback without solving a single flag.
+   */
+  ctfSolved: z.boolean(),
   /** True once at least one member has been checked in. */
   isCheckedIn: z.boolean(),
   members: z.array(teamMemberProfileSchema),

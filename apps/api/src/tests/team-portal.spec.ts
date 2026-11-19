@@ -330,6 +330,7 @@ describeDb('team portal, badges and jury management', () => {
       expect(summary.members[0].roleInTeam).toBe('leader');
       expect(summary.members.every((member) => member.color !== null)).toBe(true);
       expect(summary.isCheckedIn).toBe(false);
+      expect(summary.ctfSolved).toBe(false);
     });
 
     it('is team-only', async () => {

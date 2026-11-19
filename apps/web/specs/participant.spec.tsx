@@ -44,6 +44,20 @@ describe('Participant / Team Features', () => {
       expect(currentStep).toBeTruthy();
       expect(currentStep.textContent).toContain('Mini-CTF Open');
     });
+
+    it('keeps the Mini-CTF step unearned when a submitted team never solved it', () => {
+      render(<Stepper currentProgress={TeamProgressState.Submitted} ctfSolved={false} />);
+
+      const fallbackStep = screen.getByText('Flag Solved').closest('li');
+      expect(fallbackStep?.textContent).not.toContain('✓');
+
+      cleanup();
+
+      render(<Stepper currentProgress={TeamProgressState.Submitted} ctfSolved />);
+
+      const solvedStep = screen.getByText('Flag Solved').closest('li');
+      expect(solvedStep?.textContent).toContain('✓');
+    });
   });
 
   describe('QrPassCard', () => {
