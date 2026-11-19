@@ -339,8 +339,10 @@ describeDb('LOUAGE 404 chain', () => {
   });
 
   it('keeps two teams independent', async () => {
-    const first = await readyTeam('independent-a');
-    const second = await readyTeam('independent-b');
+    // Register both teams before going live: registration closes once the event starts.
+    const first = await checkedInTeam('independent-a');
+    const second = await checkedInTeam('independent-b');
+    await setPhase('live');
 
     await submit(first.token, 'fixture-01', FIXTURE_STAGES[0].answer);
 
