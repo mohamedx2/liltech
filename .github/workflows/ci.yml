@@ -181,6 +181,7 @@ jobs:
           SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
           SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
           QR_TOKEN_KEY: ${{ secrets.QR_TOKEN_KEY }}
+          CTF_ANSWER_PEPPER: ${{ secrets.CTF_ANSWER_PEPPER }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
@@ -191,6 +192,11 @@ jobs:
             echo '::error::The QR_TOKEN_KEY repository secret is required.'
             exit 1
           fi
+          if [ "${#CTF_ANSWER_PEPPER}" -lt 32 ]; then
+            echo '::error::The CTF_ANSWER_PEPPER repository secret must contain at least 32 characters.'
+            exit 1
+          fi
+          umask 077
           cat > /tmp/liltech.env <<EOF
           NODE_ENV=production
           POSTGRES_USER=liltech
@@ -206,6 +212,7 @@ jobs:
           API_IMAGE=${{ env.IMAGE_API }}:latest
           WEB_IMAGE=${{ env.IMAGE_WEB }}:latest
           QR_TOKEN_KEY=${QR_TOKEN_KEY}
+          CTF_ANSWER_PEPPER=${CTF_ANSWER_PEPPER}
           SMTP_HOST=smtp.gmail.com
           SMTP_PORT=465
           SMTP_USER=${SMTP_USER}

@@ -1,14 +1,16 @@
-import type {
-  CtfChainResponse,
-  CtfCurrentStage,
-  CtfHintResponse,
-  CtfStageResponse,
-  CtfStageState,
-  CtfSubmitRequest,
-  CtfSubmitResponse,
-  CtfTrackItem,
+import {
+  EventPhase,
+  type CtfChainResponse,
+  type CtfCurrentStage,
+  type CtfHintResponse,
+  type CtfStageResponse,
+  type CtfStageState,
+  type CtfSubmitRequest,
+  type CtfSubmitResponse,
+  type CtfTrackItem,
 } from 'api-contracts';
 import { ApiClientError } from '../../errors';
+import { devMockState } from './dev-state';
 
 /**
  * DEV-ONLY mock for the LOUAGE 404 chain.
@@ -43,6 +45,19 @@ interface MockTeamState {
 }
 
 const state: MockTeamState = { solved: new Set(), attempts: {}, hintsUsed: {} };
+
+function assertCtfIsLive(): void {
+  if (devMockState.phase !== EventPhase.Live) {
+    throw new ApiClientError({
+      message:
+        devMockState.phase === EventPhase.Registration || devMockState.phase === EventPhase.Checkin
+          ? 'The Mini-CTF has not started yet. An administrator opens it when the event goes live.'
+          : 'The Mini-CTF is closed.',
+      status: 403,
+      code: 'EVENT_NOT_LIVE',
+    });
+  }
+}
 
 function stageState(slug: string, index: number): CtfStageState {
   if (state.solved.has(slug)) return 'solved';
@@ -118,6 +133,7 @@ function findStageOrThrow(slug: string): { index: number } {
 }
 
 export function handleGetCtfChain(): CtfChainResponse {
+  assertCtfIsLive();
   const index = firstUnsolvedIndex();
   const solved = MOCK_STAGES.filter((stage) => state.solved.has(stage.slug)).length;
 
@@ -131,11 +147,13 @@ export function handleGetCtfChain(): CtfChainResponse {
 }
 
 export function handleGetCtfStage(slug: string): CtfStageResponse {
+  assertCtfIsLive();
   const { index } = findStageOrThrow(slug);
   return currentStage(index);
 }
 
 export function handleRevealCtfHint(slug: string): CtfHintResponse {
+  assertCtfIsLive();
   findStageOrThrow(slug);
   const hintsUsed = state.hintsUsed[slug] ?? 0;
 
@@ -157,6 +175,7 @@ export function handleRevealCtfHint(slug: string): CtfHintResponse {
 }
 
 export function handleSubmitCtfAnswer(slug: string, payload: CtfSubmitRequest): CtfSubmitResponse {
+  assertCtfIsLive();
   const { index } = findStageOrThrow(slug);
   const stage = MOCK_STAGES[index];
 

@@ -61,6 +61,23 @@ services:
         condition: service_completed_successfully
     command: ['node', 'dist/seed-build/prisma/seed.js']
 
+  # Operator-only one-shot service. It is behind a profile, is not part of the
+  # normal deploy dependency chain, and never runs unless explicitly invoked.
+  ctf-provision:
+    profiles: ['ctf-operations']
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: 'no'
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-liltech}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-liltech}?schema=public
+      CTF_PROVISION_FILE: /run/secrets/ctf-answers.json
+    secrets:
+      - ctf_answers
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ['node', 'dist/seed-build/prisma/provision-ctf.js']
+
   api:
     image: ${API_IMAGE:?API_IMAGE is required}
     container_name: liltech-api-prod
@@ -106,3 +123,7 @@ volumes:
   postgres-data:
   caddy-data:
   caddy-config:
+
+secrets:
+  ctf_answers:
+    file: ${CTF_PROVISION_HOST_FILE:-/opt/liltech/secrets/ctf-answers.json}

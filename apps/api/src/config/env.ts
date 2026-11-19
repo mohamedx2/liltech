@@ -16,6 +16,9 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+/** Minimum length for the server-only Mini-CTF HMAC key. */
+export const CTF_PEPPER_MIN_LENGTH = 32;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
@@ -60,6 +63,14 @@ const envSchema = z.object({
   QR_TOKEN_KEY: z.string().refine((value) => Buffer.from(value, 'base64').length === 32, {
     message: 'QR_TOKEN_KEY must be 32 bytes encoded as base64',
   }),
+
+  /** Server-only HMAC key for Mini-CTF answers. Rotating it requires re-provisioning. */
+  CTF_ANSWER_PEPPER: z
+    .string()
+    .trim()
+    .min(CTF_PEPPER_MIN_LENGTH, {
+      message: `CTF_ANSWER_PEPPER must contain at least ${CTF_PEPPER_MIN_LENGTH} characters`,
+    }),
 
   /** SMTP delivery of QR badge emails (Gmail: smtp.gmail.com, 465, app password). */
   SMTP_HOST: optionalString,

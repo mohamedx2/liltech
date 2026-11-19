@@ -260,6 +260,9 @@ submission is accepted, when the main challenge unlocks) is made server-side;
 the client only renders `/ctf/chain`.
 
 All endpoints require `Authorization: Bearer <token>` with the `team` role.
+They also require the authoritative event phase to be exactly `live`. An admin
+opens the Mini-CTF by moving the event to `live`; every other phase returns
+`403 EVENT_NOT_LIVE` without revealing stage data or recording a write.
 
 #### `GET /api/ctf/chain`
 
@@ -334,6 +337,7 @@ Replaying a solved stage returns the same success without a new solve.
 | Status | Code | Meaning |
 |---|---|---|
 | 400 | `CTF_NOT_SOLVED` | Incorrect flag (attempt recorded) |
+| 403 | `EVENT_NOT_LIVE` | Admin has not started the event, or the CTF is closed |
 | 403 | `FORBIDDEN` | Stage is locked |
 | 403 | `STAGE_NOT_PUBLISHED` | Stage is `draft`/`closed` |
 | 409 | `STAGE_NOT_CONFIGURED` | Stage has no answer provisioned |

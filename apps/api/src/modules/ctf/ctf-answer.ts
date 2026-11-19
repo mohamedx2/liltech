@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { env } from '../../config/env';
 
 /**
  * Answer handling for the LOUAGE 404 Mini-CTF.
@@ -27,27 +28,9 @@ const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u2032]/g;
 
 export const CTF_PEPPER_ENV = 'CTF_ANSWER_PEPPER';
 
-/** Minimum pepper length: short peppers add little over a plain hash. */
-export const CTF_PEPPER_MIN_LENGTH = 16;
-
-export class CtfPepperMissingError extends Error {
-  constructor() {
-    super(
-      `${CTF_PEPPER_ENV} is not configured (at least ${CTF_PEPPER_MIN_LENGTH} characters required).`,
-    );
-    this.name = 'CtfPepperMissingError';
-  }
-}
-
-/** Reads the server-only pepper, failing loudly instead of hashing unkeyed. */
+/** Returns the server-only pepper that was validated during process startup. */
 export function getAnswerPepper(): string {
-  const pepper = process.env[CTF_PEPPER_ENV]?.trim();
-
-  if (!pepper || pepper.length < CTF_PEPPER_MIN_LENGTH) {
-    throw new CtfPepperMissingError();
-  }
-
-  return pepper;
+  return env.CTF_ANSWER_PEPPER;
 }
 
 export function normalizeAnswer(input: string): string {

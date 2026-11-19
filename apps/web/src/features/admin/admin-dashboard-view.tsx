@@ -317,7 +317,10 @@ export function AdminDashboardView() {
     setEventState(updated);
     setFeedback({
       tone: 'success',
-      message: `Event phase transitioned to ${targetPhase.toUpperCase()} successfully.`,
+      message:
+        targetPhase === EventPhase.Live
+          ? 'Event is LIVE. The Mini-CTF is now open for checked-in teams.'
+          : `Event phase transitioned to ${targetPhase.toUpperCase()} successfully.`,
     });
     void loadData({ quiet: true });
   };
@@ -462,7 +465,9 @@ export function AdminDashboardView() {
             </div>
             {nextPhase ? (
               <Button variant="primary" size="md" onClick={() => setPendingPhase(nextPhase)}>
-                Advance to {nextPhase.replaceAll('_', ' ')} →
+                {nextPhase === EventPhase.Live
+                  ? 'Start event & open Mini-CTF'
+                  : `Advance to ${nextPhase.replaceAll('_', ' ')} →`}
               </Button>
             ) : (
               <Badge tone="success">Event Complete</Badge>
@@ -627,8 +632,12 @@ export function AdminDashboardView() {
 
       <ConfirmActionDialog
         open={pendingPhase !== null}
-        title="Confirm Event Phase Transition"
-        confirmLabel="Confirm Phase Transition"
+        title={
+          pendingPhase === EventPhase.Live
+            ? 'Start event and open the Mini-CTF?'
+            : 'Confirm Event Phase Transition'
+        }
+        confirmLabel={pendingPhase === EventPhase.Live ? 'Start event' : 'Confirm Phase Transition'}
         onClose={() => setPendingPhase(null)}
         onConfirm={async () => {
           if (pendingPhase) await executePhaseTransition(pendingPhase);
@@ -638,8 +647,9 @@ export function AdminDashboardView() {
           Move the event to <strong>{pendingPhase?.replaceAll('_', ' ').toUpperCase()}</strong>?
         </p>
         <Alert tone="warning" title="Affects every participant immediately">
-          Phase changes drive check-in, Mini-CTF and challenge availability, and submission
-          deadlines. The change is recorded in the audit trail.
+          {pendingPhase === EventPhase.Live
+            ? 'Checked-in teams will immediately gain access to stage 1 of the Mini-CTF. The change is recorded in the audit trail.'
+            : 'Phase changes drive check-in, Mini-CTF and challenge availability, and submission deadlines. The change is recorded in the audit trail.'}
         </Alert>
       </ConfirmActionDialog>
 

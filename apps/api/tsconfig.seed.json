@@ -13,5 +13,5 @@
     "rootDir": ".",
     "tsBuildInfoFile": "dist/seed-build/tsconfig.seed.tsbuildinfo"
   },
-  "include": ["prisma/seed.ts", "src/seed/seed-admin.ts"]
+  "include": ["prisma/seed.ts", "prisma/provision-ctf.ts", "src/seed/seed-admin.ts"]
 }

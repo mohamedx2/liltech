@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  hashAnswer,
-  matchesAnswerHash,
-  normalizeAnswer,
-  CtfPepperMissingError,
-} from './ctf-answer';
+import { hashAnswer, matchesAnswerHash, normalizeAnswer } from './ctf-answer';
 
 /**
  * Test-only answers. The real LOUAGE 404 flags are never written into this
@@ -91,34 +86,6 @@ describe('hashAnswer', () => {
 
   it('depends on the pepper', () => {
     expect(hashAnswer(PLAIN_ANSWER, OTHER_PEPPER)).not.toBe(hash);
-  });
-
-  it('rejects a pepper that is too short to matter', () => {
-    const original = process.env.CTF_ANSWER_PEPPER;
-    process.env.CTF_ANSWER_PEPPER = 'short';
-
-    try {
-      expect(() => hashAnswer(PLAIN_ANSWER)).toThrow(CtfPepperMissingError);
-    } finally {
-      if (original === undefined) {
-        delete process.env.CTF_ANSWER_PEPPER;
-      } else {
-        process.env.CTF_ANSWER_PEPPER = original;
-      }
-    }
-  });
-
-  it('fails loudly without a configured pepper', () => {
-    const original = process.env.CTF_ANSWER_PEPPER;
-    delete process.env.CTF_ANSWER_PEPPER;
-
-    try {
-      expect(() => hashAnswer(PLAIN_ANSWER)).toThrow(CtfPepperMissingError);
-    } finally {
-      if (original !== undefined) {
-        process.env.CTF_ANSWER_PEPPER = original;
-      }
-    }
   });
 });
 
