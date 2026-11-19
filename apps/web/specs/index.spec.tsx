@@ -49,7 +49,7 @@ describe('Public pages', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the public landing page with hero heading, workflow, tracks, and health status', async () => {
+  it('renders the public landing page with hero heading, workflow, and tracks', async () => {
     render(
       <AuthProvider>
         <HomePage />
@@ -74,7 +74,6 @@ describe('Public pages', () => {
     expect(screen.getByText('Challenge Track B')).toBeTruthy();
 
     await waitFor(() => {
-      expect(screen.getByText(/platform online — database connected/i)).toBeTruthy();
       expect(screen.getByText(/registration open/i)).toBeTruthy();
     });
   });

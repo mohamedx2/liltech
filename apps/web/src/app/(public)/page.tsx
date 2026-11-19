@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ApiStatus } from '@/components/api-status';
 import { EventPhaseBanner } from '@/components/events/event-phase-banner';
 import { HomeMotion } from '@/components/home/home-motion';
 import { LockIcon } from '@/components/icons/lock-icon';
@@ -143,10 +142,6 @@ export default function HomePage() {
 
         <div data-motion="clock">
           <EventPhaseBanner />
-        </div>
-
-        <div className={styles.apiLine}>
-          <ApiStatus />
         </div>
 
         <section id="night" className={styles.band}>
