@@ -44,19 +44,26 @@ const STEP_ORDER: TeamProgressState[] = [
 
 export interface StepperProps {
   currentProgress: TeamProgressState;
+  /**
+   * Server-owned Mini-CTF result. When `false`, the `Flag Solved` step stays
+   * unearned even for later progress states: a team reaches `submitted` by
+   * delivering Challenge 01 through the 60-minute fallback too.
+   */
+  ctfSolved?: boolean;
   className?: string;
 }
 
-export function Stepper({ currentProgress, className = '' }: StepperProps) {
+export function Stepper({ currentProgress, ctfSolved, className = '' }: StepperProps) {
   const currentIndex = STEP_ORDER.indexOf(currentProgress);
 
   return (
     <div className={[styles.stepperContainer, className].filter(Boolean).join(' ')}>
       <ol className={styles.stepperList} aria-label="Team Competition Progress">
         {PROGRESS_STEPS.map((step, idx) => {
-          const isCompleted = idx < currentIndex;
+          const skipped = ctfSolved === false && step.key === TeamProgressState.CtfSolved;
+          const isCompleted = idx < currentIndex && !skipped;
           const isCurrent = idx === currentIndex;
-          const isUpcoming = idx > currentIndex;
+          const isUpcoming = idx > currentIndex || skipped;
 
           return (
             <li

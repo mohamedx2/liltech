@@ -38,6 +38,9 @@ export async function getTeamPortalSummary(
     id: team.id,
     name: team.name,
     progress: team.progressState,
+    // The Mini-CTF answer, independent of `progress`: a team can be `submitted`
+    // after opening Challenge 01 through the 60-minute fallback.
+    ctfSolved: team.ctfSolvedAt !== null,
     isCheckedIn: members.some((member) => member.isCheckedIn),
     members,
   };
