@@ -35,6 +35,13 @@ import { getEventState } from '../event-state/event-state.service';
 /** Phases before the event starts: nothing about challenges is shown yet. */
 const PRE_EVENT_PHASES: readonly EventPhase[] = ['registration', 'checkin'];
 
+/**
+ * Team progress states that mean the LOUAGE 404 chain is finished. `modules/ctf`
+ * writes these once every required stage is solved; from then on the team counts
+ * as Mini-CTF solved for every challenge.
+ */
+const CHAIN_COMPLETED_STATES: ReadonlySet<string> = new Set(['challenge_unlocked', 'submitted']);
+
 const resourcesSchema = z.array(challengeResourceLinkSchema);
 
 function parseResources(value: Prisma.JsonValue): ChallengeResourceLink[] {
@@ -393,6 +400,7 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
     where: { leaderId: leaderUserId },
     select: {
       status: true,
+      progressState: true,
       ctfSolves: { select: { challengeId: true } },
       participants: { where: { checkIn: { isNot: null } }, select: { id: true }, take: 1 },
     },
@@ -422,12 +430,20 @@ async function loadTeamContext(leaderUserId: string): Promise<TeamContext> {
 
   const challenges = await prisma.challenge.findMany({ orderBy: { position: 'asc' } });
 
+  // Single source of truth for the Mini-CTF is the LOUAGE 404 chain: a team that
+  // cleared every required stage has `challenge_unlocked`/`submitted` progress,
+  // which unlocks every challenge it can see, whatever the per-challenge solve
+  // rows say. The chain is what writes those states (see `modules/ctf`).
+  const chainCompleted = CHAIN_COMPLETED_STATES.has(team.progressState);
+
   return {
     available: true,
     phase,
     now: new Date(),
     challenges,
-    solvedChallengeIds: new Set(team.ctfSolves.map((solve) => solve.challengeId)),
+    solvedChallengeIds: chainCompleted
+      ? new Set(challenges.map((challenge) => challenge.id))
+      : new Set(team.ctfSolves.map((solve) => solve.challengeId)),
   };
 }
 

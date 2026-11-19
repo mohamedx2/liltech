@@ -15,6 +15,8 @@ export default defineConfig(() => ({
     // placeholder DATABASE_URL; database-backed integration tests additionally
     // require TEST_DATABASE_URL (see docs/backend/DEVELOPMENT.md) — when it is
     // absent, integration tests skip so the suite still runs database-free.
+    // Integration suites share one Postgres database and each resets it, so
+    // files must not run in parallel or they would delete each other's fixtures.
     env: {
       NODE_ENV: 'test',
       DATABASE_URL:

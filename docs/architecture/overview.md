@@ -96,3 +96,47 @@ Do not add a WebSocket/SSE dependency until the transport decision is recorded i
 - Rate limiting on flag submission and authentication endpoints.
 - Audit log for administrative overrides.
 - See `AGENTS.md` §9 for the complete security rulebook.
+
+## Mini-CTF chain (LOUAGE 404)
+
+The Mini-CTF is a seven-stage sequential chain owned by
+`apps/api/src/modules/ctf`.
+
+```
+Client  ── GET /api/ctf/chain ─────────────▶ ctf.service.getChain
+                                                 │  loads chain + per-team progress
+                                                 │  resolves each stage: solved / unlocked / locked
+                                                 ▼
+                                        CtfStage, CtfHint, CtfProgress, CtfAttempt
+
+Client  ── POST /api/ctf/stages/:slug/submit ─▶ ctf.service.submitAnswer
+                                                 │  locked? → 403
+                                                 │  draft/closed? → 403
+                                                 │  rate limit (5/min/team/stage)
+                                                 │  HMAC compare (constant time)
+                                                 ▼
+                                        one transaction:
+                                          solvedAt <- now   (atomic claim)
+                                          next stage   -> unlocked
+                                          attempt row  -> correct
+                                          audit row    -> ctf.stage_solved
+                                          all required solved? -> team.challenge_unlocked
+```
+
+Rules that live only on the server:
+
+- A stage is visible only when `CtfProgress.state = 'unlocked'`; stage 1 is
+  unlocked implicitly for a checked-in team, everything else by solving the
+  previous stage.
+- Answers are HMAC-SHA256 digests keyed by `CTF_ANSWER_PEPPER`; the plaintext
+  answer never exists in the database, the API or the client bundle.
+- A `live` stage must have a digest (database `CHECK` constraint); an
+  unprovisioned stage stays `draft` and refuses submissions, which blocks the
+  chain rather than silently skipping it.
+- `GET /api/challenges/current` recomputes "all required stages solved" on every
+  request; the frontend cannot unlock anything.
+
+Assets are not hosted by the platform: each stage stores a `assetDriveUrl`
+validated against `drive.google.com` / `docs.google.com`.
+
+See `docs/ctf/README.md` for provisioning, stage content and playtesting.

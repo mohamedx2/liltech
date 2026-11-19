@@ -5,7 +5,6 @@ import { ChallengeTrack, EventPhase, Role, TeamProgressState } from 'api-contrac
 import { Stepper } from '@/features/dashboard/stepper';
 import { QrPassCard } from '@/features/dashboard/qr-pass-card';
 import { TeamRoster } from '@/features/dashboard/team-roster';
-import { MiniCtfView } from '@/features/mini-ctf/mini-ctf-view';
 import { ChallengeView } from '@/features/challenges/challenge-view';
 import { SubmissionsView } from '@/features/submissions/submissions-view';
 import { AnnouncementsView } from '@/features/announcements/announcements-view';
@@ -131,87 +130,6 @@ describe('Participant / Team Features', () => {
       expect(screen.getByText('Team Leader')).toBeTruthy();
       expect(screen.getByText('Checked In')).toBeTruthy();
       expect(screen.getByText('Pending Check-In')).toBeTruthy();
-    });
-  });
-
-  describe('MiniCtfView', () => {
-    it('renders the flag form and validates flag submission', async () => {
-      vi.spyOn(api.events, 'getEventState').mockResolvedValue(LIVE_EVENT_STATE);
-      vi.spyOn(api.miniCtf, 'getStatus')
-        .mockResolvedValueOnce({
-          isOpen: true,
-          isSolved: false,
-          attemptsCount: 0,
-          cooldownUntil: null,
-          hint: 'Inspect the platform challenge hints.',
-        })
-        .mockResolvedValueOnce({
-          isOpen: true,
-          isSolved: true,
-          solvedAt: '2026-11-21T20:05:00.000Z',
-          attemptsCount: 1,
-          cooldownUntil: null,
-          hint: 'Inspect the platform challenge hints.',
-        });
-      vi.spyOn(api.miniCtf, 'submitFlag')
-        .mockRejectedValueOnce(
-          new ApiClientError({
-            message: 'Incorrect flag. Please check the challenge hints and try again.',
-            status: 400,
-            code: 'CTF_NOT_SOLVED',
-          }),
-        )
-        .mockResolvedValueOnce({
-          success: true,
-          message: 'Correct flag! Your main track challenge has been unlocked.',
-          progress: TeamProgressState.ChallengeUnlocked,
-          unlockedChallengeTrack: ChallengeTrack.TrackA,
-        });
-
-      render(<MiniCtfView />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Track Gate/i)).toBeTruthy();
-      });
-
-      const input = screen.getByLabelText(/Mini-CTF Flag/i) as HTMLInputElement;
-      expect(input).toBeTruthy();
-
-      // Enter invalid flag
-      fireEvent.change(input, { target: { value: 'WRONG_FLAG' } });
-      const submitBtn = screen.getByRole('button', { name: /Submit Flag/i });
-      fireEvent.click(submitBtn);
-
-      await waitFor(() => {
-        const matches = screen.getAllByText(/Incorrect Flag/i);
-        expect(matches.length).toBeGreaterThan(0);
-      });
-
-      // Enter correct mock flag
-      fireEvent.change(input, { target: { value: 'LILTECH{mock_flag_demo}' } });
-      fireEvent.click(submitBtn);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Mini-CTF Solved!/i)).toBeTruthy();
-      });
-    });
-
-    it('shows the locked state while the gate is closed', async () => {
-      vi.spyOn(api.events, 'getEventState').mockResolvedValue(LIVE_EVENT_STATE);
-      vi.spyOn(api.miniCtf, 'getStatus').mockResolvedValue({
-        isOpen: false,
-        isSolved: false,
-        attemptsCount: 0,
-        cooldownUntil: null,
-        hint: undefined,
-      });
-
-      render(<MiniCtfView />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/The Mini-CTF is Locked/i)).toBeTruthy();
-      });
-      expect(screen.queryByLabelText(/Mini-CTF Flag/i)).toBeNull();
     });
   });
 

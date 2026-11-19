@@ -15,3 +15,4 @@ export * from './lib/participants-contracts.js';
 export * from './lib/jury-admin-contracts.js';
 export * from './lib/challenges-contracts.js';
 export * from './lib/admin-operations-contracts.js';
+export * from './lib/ctf-contracts.js';

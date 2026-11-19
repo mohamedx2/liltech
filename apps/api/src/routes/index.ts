@@ -9,6 +9,7 @@ import { checkinRouter } from '../modules/checkin/checkin.routes';
 import { announcementsRouter } from '../modules/announcements/announcements.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { participantsRouter } from '../modules/participants/participants.routes';
+import { ctfRouter } from '../modules/ctf/ctf.routes';
 import { challengesRouter } from '../modules/challenges/challenges.routes';
 
 /**
@@ -29,4 +30,5 @@ apiRouter.use(checkinRouter);
 apiRouter.use(announcementsRouter);
 apiRouter.use(adminRouter);
 apiRouter.use(participantsRouter);
+apiRouter.use(ctfRouter);
 apiRouter.use(challengesRouter);

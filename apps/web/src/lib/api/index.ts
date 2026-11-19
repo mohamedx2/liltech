@@ -4,6 +4,7 @@ import { createAdminApi, type AdminApi } from './modules/admin';
 import { createAnnouncementsApi, type AnnouncementsApi } from './modules/announcements';
 import { createAuthApi, type AuthApi } from './modules/auth';
 import { createChallengesApi, type ChallengesApi } from './modules/challenges';
+import { createCtfApi, type CtfApi } from './modules/ctf';
 import { createCheckinApi, type CheckinApi } from './modules/checkin';
 import { createEventsApi, type EventsApi } from './modules/events';
 import { createHealthApi } from './modules/health';
@@ -34,6 +35,8 @@ export interface ApiClient {
   registrations: RegistrationsApi;
   participants: ParticipantsApi;
   miniCtf: MiniCtfApi;
+  /** LOUAGE 404 seven-stage chain (`apps/api/src/modules/ctf`). */
+  ctf: CtfApi;
   challenges: ChallengesApi;
   submissions: SubmissionsApi;
   announcements: AnnouncementsApi;
@@ -53,6 +56,7 @@ export function createApiClient(transport: ApiTransport): ApiClient {
     registrations: createRegistrationsApi(transport),
     participants: createParticipantsApi(transport),
     miniCtf: createMiniCtfApi(transport),
+    ctf: createCtfApi(transport),
     challenges: createChallengesApi(transport),
     submissions: createSubmissionsApi(transport),
     announcements: createAnnouncementsApi(transport),

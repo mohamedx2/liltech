@@ -82,11 +82,76 @@ describe('API Client, RealTransport, and MockTransport', () => {
     });
   });
 
+  it('signs in against the real auth contract, stores the token, and sends it on later requests', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = createApiClient(
+      createRealTransport({ baseUrl: 'http://localhost:4000/api', fetchImpl: fetchMock }),
+    );
+    const token = 'test-session-token-0123456789abcdef';
+    const account = {
+      id: '11111111-1111-4111-8111-111111111111',
+      role: Role.Team,
+      name: 'Test Leader',
+      email: 'ctf.test@liltech.tn',
+    };
+
+    // Canonical `POST /auth/login` body shape.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ account, token, expiresAt: '2026-11-16T17:54:30.602Z' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const login = await client.auth.login({
+      email: 'ctf.test@liltech.tn',
+      password: 'Louage404!Test2026',
+    });
+    expect(login.user).toMatchObject({ role: Role.Team, name: 'Test Leader' });
+    expect(login.expiresAt).toBe('2026-11-16T17:54:30.602Z');
+
+    // The stored bearer token must ride along on authenticated calls.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await client.request('/ctf/chain');
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      Authorization: `Bearer ${token}`,
+    });
+
+    // `GET /auth/me` returns the account itself, not a `{ user }` envelope.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(account), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const session = await client.auth.getSession();
+    expect(session.user?.email).toBe('ctf.test@liltech.tn');
+
+    // Signing out must drop the token so later requests are anonymous.
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await client.auth.logout();
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await client.request('/ctf/chain');
+    expect(fetchMock.mock.calls[4]?.[1]?.headers).not.toHaveProperty('Authorization');
+  });
+
   it('accepts the real backend registration response and keeps the one-time badge tokens', async () => {
     const fetchMock = vi.fn<typeof fetch>();
     const client = createApiClient(
       createRealTransport({ baseUrl: 'http://localhost:4000/api', fetchImpl: fetchMock }),
     );
+
     const participants = [
       { id: '11111111-1111-4111-8111-111111111111', name: 'Leader Real', isLeader: true },
       { id: '22222222-2222-4222-8222-222222222222', name: 'Mate One', isLeader: false },

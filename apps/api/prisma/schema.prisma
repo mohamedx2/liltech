@@ -5,9 +5,13 @@
 // check-in, the event phase state (single writer), the two sequential
 // challenges with Mini-CTF early access, live announcements, and the audit log.
 //
+// The Mini-CTF gate (stage 1, "Louage 404") is modelled below: a stage holds
+// only a SHA-256 hash of its answer, teams keep per-stage progress and a
+// timestamped attempt log, and a correct answer unlocks the main challenge.
+//
 // Still intentionally absent (blocked on `docs/decisions/OPEN_QUESTIONS.md`):
 // Mini-CTF flag material and attempt log, submissions, jury scoping, scores,
-// leaderboards, results.
+// leaderboards, results. Answers are never stored in plaintext anywhere.
 
 generator client {
   provider = "prisma-client-js"
@@ -93,6 +97,10 @@ model Team {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   participants    Participant[]
+  /// LOUAGE 404 chain: per-stage state and the timestamped attempt log.
+  ctfProgress     CtfProgress[]
+  ctfAttempts     CtfAttempt[]
+  /// Per-challenge Mini-CTF solves (early access to a running challenge).
   ctfSolves       ChallengeCtfSolve[]
 
   @@index([progressState])
@@ -307,4 +315,110 @@ model Announcement {
 
   @@index([publishedAt])
   @@map("announcements")
+}
+
+/// Publication state of a Mini-CTF stage. Only `live` stages accept answers.
+enum CtfStageStatus {
+  draft
+  live
+  closed
+
+  @@map("ctf_stage_status")
+}
+
+/// One Mini-CTF stage. `answerHash` is the SHA-256 (hex) of the normalized
+/// answer — the plaintext answer never enters the database, the API, or the repo.
+model CtfStage {
+  id                String         @id @default(uuid()) @db.Uuid
+  slug              String         @unique @db.VarChar(60)
+  position          Int            @unique
+  title             String         @db.VarChar(140)
+  description       String?        @db.Text
+  status            CtfStageStatus @default(draft)
+  /// HMAC-SHA256 hex digest of the normalized answer, keyed by the server-only
+  /// `CTF_ANSWER_PEPPER`. NULL until an organizer provisions the stage; a live
+  /// stage can never be NULL (enforced by a CHECK constraint in the migration).
+  answerHash        String?        @db.VarChar(64)
+  /// Google Drive folder holding this stage's downloadable resources.
+  /// Validated against an allowlist of Google hosts before it is stored.
+  assetDriveUrl     String?        @db.VarChar(300)
+  /// Whether solving this stage is required before the main challenge unlocks.
+  requiredForUnlock Boolean        @default(true)
+  /// Deprecated: former in-app asset paths. Assets are now hosted externally.
+  assetImageUrl     String?        @db.VarChar(300)
+  assetZipUrl       String?        @db.VarChar(300)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  hints             CtfHint[]
+  progress          CtfProgress[]
+  attempts          CtfAttempt[]
+
+  @@map("ctf_stages")
+}
+
+/// Progressive hint for a stage. Teams unlock them one at a time, on demand.
+model CtfHint {
+  id       String   @id @default(uuid()) @db.Uuid
+  stage    CtfStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId  String   @db.Uuid
+  position Int
+  body     String   @db.VarChar(300)
+
+  @@unique([stageId, position])
+  @@map("ctf_hints")
+}
+
+/// Per-team progress on one stage. Unique per team+stage so a solve is
+/// recorded exactly once, no matter how many submissions arrive.
+model CtfProgress {
+  id        String        @id @default(uuid()) @db.Uuid
+  team      Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String        @db.Uuid
+  stage     CtfStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId   String        @db.Uuid
+  /// Sequential chain state. A row exists only once a stage is unlocked or
+  /// solved, so `locked` is also represented by the absence of a row.
+  state     CtfStageState @default(locked)
+  attempts  Int           @default(0)
+  hintsUsed Int           @default(0)
+  solvedAt  DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([teamId, stageId])
+  @@index([stageId, solvedAt])
+  @@index([teamId, state])
+  @@map("ctf_progress")
+}
+
+/// Per-team, per-stage sequential state.
+enum CtfStageState {
+  locked
+  unlocked
+  solved
+
+  @@map("ctf_stage_state")
+}
+
+/// Append-only attempt log (used for rate limiting evidence and review).
+/// The submitted answer is never stored.
+model CtfAttempt {
+  id        String     @id @default(uuid()) @db.Uuid
+  team      Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String     @db.Uuid
+  stage     CtfStage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId   String     @db.Uuid
+  outcome   CtfOutcome
+  createdAt DateTime   @default(now())
+
+  @@index([teamId, createdAt])
+  @@map("ctf_attempts")
+}
+
+enum CtfOutcome {
+  correct
+  incorrect
+  rate_limited
+
+  @@map("ctf_outcome")
 }

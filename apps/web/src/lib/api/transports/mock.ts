@@ -23,10 +23,17 @@ import {
   handleSubmitJuryEvaluation,
 } from './mocks/jury.mock';
 import { handleGetMiniCtfStatus, handleSubmitMiniCtfFlag } from './mocks/mini-ctf.mock';
+import {
+  handleGetCtfChain,
+  handleGetCtfStage,
+  handleRevealCtfHint,
+  handleSubmitCtfAnswer,
+} from './mocks/ctf.mock';
 import { handleGetMyBadge, handleGetMyTeam } from './mocks/participants.mock';
 import { handleCreateSubmission, handleGetMySubmissions } from './mocks/submissions.mock';
 import type { MockRouteMap } from './mocks/types';
 import { PLANNED_ENDPOINTS } from '../endpoints';
+import type { CtfSubmitRequest as CtfSubmitAnswerRequest } from 'api-contracts';
 import type { MiniCtfSubmitRequest, SubmitEvaluationRequest } from '../contracts/pending';
 
 export interface MockTransportOptions {
@@ -56,6 +63,8 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.MINI_CTF_STATUS}`]: () => handleGetMiniCtfStatus(),
     [`POST ${PLANNED_ENDPOINTS.MINI_CTF_SUBMIT}`]: (config) =>
       handleSubmitMiniCtfFlag((config.body ?? {}) as MiniCtfSubmitRequest),
+
+    [`GET ${PLANNED_ENDPOINTS.CTF_CHAIN}`]: () => handleGetCtfChain(),
 
     [`GET ${PLANNED_ENDPOINTS.CHALLENGES_CURRENT}`]: () => handleGetCurrentChallenge(),
 
@@ -102,6 +111,35 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
   };
 
+  /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */
+  function ctfStageRoute(
+    method: string,
+    path: string,
+    config: ApiRequestConfig,
+  ): (() => unknown) | undefined {
+    const match = /^\/ctf\/stages\/([^/]+)(\/(hints|submit))?$/.exec(path);
+
+    if (!match) {
+      return undefined;
+    }
+
+    const slug = decodeURIComponent(match[1]);
+
+    if (!match[2] && method === 'GET') {
+      return () => handleGetCtfStage(slug);
+    }
+
+    if (match[3] === 'hints' && method === 'POST') {
+      return () => handleRevealCtfHint(slug);
+    }
+
+    if (match[3] === 'submit' && method === 'POST') {
+      return () => handleSubmitCtfAnswer(slug, (config.body ?? {}) as CtfSubmitAnswerRequest);
+    }
+
+    return undefined;
+  }
+
   /** Parameterized read routes (`:id` segments). Writes need the real API. */
   const patternRoutes: ReadonlyArray<{
     method: string;
@@ -147,7 +185,10 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
         },
       };
 
-      const handler = routes[`${method} ${path}`] ?? routes[`${method} ${cleanPath}`];
+      const handler =
+        routes[`${method} ${path}`] ??
+        routes[`${method} ${cleanPath}`] ??
+        ctfStageRoute(method, cleanPath, effectiveConfig);
       if (!handler) {
         for (const route of patternRoutes) {
           const match = route.method === method ? cleanPath.match(route.pattern) : null;
