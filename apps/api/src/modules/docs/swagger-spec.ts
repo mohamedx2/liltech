@@ -181,10 +181,18 @@ export const swaggerSpec = {
           teamName: { type: 'string', minLength: 3, maxLength: 60, example: 'Quantum Coders' },
           leader: {
             type: 'object',
-            required: ['name', 'email', 'password'],
+            required: ['name', 'email', 'university', 'phone', 'password'],
             properties: {
               name: { type: 'string', example: 'Sarra Ben Ahmed' },
               email: { type: 'string', format: 'email', example: 'leader@quantumcoders.tn' },
+              university: { type: 'string', minLength: 2, maxLength: 120, example: 'ISITCom' },
+              phone: {
+                type: 'string',
+                maxLength: 20,
+                example: '+216 20 123 456',
+                description:
+                  'Mobile number: digits with optional +, spaces, dashes or parentheses; 8–15 digits.',
+              },
               password: { type: 'string', minLength: 12, example: 'SuperSecureSecret123!' },
             },
           },
@@ -194,10 +202,18 @@ export const swaggerSpec = {
             maxItems: TEAM_MEMBERS_TOTAL_MAX - 1,
             items: {
               type: 'object',
-              required: ['name'],
+              required: ['name', 'email', 'university', 'phone'],
               properties: {
                 name: { type: 'string', example: 'Karim Mansour' },
                 email: { type: 'string', format: 'email', example: 'karim@quantumcoders.tn' },
+                university: { type: 'string', minLength: 2, maxLength: 120, example: 'ISITCom' },
+                phone: {
+                  type: 'string',
+                  maxLength: 20,
+                  example: '+216 20 123 456',
+                  description:
+                    'Mobile number: digits with optional +, spaces, dashes or parentheses; 8–15 digits.',
+                },
               },
             },
           },
@@ -896,7 +912,7 @@ export const swaggerSpec = {
                       items: {
                         type: 'object',
                         description:
-                          'AdminTeam (adminTeamSchema): standing, progress, leader login, participants with email, color, check-in and badge state, Mini-CTF solves',
+                          'AdminTeam (adminTeamSchema): standing, progress, leader login, participants with email, university, phone, color, check-in and badge state, Mini-CTF solves',
                       },
                     },
                     total: { type: 'number' },

@@ -22,11 +22,15 @@ export function createRegistrationsApi(transport: ApiTransport): RegistrationsAp
         leader: {
           name: payload.leader.fullName,
           email: payload.leader.email,
+          university: payload.leader.university,
+          phone: payload.leader.phone,
           password: payload.password,
         },
         members: payload.teammates.map((m) => ({
           name: m.fullName,
           email: m.email,
+          university: m.university,
+          phone: m.phone,
         })),
       };
 

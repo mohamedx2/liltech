@@ -98,6 +98,8 @@
   --content-width-narrow: 44rem;
   --header-height: 4.75rem;
   --z-sticky: 20;
+  /* The site header sits above every other sticky bar (e.g. the dashboard section nav). */
+  --z-header: 30;
   --z-overlay: 40;
   --z-skip-link: 100;
 

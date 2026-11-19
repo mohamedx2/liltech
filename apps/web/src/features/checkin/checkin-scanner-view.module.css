@@ -238,6 +238,7 @@
 }
 
 .scannerInput {
+  box-sizing: border-box;
   width: 100%;
   padding: var(--space-3) var(--space-4);
   padding-left: var(--space-10);
@@ -433,7 +434,17 @@
   overflow-x: auto;
 }
 
+/* Phones: the four filters wrap into a grid instead of scrolling sideways. */
+@media (max-width: 640px) {
+  .filterTabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+}
+
 .filterTab {
+  min-height: 44px;
   background: transparent;
   border: none;
   color: var(--color-text-muted);
@@ -464,6 +475,9 @@
 }
 
 .searchInput {
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: 100%;
   padding: var(--space-2) var(--space-3);
   background: var(--color-bg);
   color: var(--color-text);

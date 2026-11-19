@@ -3,12 +3,19 @@ import {
   TEAM_MEMBERS_TOTAL_MAX,
   TEAM_MEMBERS_TOTAL_MIN,
   createTeamRequestSchema,
+  participantPhoneSchema,
 } from './registration-contracts.js';
 
 function teamRequest(members: Array<{ name: string; email?: string }>) {
   return {
     teamName: 'Contract Crew',
-    leader: { name: 'Leader', email: 'leader@example.com', password: 'long-enough-password' },
+    leader: {
+      name: 'Leader',
+      email: 'leader@example.com',
+      password: 'long-enough-password',
+      university: 'Test University',
+      phone: '+216 20 123 456',
+    },
     members,
   };
 }
@@ -17,6 +24,8 @@ function membersOf(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     name: `Member ${index + 1}`,
     email: `member${index + 1}@example.com`,
+    university: 'Test University',
+    phone: '+216 20 123 456',
   }));
 }
 
@@ -35,7 +44,12 @@ describe('createTeamRequestSchema', () => {
 
   it('rejects a member email that repeats the leader email, case-insensitively', () => {
     const members = membersOf(3);
-    members[1] = { name: 'Copycat', email: 'LEADER@example.com' };
+    members[1] = {
+      name: 'Copycat',
+      email: 'LEADER@example.com',
+      university: 'Test University',
+      phone: '+216 20 123 456',
+    };
 
     const result = createTeamRequestSchema.safeParse(teamRequest(members));
 
@@ -45,7 +59,12 @@ describe('createTeamRequestSchema', () => {
 
   it('rejects two members sharing an email', () => {
     const members = membersOf(3);
-    members[2] = { name: 'Twin', email: members[0].email };
+    members[2] = {
+      name: 'Twin',
+      email: members[0].email,
+      university: 'Test University',
+      phone: '+216 20 123 456',
+    };
 
     expect(createTeamRequestSchema.safeParse(teamRequest(members)).success).toBe(false);
   });
@@ -59,4 +78,35 @@ describe('createTeamRequestSchema', () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['members', 1, 'email']);
   });
+
+  it('requires every member to have a university and a mobile number', () => {
+    const members: Array<{ name: string; email?: string; university?: string; phone?: string }> =
+      membersOf(3);
+    delete members[0].university;
+    delete members[2].phone;
+
+    const result = createTeamRequestSchema.safeParse(teamRequest(members));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path)).toEqual(
+      expect.arrayContaining([
+        ['members', 0, 'university'],
+        ['members', 2, 'phone'],
+      ]),
+    );
+  });
+
+  it.each(['+216 20 123 456', '20123456', '(+216) 20-123-456', '+33 6 12 34 56 78'])(
+    'accepts the mobile number %s',
+    (phone) => {
+      expect(participantPhoneSchema.safeParse(phone).success).toBe(true);
+    },
+  );
+
+  it.each(['', '1234567', 'call me', '+216 20 123 456 789 000', '++21620123456'])(
+    'rejects the mobile number %j',
+    (phone) => {
+      expect(participantPhoneSchema.safeParse(phone).success).toBe(false);
+    },
+  );
 });

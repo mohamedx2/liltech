@@ -179,7 +179,7 @@ function attentionItems(
       tone: eventStarted ? 'danger' : 'warning',
       message: 'No challenge is configured yet.',
       action: (
-        <Link className={styles.link} href="/admin/challenges">
+        <Link className={`${styles.link} ${styles.touchLink}`} href="/admin/challenges">
           Configure challenges
         </Link>
       ),
@@ -579,6 +579,7 @@ export function AdminDashboardView() {
                 <li key={entry.id} className={styles.listItem}>
                   <div className={styles.listItemBody}>
                     <span className={styles.strong}>{entry.action}</span>
+                    {entry.summary ? <span>{entry.summary}</span> : null}
                     <span className={styles.small}>
                       By: {entry.actorName ?? 'System / Anonymous'}
                       {entry.targetType ? ` · ${entry.targetType}` : ''}
@@ -608,14 +609,20 @@ export function AdminDashboardView() {
           Event-night playbook
         </h2>
         <p className={styles.hint}>What to do when something goes wrong, and where to fix it.</p>
-        <dl className={styles.playbook}>
-          {PLAYBOOK.map((entry) => (
-            <div key={entry.situation} className={styles.playbookItem}>
-              <dt>{entry.situation}</dt>
-              <dd>{entry.fix}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* Reference material: collapsed so the live controls above stay within reach. */}
+        <details className={styles.disclosure}>
+          <summary className={styles.disclosureSummary}>
+            Show the {PLAYBOOK.length} situations
+          </summary>
+          <dl className={styles.playbook}>
+            {PLAYBOOK.map((entry) => (
+              <div key={entry.situation} className={styles.playbookItem}>
+                <dt>{entry.situation}</dt>
+                <dd>{entry.fix}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </section>
 
       <ConfirmActionDialog

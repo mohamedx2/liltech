@@ -130,7 +130,7 @@ Schema: `updateEventStateRequestSchema` / `eventStateResponseSchema`.
 
 #### `POST /api/registration/teams`
 
-Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the shared team account (leader email + password ≥ 12 chars, bcrypt) plus participant records. Every participant needs an email, unique within the team (case-insensitive) → otherwise `VALIDATION_ERROR` (400).
+Public. Registers a team of 4–7 members (leader + 3–6 members). Creates the shared team account (leader email + password ≥ 12 chars, bcrypt) plus participant records. Every participant (leader included) needs an email, unique within the team (case-insensitive), a `university` (2–120 characters) and a mobile `phone` (digits with optional `+`, spaces, dashes or parentheses; 8–15 digits) → otherwise `VALIDATION_ERROR` (400) with the field path, e.g. `members.2.phone`. Teams registered before university and phone were required keep `null` for both.
 
 Each participant gets one of four badge colors (`blue`, `red`, `yellow`, `green`): always the least used color so far, chosen inside a serializable transaction, so the four groups never differ by more than one. Each participant also gets one revocable QR badge; the token is stored as a SHA-256 hash (scan lookup) and AES-256-GCM encrypted under `QR_TOKEN_KEY` (so the team can display it again). After the transaction commits, each participant is emailed their own QR badge (Gmail SMTP); a delivery failure never fails the registration and is recorded per badge.
 
@@ -149,8 +149,8 @@ Registration is accepted while the event phase is `registration` or `checkin` (o
 ```json
 {
   "teamName": "string (3–60)",
-  "leader": { "name": "string", "email": "string", "password": "string (≥12)" },
-  "members": [ { "name": "string", "email": "string" } ]
+  "leader": { "name": "string", "email": "string", "university": "string", "phone": "string", "password": "string (≥12)" },
+  "members": [ { "name": "string", "email": "string", "university": "string", "phone": "string" } ]
 }
 ```
 
@@ -359,7 +359,7 @@ Situation board aggregates: phase, team counts by standing and progress, check-i
 
 #### `GET /api/admin/teams`, `GET /api/admin/teams/:teamId`
 
-Roster (newest first) / one team: standing (`status`, `statusReason`, `statusChangedAt`), progress, leader account email (the team login), every participant with email, badge color, check-in time and the staff member who recorded it, badge state (`issuedAt`, `revokedAt`, `emailStatus`, `emailLastSentAt` — never the token), and Mini-CTF solves. Schemas: `adminTeamListResponseSchema` / `adminTeamSchema`.
+Roster (newest first) / one team: standing (`status`, `statusReason`, `statusChangedAt`), progress, leader account email (the team login), every participant with email, `university` and `phone` (`null` for teams registered before both were required), badge color, check-in time and the staff member who recorded it, badge state (`issuedAt`, `revokedAt`, `emailStatus`, `emailLastSentAt` — never the token), and Mini-CTF solves. Schemas: `adminTeamListResponseSchema` / `adminTeamSchema`.
 
 #### Team tools
 
@@ -369,7 +369,7 @@ Roster (newest first) / one team: standing (`status`, `statusReason`, `statusCha
 | `POST /api/admin/teams/:teamId/status` | `{ status: active\|withdrawn\|disqualified, reason? }` | Reason required unless `active`. A non-active team cannot be checked in (scan → 403, manual → 409) and gets 403 on `/api/challenges*`. Reversible. Audit `team.status_changed`. |
 | `POST /api/admin/teams/:teamId/reset-password` | — | New 16-char password returned once (`temporaryPassword`, hash stored only); every session of the team account is revoked. Audit `team.password_reset`. |
 | `DELETE /api/admin/teams/:teamId` | — | Only in phases `registration`/`checkin` (409 otherwise); deletes team, members, badges and team account. `204`. Audit `team.deleted`. |
-| `POST /api/admin/teams/:teamId/participants` | `{ name, email }` | Max 7 members (409); email unique across teams (409). Balanced badge color, new badge emailed in the background. `201`. Audit `participant.added`. |
+| `POST /api/admin/teams/:teamId/participants` | `{ name, email, university, phone }` | Max 7 members (409); email unique across teams (409). Balanced badge color, new badge emailed in the background. `201`. Audit `participant.added`. |
 | `POST /api/admin/teams/:teamId/ctf-solves` | `{ challengeId }` | Grants Mini-CTF early access (already granted → 409). `201`. Audit `ctf.solve_granted`. |
 | `DELETE /api/admin/teams/:teamId/ctf-solves/:challengeId` | — | Withdraws it (none → 404). Audit `ctf.solve_revoked`. |
 
@@ -377,7 +377,7 @@ Roster (newest first) / one team: standing (`status`, `statusReason`, `statusCha
 
 | Endpoint | Body | Rules |
 |---|---|---|
-| `PATCH /api/admin/participants/:participantId` | `{ name?, email? }` | Email unique across teams (409). For the leader, the team login email/name change too. Audit `participant.updated`. |
+| `PATCH /api/admin/participants/:participantId` | `{ name?, email?, university?, phone? }` | Email unique across teams (409). For the leader, the team login email/name change too. Audit `participant.updated`. |
 | `DELETE /api/admin/participants/:participantId` | — | The leader cannot be removed (409). Audit `participant.removed`. |
 | `POST /api/admin/participants/:participantId/check-in` | — | Manual check-in without QR (works with a revoked badge; team must be `active`); already checked in → 409. Audit `checkin.manual`. |
 | `DELETE /api/admin/participants/:participantId/check-in` | — | Undo; a team with no check-in left goes back from `checked_in` to `registered`. Audit `checkin.undone`. |
