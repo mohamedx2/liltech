@@ -987,6 +987,84 @@ export const swaggerSpec = {
         },
       },
     },
+    '/jury/overview': {
+      get: {
+        tags: ['Jury'],
+        summary: 'Assigned challenge, progress and scoring window (Jury only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object', description: 'juryOverviewResponseSchema' }, 'Overview'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+        },
+      },
+    },
+    '/jury/teams': {
+      get: {
+        tags: ['Jury'],
+        summary: 'Teams to score on my challenge (Jury only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'array', description: 'juryTeamItemSchema[]' }, 'Teams'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+        },
+      },
+    },
+    '/jury/evaluation': {
+      get: {
+        tags: ['Jury'],
+        summary: 'One team, its latest submission and my scores (Jury only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'teamId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          200: json(
+            { type: 'object', description: 'juryTeamEvaluationResponseSchema' },
+            'Evaluation',
+          ),
+          400: errorResponse('Invalid team id'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+          404: errorResponse('Team not part of the evaluation'),
+        },
+      },
+      post: {
+        tags: ['Jury'],
+        summary: 'Save my scores for a team (Jury only, scoring window, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'teamId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                description: 'submitEvaluationRequestSchema (integers 0–25)',
+              },
+            },
+          },
+        },
+        responses: {
+          200: json({ type: 'object', description: 'submitEvaluationResponseSchema' }, 'Saved'),
+          400: errorResponse('Invalid scores'),
+          403: errorResponse('SCORING_CLOSED, JURY_NOT_ASSIGNED or wrong role'),
+          404: errorResponse('Team not part of the evaluation'),
+        },
+      },
+    },
     '/admin/jury/{id}': {
       patch: {
         tags: ['Admin'],

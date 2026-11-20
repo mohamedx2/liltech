@@ -87,18 +87,16 @@ const MOCK_EVALUATION_DATA: JuryTeamEvaluationResponse = {
     { id: 'm3', fullName: 'Charlie Lee', roleInTeam: 'member' },
   ],
   submission: {
-    id: 'sub-01',
-    teamId: 'team-01',
-    track: ChallengeTrack.TrackA,
-    title: 'Initial Architecture Draft & Prototype',
-    description: 'Autonomous multi-agent heuristic for dispatch routing.',
-    repoUrl: 'https://github.com/sample-builders/liltech-dispatcher',
-    fileName: 'prototype-v1.zip',
-    fileSizeBytes: 1048576,
     submittedAt: '2026-11-21T21:15:00.000Z',
-    version: 1,
+    version: 2,
+    driveUrl: 'https://drive.google.com/drive/folders/sample-builders',
+    githubUrl: 'https://github.com/sample-builders/liltech-dispatcher',
+    reportUrl: null,
+    presentationUrl: 'https://docs.google.com/presentation/d/sample-pitch',
+    commitSha: '0123456789abcdef0123456789abcdef01234567',
   },
   evaluation: null,
+  scoringOpen: true,
 };
 
 describe('Jury Portal Features', () => {
@@ -210,10 +208,20 @@ describe('Jury Portal Features', () => {
         expect(screen.getByText('Sample Builders')).toBeTruthy();
       });
 
-      // Verify deliverables
-      expect(screen.getByText('Initial Architecture Draft & Prototype')).toBeTruthy();
-      expect(screen.getByText(/Open GitHub Repository/i)).toBeTruthy();
-      expect(screen.getByText(/prototype-v1.zip/i)).toBeTruthy();
+      // Verify deliverables: every link of the latest submission, no empty ones
+      expect(screen.getByText('Latest submission (the one that counts)')).toBeTruthy();
+      expect(
+        screen
+          .getByRole('link', { name: /GitHub repository of Sample Builders/i })
+          .getAttribute('href'),
+      ).toBe('https://github.com/sample-builders/liltech-dispatcher');
+      expect(
+        screen.getByRole('link', { name: /Google Drive folder of Sample Builders/i }),
+      ).toBeTruthy();
+      expect(screen.getByRole('link', { name: /Presentation of Sample Builders/i })).toBeTruthy();
+      expect(screen.queryByRole('link', { name: /Technical report/i })).toBeNull();
+      expect(screen.getByText('Commit 0123456')).toBeTruthy();
+      expect(screen.getByText(/Version 2/)).toBeTruthy();
 
       // Verify all 4 criteria are displayed
       expect(screen.getByText('Technical Execution & Architecture')).toBeTruthy();
@@ -224,6 +232,22 @@ describe('Jury Portal Features', () => {
       // Default score total: 18 * 4 = 72
       expect(screen.getByText('72')).toBeTruthy();
       expect(screen.getByText('/ 100')).toBeTruthy();
+    });
+
+    it('locks the form outside the scoring window', async () => {
+      vi.spyOn(api.jury, 'getTeamEvaluation').mockResolvedValue({
+        ...MOCK_EVALUATION_DATA,
+        scoringOpen: false,
+      });
+
+      render(<TeamEvaluationView teamId="team-01" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Scoring is not open')).toBeTruthy();
+      });
+      expect(
+        (screen.getByRole('button', { name: /submit evaluation/i }) as HTMLButtonElement).disabled,
+      ).toBe(true);
     });
 
     it('updates scores dynamically via presets and inputs', async () => {

@@ -20,6 +20,7 @@ export const AuditAction = {
   JuryCreated: 'jury.created',
   JuryUpdated: 'jury.updated',
   JuryDeleted: 'jury.deleted',
+  JuryEvaluationSaved: 'jury.evaluation_saved',
   ChallengeCreated: 'challenge.created',
   ChallengeUpdated: 'challenge.updated',
   ChallengeStarted: 'challenge.started',

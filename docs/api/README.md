@@ -536,7 +536,7 @@ Admin only; every route is pinned to `role: 'jury'`, so a team or admin account 
 
 #### `PATCH /api/admin/jury/:id`
 
-Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`.
+Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`. `challengeId` (UUID, or `null` to unassign) sets the challenge the juror scores; an unknown challenge → `400`. The same field is accepted by `POST /api/admin/jury`, and every account returns `challengeId` and `challengeTitle`. Deleting a juror who already scored teams is refused (`409`) so scores are never lost silently.
 
 #### `DELETE /api/admin/jury/:id`
 
@@ -547,6 +547,19 @@ At every API start, badges issued before encrypted storage existed are reissued 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 
 Resends a participant's badge email without the hourly limit (audited as `badge.email_resent`).
+
+### Jury evaluation
+
+Jury role only (`libs/api-contracts/src/lib/jury-contracts.ts`). An administrator assigns each jury account one challenge (challenge 01 = `track_a`, challenge 02 = `track_b`); without an assignment every route answers `403 JURY_NOT_ASSIGNED`. A juror scores every **active team with at least one checked-in member** on their challenge, and only ever reads or writes their **own** scores.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/jury/overview` | Assigned challenge, phase, team counts, my average, `scoringOpen`. |
+| `GET /api/jury/teams` | Teams to score: latest submission link for my challenge, my status and total. |
+| `GET /api/jury/evaluation?teamId=…` | One team: members, latest submission (links, version, commit), my scores, `scoringOpen`. A team outside the evaluation → `404`. |
+| `POST /api/jury/evaluation?teamId=…` | `{ criteriaScores: { technical_execution, innovation_originality, ui_ux_design, pitch_presentation }, notes? }` — integers 0–25 each (strict). Upsert of my evaluation → `{ success, teamId, totalScore, evaluatedAt, message }`. |
+
+Scores can be saved only in the `submissions_closed` and `pitching` phases (organizer decision); otherwise `403 SCORING_CLOSED`. Scores are stored per juror (`jury_evaluations`, unique per juror/team/challenge, range and total enforced by a CHECK constraint). How several jurors combine into a final score is still open (docs/decisions/OPEN_QUESTIONS.md #5), so `Team.c1JuryScore`/`c2JuryScore` stay empty. Each save is audited as `jury.evaluation_saved` (who, which team, when — not the scores).
 
 ## Planned Endpoint Groups
 

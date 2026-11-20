@@ -127,17 +127,13 @@ export function handleGetJuryEvaluation(teamId: string): JuryTeamEvaluationRespo
     ],
     submission: team.submitted
       ? {
-          id: `sub-${team.id}`,
-          teamId: team.id,
-          track: team.track,
-          title: team.submissionTitle ?? `${team.name} Final Deliverable`,
-          description:
-            'Automated dispatch heuristics implementation with interactive map visualization, simulation test suite, and benchmark reports.',
-          repoUrl: team.submissionRepoUrl ?? 'https://github.com/liltech/sample-repo',
-          fileName: team.submissionFileName ?? 'deliverables.zip',
-          fileSizeBytes: 2450000,
           submittedAt: team.submittedAt ?? '2026-11-21T21:15:00.000Z',
           version: 1,
+          driveUrl: 'https://drive.google.com/drive/folders/demo-deliverables',
+          githubUrl: team.submissionRepoUrl ?? 'https://github.com/liltech/sample-repo',
+          reportUrl: 'https://docs.google.com/document/d/demo-report',
+          presentationUrl: 'https://docs.google.com/presentation/d/demo-pitch',
+          commitSha: null,
         }
       : null,
     evaluation: evaluation
@@ -148,6 +144,7 @@ export function handleGetJuryEvaluation(teamId: string): JuryTeamEvaluationRespo
           evaluatedAt: evaluation.evaluatedAt,
         }
       : null,
+    scoringOpen: true,
   };
 }
 
