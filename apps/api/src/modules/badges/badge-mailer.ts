@@ -1,6 +1,11 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
-import type { BadgeColor } from 'api-contracts';
+import {
+  DEFAULT_BADGE_EMAIL_BODY,
+  DEFAULT_BADGE_EMAIL_SUBJECT,
+  type BadgeColor,
+} from 'api-contracts';
+import { emailBodyToText, parseEmailBody, type EmailInline } from 'shared';
 import { env } from '../../config/env';
 
 /**
@@ -117,40 +122,122 @@ export function renderQrDataUrl(token: string, color: BadgeColor | null): Promis
   return QRCode.toDataURL(token, qrOptions(color));
 }
 
-export async function buildBadgeEmail(email: BadgeEmail, from: string): Promise<BadgeMailMessage> {
+/** Organizer-written subject and body; omitted fields use the defaults. */
+export interface BadgeEmailTemplate {
+  subject?: string;
+  body?: string;
+}
+
+const BRAND = {
+  ink: '#111114',
+  red: '#d93025',
+  muted: '#5f6368',
+  line: '#e6e6ea',
+  page: '#f3f3f6',
+};
+
+/**
+ * Replaces the `[participant name]`, `[team name]` and `[color]` markers for
+ * one recipient. The result is plain text; it is HTML-escaped when rendered.
+ */
+export function personalizeTemplate(template: string, email: BadgeEmail): string {
+  const colorLabel = (email.color ? COLOR_STYLES[email.color] : null)?.label ?? 'Unassigned';
+  return template
+    .replaceAll('[participant name]', email.participantName)
+    .replaceAll('[team name]', email.teamName)
+    .replaceAll('[color]', colorLabel);
+}
+
+function renderInline(tokens: EmailInline[]): string {
+  return tokens
+    .map((token) =>
+      token.kind === 'link'
+        ? `<a href="${escapeHtml(token.href)}" style="color:${BRAND.red};font-weight:bold;text-decoration:underline;${token.label ? '' : 'word-break:break-all'}">${escapeHtml(token.label ?? token.href)}</a>`
+        : escapeHtml(token.value),
+    )
+    .join('');
+}
+
+/** Paragraphs and bullet lists of the (already personalized) body, as email-safe HTML. */
+function renderBody(body: string): string {
+  return parseEmailBody(body)
+    .map((block) =>
+      block.kind === 'paragraph'
+        ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.ink}">${block.lines.map(renderInline).join('<br>')}</p>`
+        : `<ul style="margin:0 0 16px;padding:0 0 0 20px;font-size:15px;line-height:1.6;color:${BRAND.ink}">${block.items
+            .map((item) => `<li style="margin:0 0 6px">${renderInline(item)}</li>`)
+            .join('')}</ul>`,
+    )
+    .join('\n');
+}
+
+/**
+ * Builds the badge email: organizer text (default or custom) in a branded
+ * layout, then a card with the participant's personal QR code shown inline.
+ * The raw token travels only inside the QR image, never in the text.
+ */
+export async function buildBadgeEmail(
+  email: BadgeEmail,
+  from: string,
+  template: BadgeEmailTemplate = {},
+): Promise<BadgeMailMessage> {
   const style = email.color ? COLOR_STYLES[email.color] : null;
   const colorLabel = style?.label ?? 'Unassigned';
-  const name = escapeHtml(email.participantName);
-  const team = escapeHtml(email.teamName);
+  const groupHex = style?.hex ?? BRAND.muted;
+  const groupText = style?.text ?? '#ffffff';
   const portalUrl = `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/login`;
+  const subject = personalizeTemplate(
+    template.subject?.trim() || DEFAULT_BADGE_EMAIL_SUBJECT,
+    email,
+  );
+  const body = personalizeTemplate(template.body?.trim() || DEFAULT_BADGE_EMAIL_BODY, email);
 
   const text = [
-    `Hi ${email.participantName},`,
+    emailBodyToText(body),
     '',
-    `Here is your personal QR badge for LilTech 2026 (team "${email.teamName}").`,
-    `Your color group: ${colorLabel}.`,
-    '',
-    'Show the attached QR code at the entrance on November 21 at Campus EPI, Sousse.',
-    'It is personal: do not share it outside your team.',
-    `Your team can also display every badge after signing in at ${portalUrl}.`,
+    '----------------------------------------',
+    `Your personal QR badge is attached (liltech-badge.png). Color group: ${colorLabel}.`,
+    'Present it at the entrance to check in. It is personal: do not share it.',
+    `Your team can also display every badge after signing in at ${portalUrl}`,
   ].join('\n');
 
   const html = `<!doctype html>
-<html><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#202124">
-<table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden">
-<tr><td style="background:${style?.hex ?? '#5f6368'};color:${style?.text ?? '#ffffff'};padding:16px 24px;font-size:18px;font-weight:bold">${escapeHtml(colorLabel)} group</td></tr>
-<tr><td style="padding:24px">
-<p style="margin:0 0 12px">Hi ${name},</p>
-<p style="margin:0 0 16px">Here is your personal QR badge for <strong>LilTech 2026</strong>, team <strong>${team}</strong>.</p>
-<p style="text-align:center;margin:0 0 16px"><img src="cid:badge-qr" alt="Your QR badge" width="240" height="240" style="border:8px solid ${style?.hex ?? '#5f6368'};border-radius:8px"></p>
-<p style="margin:0 0 8px">Show this QR code at the entrance on November 21 at Campus EPI, Sousse. It is personal: do not share it outside your team.</p>
-<p style="margin:0">Your team can also display every badge after <a href="${escapeHtml(portalUrl)}">signing in</a>.</p>
-</td></tr></table></body></html>`;
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:${BRAND.page};font-family:Arial,Helvetica,sans-serif;color:${BRAND.ink}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.page};padding:24px 12px">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.line}">
+<tr><td style="background:${BRAND.ink};padding:28px 32px">
+<div style="font-size:24px;font-weight:bold;color:#ffffff;letter-spacing:.5px">LilTech <span style="color:${BRAND.red}">2026</span></div>
+<div style="margin-top:6px;font-size:13px;color:#c9c9d1;letter-spacing:.4px">ONE NIGHT · TWO CHALLENGES · NOVEMBER 21–22, 2026</div>
+</td></tr>
+<tr><td style="height:4px;background:${BRAND.red};line-height:4px;font-size:0">&nbsp;</td></tr>
+<tr><td style="padding:32px 32px 8px">
+${renderBody(body)}
+</td></tr>
+<tr><td style="padding:8px 32px 32px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${BRAND.line};border-radius:14px">
+<tr><td align="center" style="padding:24px">
+<div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase">Your personal QR badge</div>
+<div style="margin:10px 0 0"><span style="display:inline-block;padding:6px 14px;border-radius:999px;background:${groupHex};color:${groupText};font-size:13px;font-weight:bold">${escapeHtml(colorLabel)} group</span></div>
+<div style="margin:16px 0"><img src="cid:badge-qr" alt="Your personal QR badge" width="220" height="220" style="display:block;margin:0 auto;border:6px solid ${groupHex};border-radius:12px"></div>
+<div style="font-size:15px;font-weight:bold;color:${BRAND.ink}">${escapeHtml(email.participantName)}</div>
+<div style="font-size:13px;color:${BRAND.muted};margin-top:2px">Team ${escapeHtml(email.teamName)}</div>
+<div style="font-size:13px;color:${BRAND.muted};margin-top:12px;line-height:1.5">Present this code at the entrance to check in.<br>It is personal — please do not share it.</div>
+</td></tr></table>
+</td></tr>
+<tr><td style="background:#fafafb;border-top:1px solid ${BRAND.line};padding:20px 32px;font-size:12px;line-height:1.6;color:${BRAND.muted}">
+Your team can also display every badge after <a href="${escapeHtml(portalUrl)}" style="color:${BRAND.red}">signing in to the platform</a>.<br>
+LilTech 2026 · Organized by GDG on Campus EPI and ISITCom Google Club
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
 
   return {
     from,
     to: email.to,
-    subject: `Your LilTech 2026 QR badge (${colorLabel} group)`,
+    subject,
     text,
     html,
     attachments: [
@@ -164,40 +251,26 @@ export async function buildBadgeEmail(email: BadgeEmail, from: string): Promise<
   };
 }
 
-/** Sends one badge email; resolves `true` on success, `false` when it could not be sent. */
+function senderAddress(): string {
+  const address = env.MAIL_FROM ?? env.SMTP_USER;
+  // A display name makes the email look like it comes from the event, not a bare inbox.
+  return address && !address.includes('<')
+    ? `LilTech 2026 <${address}>`
+    : (address ?? 'LilTech 2026');
+}
+
+/** Sends one badge email with the default copy; resolves `false` when it could not be sent. */
 export async function sendBadgeEmail(email: BadgeEmail): Promise<boolean> {
-  const transport = resolveTransport();
-
-  if (!transport) {
-    return false;
-  }
-
-  const from = env.MAIL_FROM ?? env.SMTP_USER ?? 'LilTech 2026';
-  await transport.sendMail(await buildBadgeEmail(email, from));
-  return true;
+  return sendBadgeEmailWithTemplate(email);
 }
 
 /**
- * Replaces the `[participant name]`, `[team name]` and `[color]` markers of an
- * admin-written subject or body for one recipient. The result is plain text;
- * callers HTML-escape it before putting it in the HTML part.
- */
-export function personalizeTemplate(template: string, email: BadgeEmail): string {
-  const colorLabel = (email.color ? COLOR_STYLES[email.color] : null)?.label ?? 'Unassigned';
-  return template
-    .replaceAll('[participant name]', email.participantName)
-    .replaceAll('[team name]', email.teamName)
-    .replaceAll('[color]', colorLabel);
-}
-
-/**
- * Sends a badge email with optional subject/body overrides for admin manual
- * dispatch. When overrides are provided the custom text replaces the default
- * copy. The QR code is always attached and shown inline below a custom body.
+ * Sends one badge email with optional organizer-written subject and body
+ * (admin dispatch). The QR card and layout are always the same.
  */
 export async function sendBadgeEmailWithTemplate(
   email: BadgeEmail,
-  overrides: { subject?: string; body?: string } = {},
+  template: BadgeEmailTemplate = {},
 ): Promise<boolean> {
   const transport = resolveTransport();
 
@@ -205,22 +278,6 @@ export async function sendBadgeEmailWithTemplate(
     return false;
   }
 
-  const from = env.MAIL_FROM ?? env.SMTP_USER ?? 'LilTech 2026';
-  const base = await buildBadgeEmail(email, from);
-  const subject = overrides.subject ? personalizeTemplate(overrides.subject, email) : undefined;
-  const body = overrides.body ? personalizeTemplate(overrides.body, email) : undefined;
-
-  const message: BadgeMailMessage = {
-    ...base,
-    ...(subject ? { subject } : {}),
-    ...(body
-      ? {
-          text: body,
-          html: `<!doctype html>\n<html><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#202124">\n<table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden">\n<tr><td style="padding:24px;white-space:pre-wrap">${escapeHtml(body)}</td></tr>\n<tr><td style="padding:0 24px 24px;text-align:center"><img src="cid:badge-qr" alt="Your QR badge" width="240" height="240" style="border-radius:8px"></td></tr>\n</table></body></html>`,
-        }
-      : {}),
-  };
-
-  await transport.sendMail(message);
+  await transport.sendMail(await buildBadgeEmail(email, senderAddress(), template));
   return true;
 }

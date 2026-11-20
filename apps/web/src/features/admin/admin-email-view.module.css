@@ -1,0 +1,144 @@
+/*
+ * Email preview: mirrors the server-rendered badge email (light email canvas
+ * inside the dark admin UI), so organizers see what participants receive.
+ */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.meta {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.metaLabel {
+  display: inline-block;
+  min-inline-size: 4.5rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.email {
+  overflow: hidden;
+  border: 1px solid #e6e6ea;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111114;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  padding: 22px 24px;
+  background: #111114;
+}
+
+.wordmark {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.accent {
+  color: #d93025;
+}
+
+.tagline {
+  margin-block-start: 4px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #c9c9d1;
+}
+
+.rule {
+  block-size: 4px;
+  background: #d93025;
+}
+
+.body {
+  padding: 22px 24px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.body p {
+  margin: 0 0 14px;
+}
+
+.body ul {
+  margin: 0 0 14px;
+  padding-inline-start: 20px;
+}
+
+.body li {
+  margin-block-end: 4px;
+}
+
+.link {
+  color: #d93025;
+  font-weight: 700;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.qrCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-block-start: 8px;
+  padding: 18px;
+  border: 1px solid #e6e6ea;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.qrTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f6368;
+}
+
+.groupPill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.qrPlaceholder {
+  display: grid;
+  place-items: center;
+  inline-size: 120px;
+  block-size: 120px;
+  border: 5px solid #1a73e8;
+  border-radius: 10px;
+  background: repeating-linear-gradient(45deg, #e8f0fe 0 6px, #ffffff 6px 12px);
+  color: #1a56c4;
+  font-weight: 700;
+}
+
+.qrName {
+  font-weight: 700;
+}
+
+.qrHint {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.footer {
+  padding: 14px 24px;
+  border-block-start: 1px solid #e6e6ea;
+  background: #fafafb;
+  font-size: 11px;
+  color: #5f6368;
+}
