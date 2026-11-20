@@ -225,9 +225,10 @@ describeDb('event hardening', () => {
       const team = await registerTeam('legacy');
       const legacy = team.badges[0];
       const revoked = team.badges[1];
+      // The old code had been emailed, so its replacement must be emailed too.
       await prisma.qrToken.update({
         where: { participantId: legacy.participantId },
-        data: { tokenCiphertext: null },
+        data: { tokenCiphertext: null, emailStatus: 'sent' },
       });
       await prisma.qrToken.update({
         where: { participantId: revoked.participantId },
@@ -273,6 +274,27 @@ describeDb('event hardening', () => {
         where: { participantId: legacy.participantId },
       });
       expect(badge.emailStatus).toBe('sent');
+    });
+
+    it('leaves an undistributed badge unsent when reissuing it at startup', async () => {
+      const team = await registerTeam('undistributed');
+      const legacy = team.badges[0];
+      await prisma.qrToken.update({
+        where: { participantId: legacy.participantId },
+        data: { tokenCiphertext: null, emailStatus: null },
+      });
+      const before = mail.sent.length;
+
+      await runBadgeMaintenance();
+      await waitForScheduledBadgeEmails();
+
+      // Badges go out through the admin dispatch, never through a restart.
+      expect(mail.sent.length).toBe(before);
+      const badge = await prisma.qrToken.findUniqueOrThrow({
+        where: { participantId: legacy.participantId },
+      });
+      expect(badge.tokenCiphertext).not.toBeNull();
+      expect(badge.emailStatus).toBeNull();
     });
 
     it('creates a badge for a participant that has none', async () => {

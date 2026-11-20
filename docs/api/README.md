@@ -395,6 +395,23 @@ report Challenge 01 as `access: "early"`. Teams that did not solve it get it at
 `ctfStartedAt + 60 min` (evaluated lazily on every request), or when an
 administrator force-opens it. See the challenge section above.
 
+#### `GET /api/admin/ctf` (admin)
+
+Read-only Mini-CTF board (`adminCtfOverviewResponseSchema` in
+`libs/api-contracts/src/lib/admin-ctf-contracts.ts`), shown at `/admin/ctf`:
+
+- `phase`, `timing` (same clock as `GET /api/ctf/chain`) and `windowMinutes`;
+- `stages[]` in chain order: `status`, `answerConfigured` (a boolean — the answer
+  and its digest are never sent), `hasDriveUrl`, `hintCount`, `solvedTeams`,
+  `attempts`;
+- `teams[]`, finished teams first: `checkedIn`, `currentStagePosition`,
+  `solvedStages`, `attempts`, `hintsUsed`, `lastActivityAt`, `chainSolvedAt`,
+  `points`;
+- `totals`, including `blockingStages`: required stages that are draft or have no
+  answer, which stop every team at that stage.
+
+`401` without a session, `403` for non-admin roles.
+
 ---
 
 ### Team submissions
@@ -500,6 +517,7 @@ Roster (newest first) / one team: standing (`status`, `statusReason`, `statusCha
 | `DELETE /api/admin/participants/:participantId/check-in` | — | Undo; a team with no check-in left goes back from `checked_in` to `registered`. Audit `checkin.undone`. |
 | `POST /api/admin/participants/:participantId/reissue-badge` | — | New QR token (old one stops working, revocation lifted), emailed in the background → `{ participantId, issuedAt, emailQueued }`. Audit `badge.reissued`. |
 | `POST /api/admin/badges/resend-failed` | — | Requeues every failed (or stuck > 10 min pending) badge email of a non-revoked badge → `{ queued }`. Audit `badge.email_bulk_resent`. |
+| `POST /api/admin/badges/send-all` | `{ subject?, body? }` | Emails every non-revoked badge with an email (registration no longer emails badges). Optional subject/body replace the default copy; `[participant name]`, `[team name]` and `[color]` are replaced per recipient; the QR code is always included. Runs in the background, one email at a time → `{ queued }`; `409` while a dispatch is running. Audit `badge.email_bulk_resent`. |
 
 Check-in no longer moves a team back to `checked_in` from a later progress state when a late member is scanned (scan and manual check-in both only advance from `registered`).
 

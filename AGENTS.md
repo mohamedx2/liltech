@@ -40,7 +40,7 @@ The platform handles: team registration, participant accounts with personal QR b
 
 **Event shape:** two parallel challenge tracks, two separate juries, two podiums.
 
-**Event workflow:** team leader registers a team (4–7 members) → every participant receives a personal QR code by email → staff scan QR codes at the entrance → at 20:00 administrators launch the event → the Mini-CTF opens for eligible checked-in teams → a valid flag unlocks the team's main challenge → teams submit deliverables until 08:00 → pitches at 09:00 → jury evaluation → results and podiums published at 11:00.
+**Event workflow:** team leader registers a team (4–7 members) → administrators email every participant a personal QR code (Admin → Emails) → staff scan QR codes at the entrance → at 20:00 administrators launch the event → the Mini-CTF opens for eligible checked-in teams → a valid flag unlocks the team's main challenge → teams submit deliverables until 08:00 → pitches at 09:00 → jury evaluation → results and podiums published at 11:00.
 
 **Canonical states:**
 

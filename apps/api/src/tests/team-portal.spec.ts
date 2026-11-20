@@ -169,8 +169,32 @@ describeDb('team portal, badges and jury management', () => {
       // Three registrations with bcrypt hashing: slow on CI and Windows machines.
     }, 30_000);
 
+    it('does not email badges at registration: they wait for the admin dispatch', async () => {
+      await registerTeam('golf', 3);
+
+      expect(mail.sent).toHaveLength(0);
+      const statuses = await prisma.qrToken.findMany({ select: { emailStatus: true } });
+      expect(statuses).toHaveLength(4);
+      // Not `pending`: the startup retry of interrupted emails must not send them.
+      expect(statuses.every((row) => row.emailStatus === null)).toBe(true);
+    });
+  });
+
+  describe('admin badge email dispatch', () => {
+    function dispatch(body: Record<string, unknown> = {}, token = adminToken) {
+      return request(app)
+        .post('/api/admin/badges/send-all')
+        .set('Authorization', `Bearer ${token}`)
+        .send(body);
+    }
+
     it('emails every participant their own QR badge and records the delivery', async () => {
       const team = await registerTeam('delta', 3);
+
+      const response = await dispatch();
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ queued: 4 });
+      await waitForScheduledBadgeEmails();
 
       expect(mail.sent.map((message) => message.to).sort()).toEqual(
         [
@@ -194,9 +218,32 @@ describeDb('team portal, badges and jury management', () => {
         select: { emailStatus: true, emailLastSentAt: true },
       });
       expect(statuses.every((row) => row.emailStatus === 'sent' && row.emailLastSentAt)).toBe(true);
+      expect(
+        await prisma.auditLog.count({ where: { action: 'badge.email_bulk_resent' } }),
+      ).toBeGreaterThanOrEqual(1);
     });
 
-    it('responds as soon as the team is stored, without waiting for the emails', async () => {
+    it('personalizes and escapes a custom subject and body, keeping the QR code', async () => {
+      await registerTeam('hotel', 3);
+
+      const response = await dispatch({
+        subject: 'Badge for [participant name]',
+        body: 'Hello [participant name] of [team name] ([color]) <script>alert(1)</script>',
+      });
+      expect(response.status).toBe(200);
+      await waitForScheduledBadgeEmails();
+
+      const leader = mail.sent.find((message) => message.to === 'leader@hotel.test');
+      expect(leader?.subject).toBe('Badge for hotel Leader');
+      expect(leader?.text).toMatch(/^Hello hotel Leader of Team hotel \(\w+\)/);
+      expect(leader?.html).toContain('&lt;script&gt;');
+      expect(leader?.html).not.toContain('<script>');
+      expect(leader?.html).toContain('cid:badge-qr');
+      expect(leader?.attachments[0]?.contentType).toBe('image/png');
+    });
+
+    it('answers before the emails are sent, one dispatch at a time', async () => {
+      await registerTeam('india', 3);
       let release: () => void = () => undefined;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
@@ -208,31 +255,43 @@ describeDb('team portal, badges and jury management', () => {
         },
       });
 
-      const response = await request(app)
-        .post('/api/registration/teams')
-        .send(teamPayload('async'));
-
-      expect(response.status).toBe(201);
+      const first = await dispatch();
+      expect(first.status).toBe(200);
       const pending = await prisma.qrToken.findMany({ select: { emailStatus: true } });
       expect(pending.every((row) => row.emailStatus === 'pending')).toBe(true);
+
+      const second = await dispatch();
+      expect(second.status).toBe(409);
 
       release();
       await waitForScheduledBadgeEmails();
       const sent = await prisma.qrToken.findMany({ select: { emailStatus: true } });
       expect(sent.every((row) => row.emailStatus === 'sent')).toBe(true);
+      expect((await dispatch()).status).toBe(200);
+      await waitForScheduledBadgeEmails();
     });
 
-    it('still registers the team when email delivery is unavailable', async () => {
+    it('records failures when email delivery is unavailable', async () => {
+      await registerTeam('echo');
       setBadgeMailTransport(null);
 
-      const response = await request(app).post('/api/registration/teams').send(teamPayload('echo'));
-
-      expect(response.status).toBe(201);
+      expect((await dispatch()).status).toBe(200);
       await waitForScheduledBadgeEmails();
       const statuses = await prisma.qrToken.findMany({ select: { emailStatus: true } });
       expect(statuses.every((row) => row.emailStatus === 'failed')).toBe(true);
     });
 
+    it('is admin-only and rejects unknown fields', async () => {
+      const team = await registerTeam('juliett');
+
+      expect((await dispatch({}, team.token)).status).toBe(403);
+      expect((await dispatch({}, juryToken)).status).toBe(403);
+      expect((await dispatch({ to: 'someone@else.test' })).status).toBe(400);
+      expect(mail.sent).toHaveLength(0);
+    });
+  });
+
+  describe('registration validation', () => {
     it('refuses a member already registered on another team, naming the email and field', async () => {
       await registerTeam('foxtrot');
       const payload = teamPayload('golf');
@@ -361,8 +420,9 @@ describeDb('team portal, badges and jury management', () => {
       for (const badge of badges.badges) {
         expect(badge.qrToken).toBe(issued.get(badge.participantId));
         expect(badge.qrImageDataUrl).toMatch(/^data:image\/png;base64,/);
-        expect(badge.emailStatus).toBe('sent');
-        expect(badge.emailResendAvailableAt).not.toBeNull();
+        // Not emailed yet: the admin dispatch has not run, so no resend wait.
+        expect(badge.emailStatus).toBeNull();
+        expect(badge.emailResendAvailableAt).toBeNull();
       }
     });
 
@@ -419,6 +479,11 @@ describeDb('team portal, badges and jury management', () => {
       const team = await registerTeam('papa');
       const target = team.raw.badges[2].participantId;
       const url = `/api/participants/badge/${target}/resend-email`;
+
+      // A badge never emailed can be sent once right away; then the limit applies.
+      const first = await request(app).post(url).set('Authorization', `Bearer ${team.token}`);
+      expect(first.status).toBe(200);
+      expect(first.body.emailStatus).toBe('sent');
 
       const tooSoon = await request(app).post(url).set('Authorization', `Bearer ${team.token}`);
       expect(tooSoon.status).toBe(429);

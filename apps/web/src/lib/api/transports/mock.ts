@@ -4,6 +4,7 @@ import { createAuthMockRoutes } from './mocks/auth.mock';
 import { createEventsMockRoutes } from './mocks/events.mock';
 import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
+import { handleGetAdminCtf } from './mocks/admin-ctf.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
@@ -15,6 +16,7 @@ import {
   handleGetAdminTeams,
   handleGetAuditLog,
   handlePublishAdminAnnouncement,
+  handleSendAllBadgeEmails,
 } from './mocks/admin.mock';
 import {
   handleGetJuryEvaluation,
@@ -112,7 +114,9 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.ADMIN_TEAMS}`]: () => handleGetAdminTeams(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_CTF}`]: () => handleGetAdminCtf(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
+    [`POST ${PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL}`]: () => handleSendAllBadgeEmails(),
   };
 
   /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */

@@ -7,6 +7,7 @@ import {
   type AdminTeam,
   type AdminTeamListResponse,
   type AuditLogEntry,
+  type SendBadgeEmailsResponse,
 } from 'api-contracts';
 import { ApiClientError } from '../../errors';
 import { devMockState } from './dev-state';
@@ -163,6 +164,12 @@ export function handleGetAdminOverview(): AdminOverviewResponse {
 /** No challenges exist in mock mode; challenge management needs the real API. */
 export function handleGetAdminChallenges(): AdminChallengeListResponse {
   return { items: [], total: 0 };
+}
+
+/** Mock bulk send: simulates success with the team member count. */
+export function handleSendAllBadgeEmails(): SendBadgeEmailsResponse {
+  const team = devMockState.team;
+  return { queued: team.members.filter((m) => m.email).length };
 }
 
 /** Mock jury accounts derived from the dev mock users. */

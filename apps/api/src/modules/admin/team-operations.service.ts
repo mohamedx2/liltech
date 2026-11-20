@@ -342,7 +342,7 @@ export async function addParticipant(
             color,
           },
         });
-        const issued = await issueBadgeInTx(tx, created.id, created.name);
+        const issued = await issueBadgeInTx(tx, created.id, created.name, { queueEmail: true });
         await recordAuditLog(
           {
             action: AuditAction.ParticipantAdded,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   adminChallengeListResponseSchema,
+  adminCtfOverviewResponseSchema,
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
   adminOverviewResponseSchema,
@@ -13,8 +14,10 @@ import {
   reissueBadgeResponseSchema,
   resendBadgeEmailResponseSchema,
   resetTeamPasswordResponseSchema,
+  sendBadgeEmailsResponseSchema,
   type AddParticipantRequest,
   type AdminChallengeListResponse,
+  type AdminCtfOverviewResponse,
   type AdminJuryAccountDetail,
   type AdminJuryListResponse,
   type AdminOverviewResponse,
@@ -30,6 +33,8 @@ import {
   type RenameTeamRequest,
   type ResendBadgeEmailResponse,
   type ResetTeamPasswordResponse,
+  type SendBadgeEmailsRequest,
+  type SendBadgeEmailsResponse,
   type SetTeamStatusRequest,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
@@ -63,6 +68,7 @@ type Signal = Pick<ApiRequestConfig, 'signal'>;
  */
 export interface AdminApi {
   getOverview: (config?: Signal) => Promise<AdminOverviewResponse>;
+  getCtfOverview: (config?: Signal) => Promise<AdminCtfOverviewResponse>;
   getAuditLog: (
     params?: { limit?: number; offset?: number; action?: string },
     config?: Signal,
@@ -93,6 +99,7 @@ export interface AdminApi {
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
   revokeBadge: (participantId: string) => Promise<void>;
   resendFailedBadgeEmails: () => Promise<BulkResendBadgeEmailsResponse>;
+  sendBadgeEmails: (opts: SendBadgeEmailsRequest) => Promise<SendBadgeEmailsResponse>;
 
   // Challenges
   getChallenges: (config?: Signal) => Promise<AdminChallengeListResponse>;
@@ -163,6 +170,9 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
   return {
     getOverview: (config) =>
       get(PLANNED_ENDPOINTS.ADMIN_OVERVIEW, adminOverviewResponseSchema, 'Overview', config),
+
+    getCtfOverview: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_CTF, adminCtfOverviewResponseSchema, 'Mini-CTF board', config),
 
     getAuditLog(params, config) {
       const query = new URLSearchParams({
@@ -240,6 +250,14 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
         PLANNED_ENDPOINTS.ADMIN_BADGES_RESEND_FAILED,
         bulkResendBadgeEmailsResponseSchema,
         'Bulk resend',
+      ),
+    sendBadgeEmails: (opts) =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL,
+        sendBadgeEmailsResponseSchema,
+        'Send all badge emails',
+        opts,
       ),
 
     getChallenges: (config) =>
