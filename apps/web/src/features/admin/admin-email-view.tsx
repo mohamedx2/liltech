@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { DEFAULT_BADGE_EMAIL_BODY, DEFAULT_BADGE_EMAIL_SUBJECT } from 'api-contracts';
+import { parseEmailBody, type EmailInline } from 'shared';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -9,44 +11,135 @@ import { FormField, TextInput, Textarea } from '@/components/ui/input';
 import { Alert } from '@/components/feedback/alert';
 import { ConfirmActionDialog, FeedbackBanner, type Feedback } from './admin-ui';
 import styles from './admin-tools.module.css';
+import previewStyles from './admin-email-view.module.css';
 
 /**
- * Admin badge email dispatch: compose an optional custom template and send QR
- * badge emails to all participants in one operation. Emails are NOT sent
- * automatically on registration — this is the controlled dispatch panel.
+ * Admin badge email dispatch. Badges are NOT emailed at registration: the
+ * organizers send them from here, with the default LilTech template (prefilled
+ * below and editable) or their own subject and body. The preview uses the same
+ * text parsing as the real email, with a sample recipient.
  */
 
-const DEFAULT_SUBJECT = 'Your LilTech 2026 QR badge';
-const DEFAULT_BODY = `Hi [participant name],
+const SUBJECT_MAX = 200;
+const BODY_MAX = 5000;
 
-Here is your personal QR badge for LilTech 2026 (team "[team name]").
-Your color group: [color].
+/** Sample recipient used only by the preview. */
+const SAMPLE = { participantName: 'Sarra Ben Youssef', teamName: 'Demo Falcons', color: 'Blue' };
 
-Show the attached QR code at the entrance on November 21 at Campus EPI, Sousse.
-It is personal — do not share it outside your team.
+function personalize(template: string): string {
+  return template
+    .replaceAll('[participant name]', SAMPLE.participantName)
+    .replaceAll('[team name]', SAMPLE.teamName)
+    .replaceAll('[color]', SAMPLE.color);
+}
 
-Your team can also display every badge after signing in at the platform.`;
+function Inline({ tokens }: { tokens: EmailInline[] }) {
+  return (
+    <>
+      {tokens.map((token, index) =>
+        token.kind === 'link' ? (
+          <a
+            key={index}
+            href={token.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={previewStyles.link}
+          >
+            {token.label ?? token.href}
+          </a>
+        ) : (
+          <React.Fragment key={index}>{token.value}</React.Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/** Mirrors the HTML email the server sends (layout, text blocks, QR card). */
+function EmailPreview({ subject, body }: { subject: string; body: string }) {
+  const blocks = useMemo(() => parseEmailBody(personalize(body)), [body]);
+
+  return (
+    <div className={previewStyles.frame}>
+      <div className={previewStyles.meta}>
+        <span className={previewStyles.metaLabel}>From</span> LilTech 2026
+        <br />
+        <span className={previewStyles.metaLabel}>Subject</span> {personalize(subject)}
+      </div>
+      <div className={previewStyles.email}>
+        <div className={previewStyles.header}>
+          <div className={previewStyles.wordmark}>
+            LilTech <span className={previewStyles.accent}>2026</span>
+          </div>
+          <div className={previewStyles.tagline}>
+            ONE NIGHT · TWO CHALLENGES · NOVEMBER 21–22, 2026
+          </div>
+        </div>
+        <div className={previewStyles.rule} />
+        <div className={previewStyles.body}>
+          {blocks.map((block, index) =>
+            block.kind === 'paragraph' ? (
+              <p key={index}>
+                {block.lines.map((line, lineIndex) => (
+                  <React.Fragment key={lineIndex}>
+                    {lineIndex > 0 ? <br /> : null}
+                    <Inline tokens={line} />
+                  </React.Fragment>
+                ))}
+              </p>
+            ) : (
+              <ul key={index}>
+                {block.items.map((item, itemIndex) => (
+                  <li key={itemIndex}>
+                    <Inline tokens={item} />
+                  </li>
+                ))}
+              </ul>
+            ),
+          )}
+          <div className={previewStyles.qrCard}>
+            <div className={previewStyles.qrTitle}>Your personal QR badge</div>
+            <span className={previewStyles.groupPill}>{SAMPLE.color} group</span>
+            <div className={previewStyles.qrPlaceholder} aria-hidden="true">
+              QR
+            </div>
+            <div className={previewStyles.qrName}>{SAMPLE.participantName}</div>
+            <div className={previewStyles.qrHint}>Team {SAMPLE.teamName}</div>
+          </div>
+        </div>
+        <div className={previewStyles.footer}>
+          LilTech 2026 · Organized by GDG on Campus EPI and ISITCom Google Club
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AdminEmailView() {
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [subject, setSubject] = useState(DEFAULT_BADGE_EMAIL_SUBJECT);
+  const [body, setBody] = useState(DEFAULT_BADGE_EMAIL_BODY);
   const [isSending, setIsSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [lastQueued, setLastQueued] = useState<number | null>(null);
 
-  const effectiveSubject = subject.trim() || DEFAULT_SUBJECT;
-  const effectiveBody = body.trim() || DEFAULT_BODY;
+  const isDefault =
+    subject.trim() === DEFAULT_BADGE_EMAIL_SUBJECT && body.trim() === DEFAULT_BADGE_EMAIL_BODY;
+  const isEmpty = !subject.trim() || !body.trim();
+
+  const resetToDefault = () => {
+    setSubject(DEFAULT_BADGE_EMAIL_SUBJECT);
+    setBody(DEFAULT_BADGE_EMAIL_BODY);
+  };
 
   const handleSend = async () => {
     setIsSending(true);
     setFeedback(null);
     try {
-      const opts: { subject?: string; body?: string } = {};
-      if (subject.trim()) opts.subject = subject.trim();
-      if (body.trim()) opts.body = body.trim();
-
-      const result = await api.admin.sendBadgeEmails(opts);
+      // The server uses the same default template; only send what was changed.
+      const result = await api.admin.sendBadgeEmails(
+        isDefault ? {} : { subject: subject.trim(), body: body.trim() },
+      );
       setLastQueued(result.queued);
       setFeedback({
         tone: 'success',
@@ -70,7 +163,6 @@ export function AdminEmailView() {
 
   return (
     <div className={styles.container}>
-      {/* ── Page header ─────────────────────────────────────────────── */}
       <section className={styles.hero} aria-labelledby="email-dispatch-title">
         <div className={styles.heroTop}>
           <span className={styles.eyebrow}>Email Operations</span>
@@ -79,16 +171,15 @@ export function AdminEmailView() {
           Badge Email Dispatch
         </h1>
         <p className={styles.description}>
-          Badge emails are <strong>not sent automatically</strong> when teams register. Use this
-          panel to send QR badge emails to every participant at once — after registrations close and
-          before check-in begins. Leave the fields blank to use the default template, or customize
-          the subject and body below.
+          Badge emails are <strong>not sent automatically</strong> when teams register. When
+          registrations are complete, send every participant the welcome email with their personal
+          QR badge. The official template is loaded below — adjust it if needed, check the preview,
+          then send.
         </p>
       </section>
 
       <FeedbackBanner feedback={feedback} />
 
-      {/* ── Last dispatch result ─────────────────────────────────────── */}
       {lastQueued !== null ? (
         <section className={styles.panel} aria-label="Last dispatch result">
           <h2 className={styles.sectionTitle}>
@@ -114,25 +205,30 @@ export function AdminEmailView() {
       ) : null}
 
       <div className={styles.twoColumn}>
-        {/* ── Template editor ─────────────────────────────────────────── */}
         <section className={styles.panel} aria-labelledby="template-heading">
-          <h2 id="template-heading" className={styles.sectionTitle}>
-            <span className={styles.sectionIcon} aria-hidden="true">
-              <Icon name="zap" />
-            </span>
-            Email template
-          </h2>
+          <div className={styles.panelHeader}>
+            <h2 id="template-heading" className={styles.sectionTitle}>
+              <span className={styles.sectionIcon} aria-hidden="true">
+                <Icon name="zap" />
+              </span>
+              Email template
+            </h2>
+            <Button size="sm" variant="outline" onClick={resetToDefault} disabled={isDefault}>
+              Reset to default
+            </Button>
+          </div>
           <p className={styles.hint}>
-            Leave fields blank to use the default LilTech template. In a custom subject or body,
-            [participant name], [team name] and [color] are replaced for each recipient. The QR code
-            is always included.
+            <strong>[participant name]</strong>, <strong>[team name]</strong> and{' '}
+            <strong>[color]</strong> are replaced for each recipient. Start a line with “•” for a
+            bullet, and write <strong>[link text](https://…)</strong> for a named link. The personal
+            QR code is always added below the text.
           </p>
 
           <div className={styles.form}>
             <FormField
               id="email-subject"
               label="Subject line"
-              hint={`${subject.length} / 200 characters — blank uses the default`}
+              hint={`${subject.length} / ${SUBJECT_MAX} characters`}
             >
               {({ id, describedBy, invalid }) => (
                 <TextInput
@@ -141,9 +237,8 @@ export function AdminEmailView() {
                   aria-invalid={invalid}
                   type="text"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder={DEFAULT_SUBJECT}
-                  maxLength={200}
+                  onChange={(event) => setSubject(event.target.value)}
+                  maxLength={SUBJECT_MAX}
                 />
               )}
             </FormField>
@@ -151,7 +246,7 @@ export function AdminEmailView() {
             <FormField
               id="email-body"
               label="Email body"
-              hint={`${body.length} / 5000 characters — blank uses the default`}
+              hint={`${body.length} / ${BODY_MAX} characters`}
             >
               {({ id, describedBy, invalid }) => (
                 <Textarea
@@ -159,17 +254,15 @@ export function AdminEmailView() {
                   aria-describedby={describedBy}
                   aria-invalid={invalid}
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder={DEFAULT_BODY}
-                  rows={10}
-                  maxLength={5000}
+                  onChange={(event) => setBody(event.target.value)}
+                  rows={18}
+                  maxLength={BODY_MAX}
                 />
               )}
             </FormField>
           </div>
         </section>
 
-        {/* ── Live preview ─────────────────────────────────────────────── */}
         <section className={styles.panel} aria-labelledby="preview-heading">
           <h2 id="preview-heading" className={styles.sectionTitle}>
             <span className={styles.sectionIcon} aria-hidden="true">
@@ -178,40 +271,12 @@ export function AdminEmailView() {
             Preview
           </h2>
           <p className={styles.hint}>
-            This is how the email will appear, before the markers are replaced. The personal QR code
-            is shown below the text.
+            How participants will see the email, shown for a sample participant.
           </p>
-
-          <div className={styles.secretBox}>
-            <p className={styles.strong} style={{ marginBottom: '8px' }}>
-              Subject: {effectiveSubject}
-            </p>
-            <hr
-              style={{
-                border: 'none',
-                borderTop: '1px solid var(--color-border)',
-                margin: '8px 0',
-              }}
-            />
-            <pre
-              style={{
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'inherit',
-                fontSize: 'var(--text-sm)',
-                margin: 0,
-              }}
-            >
-              {effectiveBody}
-            </pre>
-          </div>
-
-          <Alert tone="info" title="QR code is always included">
-            Every email shows the recipient's personal QR badge, whatever the subject and body.
-          </Alert>
+          <EmailPreview subject={subject || ' '} body={body} />
         </section>
       </div>
 
-      {/* ── Send action ──────────────────────────────────────────────── */}
       <section className={styles.panel} aria-labelledby="send-action-heading">
         <h2 id="send-action-heading" className={styles.sectionTitle}>
           <span className={styles.sectionIcon} aria-hidden="true">
@@ -237,13 +302,13 @@ export function AdminEmailView() {
           onClick={() => setConfirmOpen(true)}
           loading={isSending}
           loadingLabel="Queuing badge emails…"
+          disabled={isEmpty}
           style={{ alignSelf: 'flex-start', marginTop: 'var(--space-3)' }}
         >
           <Icon name="megaphone" /> Send badge emails to all participants
         </Button>
       </section>
 
-      {/* ── Confirmation dialog ──────────────────────────────────────── */}
       <ConfirmActionDialog
         open={confirmOpen}
         title="Send badge emails to all participants?"
@@ -252,9 +317,8 @@ export function AdminEmailView() {
         onConfirm={handleSend}
       >
         <p style={{ margin: 0 }}>
-          Every participant with an email address and an active QR badge will receive an email
-          immediately
-          {subject.trim() ? ` with the subject "${subject.trim()}"` : ' with the default subject'}.
+          Every participant with an email address and an active QR badge will receive “
+          {subject.trim()}” immediately{isDefault ? ' (official template)' : ' (edited template)'}.
           The action is audited and cannot be undone.
         </p>
       </ConfirmActionDialog>

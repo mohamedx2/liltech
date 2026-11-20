@@ -15,7 +15,12 @@ import { ApiError } from '../../utils/api-error';
 import { logger } from '../../utils/logger';
 import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import { decryptQrToken, encryptQrToken, generateQrToken } from '../checkin/qr-token';
-import { renderQrDataUrl, sendBadgeEmail, sendBadgeEmailWithTemplate } from './badge-mailer';
+import {
+  renderQrDataUrl,
+  sendBadgeEmail,
+  sendBadgeEmailWithTemplate,
+  type BadgeEmailTemplate,
+} from './badge-mailer';
 
 /**
  * QR badge lifecycle beyond check-in: issuance with a retrievable encrypted
@@ -468,12 +473,6 @@ export async function resendFailedBadgeEmails(
 
   scheduleBadgeEmails(deliveries);
   return { queued: deliveries.length };
-}
-
-/** Admin-written subject and body; omitted fields keep the default copy. */
-export interface BadgeEmailTemplate {
-  subject?: string;
-  body?: string;
 }
 
 let bulkDispatchRunning = false;
