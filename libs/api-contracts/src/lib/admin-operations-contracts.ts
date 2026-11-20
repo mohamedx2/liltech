@@ -207,10 +207,12 @@ export const sendBadgeEmailsRequestSchema = z.strictObject({
 
 export type SendBadgeEmailsRequest = z.infer<typeof sendBadgeEmailsRequestSchema>;
 
+/**
+ * The dispatch runs in the background, one email at a time: `queued` badges
+ * then move from `pending` to `sent` or `failed` (visible on Admin → Teams).
+ */
 export const sendBadgeEmailsResponseSchema = z.strictObject({
-  total: z.number().int().nonnegative(),
-  sent: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
 });
 
 export type SendBadgeEmailsResponse = z.infer<typeof sendBadgeEmailsResponseSchema>;

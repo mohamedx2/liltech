@@ -169,8 +169,7 @@ export function handleGetAdminChallenges(): AdminChallengeListResponse {
 /** Mock bulk send: simulates success with the team member count. */
 export function handleSendAllBadgeEmails(): SendBadgeEmailsResponse {
   const team = devMockState.team;
-  const total = team.members.filter((m) => m.email).length;
-  return { total, sent: total, failed: 0 };
+  return { queued: team.members.filter((m) => m.email).length };
 }
 
 /** Mock jury accounts derived from the dev mock users. */

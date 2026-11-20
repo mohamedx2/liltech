@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -32,11 +33,7 @@ export function AdminEmailView() {
   const [isSending, setIsSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [lastResult, setLastResult] = useState<{
-    total: number;
-    sent: number;
-    failed: number;
-  } | null>(null);
+  const [lastQueued, setLastQueued] = useState<number | null>(null);
 
   const effectiveSubject = subject.trim() || DEFAULT_SUBJECT;
   const effectiveBody = body.trim() || DEFAULT_BODY;
@@ -50,15 +47,13 @@ export function AdminEmailView() {
       if (body.trim()) opts.body = body.trim();
 
       const result = await api.admin.sendBadgeEmails(opts);
-      setLastResult(result);
+      setLastQueued(result.queued);
       setFeedback({
         tone: 'success',
         message:
-          result.failed > 0
-            ? `${result.sent} of ${result.total} emails sent — ${result.failed} failed. Fix SMTP and use "Retry failed emails" on the control panel.`
-            : result.sent > 0
-              ? `All ${result.sent} badge emails sent successfully.`
-              : 'No participants with an email address found.',
+          result.queued > 0
+            ? `${result.queued} badge email(s) queued. They go out one at a time in the background; follow each status on Admin → Teams and use "Retry failed emails" on the control panel for any failure.`
+            : 'No participants with an email address and an active badge found.',
       });
     } catch (error) {
       setFeedback({
@@ -94,7 +89,7 @@ export function AdminEmailView() {
       <FeedbackBanner feedback={feedback} />
 
       {/* ── Last dispatch result ─────────────────────────────────────── */}
-      {lastResult ? (
+      {lastQueued !== null ? (
         <section className={styles.panel} aria-label="Last dispatch result">
           <h2 className={styles.sectionTitle}>
             <span className={styles.sectionIcon} aria-hidden="true">
@@ -104,18 +99,17 @@ export function AdminEmailView() {
           </h2>
           <dl className={styles.statGrid}>
             <div className={styles.stat}>
-              <dt>Total</dt>
-              <dd>{lastResult.total}</dd>
-            </div>
-            <div className={styles.stat}>
-              <dt>Sent</dt>
-              <dd>{lastResult.sent}</dd>
-            </div>
-            <div className={styles.stat}>
-              <dt>Failed</dt>
-              <dd>{lastResult.failed}</dd>
+              <dt>Queued</dt>
+              <dd>{lastQueued}</dd>
             </div>
           </dl>
+          <p className={styles.hint}>
+            Delivery runs in the background. Each badge moves from pending to sent or failed on{' '}
+            <Link className={styles.link} href="/admin/teams">
+              Admin → Teams
+            </Link>
+            .
+          </p>
         </section>
       ) : null}
 
@@ -129,8 +123,9 @@ export function AdminEmailView() {
             Email template
           </h2>
           <p className={styles.hint}>
-            Leave fields blank to use the default LilTech template. Customizations override the
-            subject and body; the QR code attachment is always included.
+            Leave fields blank to use the default LilTech template. In a custom subject or body,
+            [participant name], [team name] and [color] are replaced for each recipient. The QR code
+            is always included.
           </p>
 
           <div className={styles.form}>
@@ -183,8 +178,8 @@ export function AdminEmailView() {
             Preview
           </h2>
           <p className={styles.hint}>
-            This is how the email will appear. The QR code image is attached separately to every
-            recipient.
+            This is how the email will appear, before the markers are replaced. The personal QR code
+            is shown below the text.
           </p>
 
           <div className={styles.secretBox}>
@@ -211,7 +206,7 @@ export function AdminEmailView() {
           </div>
 
           <Alert tone="info" title="QR code is always included">
-            The personal QR badge image is attached to every email regardless of body customization.
+            Every email shows the recipient's personal QR badge, whatever the subject and body.
           </Alert>
         </section>
       </div>
@@ -231,8 +226,9 @@ export function AdminEmailView() {
         </p>
 
         <Alert tone="warning" title="Irreversible action">
-          Participants will receive an email immediately. Confirm registrations are complete and
-          SMTP is configured before sending.
+          Participants start receiving emails right away. It also re-sends to participants who
+          already received their badge. Confirm registrations are complete and SMTP is configured
+          before sending.
         </Alert>
 
         <Button
@@ -240,7 +236,7 @@ export function AdminEmailView() {
           size="md"
           onClick={() => setConfirmOpen(true)}
           loading={isSending}
-          loadingLabel="Sending badge emails…"
+          loadingLabel="Queuing badge emails…"
           style={{ alignSelf: 'flex-start', marginTop: 'var(--space-3)' }}
         >
           <Icon name="megaphone" /> Send badge emails to all participants

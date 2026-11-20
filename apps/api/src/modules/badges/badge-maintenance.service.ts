@@ -28,9 +28,11 @@ const participantForDelivery = {
  * - an active badge issued before encrypted storage existed (hash only, so
  *   its QR code cannot be shown again) is reissued. Its old code stops
  *   working; the new one shows on the team portal.
- * Every new badge of a participant with an email is marked `pending`, so the
- * startup retry emails it: nobody arrives at the entrance holding only a QR
- * code that silently stopped working. Revoked badges are left alone.
+ * Badges are distributed by the admin dispatch (Admin → Emails), so a new
+ * badge is not emailed here. A reissued badge whose old code had already been
+ * emailed is marked `pending`, so the startup retry emails the new one: nobody
+ * arrives at the entrance holding only a QR code that silently stopped
+ * working. Revoked badges are left alone.
  * Returns how many badges were written.
  */
 export async function backfillReadableBadges(): Promise<{ created: number; reissued: number }> {
@@ -39,7 +41,7 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
 
   const withoutBadge = await prisma.participant.findMany({
     where: { badge: null },
-    select: { id: true, email: true },
+    select: { id: true },
   });
   for (const participant of withoutBadge) {
     const { token, tokenHash } = generateQrToken();
@@ -48,14 +50,15 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
         participantId: participant.id,
         tokenHash,
         tokenCiphertext: encryptQrToken(token, key),
-        emailStatus: participant.email ? 'pending' : null,
+        // Not emailed yet: the admin dispatch distributes badges.
+        emailStatus: null,
       },
     });
   }
 
   const unreadable = await prisma.qrToken.findMany({
     where: { tokenCiphertext: null, revokedAt: null },
-    select: { id: true, participant: { select: { email: true } } },
+    select: { id: true, emailStatus: true, participant: { select: { email: true } } },
   });
   for (const badge of unreadable) {
     const { token, tokenHash } = generateQrToken();
@@ -67,7 +70,9 @@ export async function backfillReadableBadges(): Promise<{ created: number; reiss
         tokenHash,
         tokenCiphertext: encryptQrToken(token, key),
         issuedAt: new Date(),
-        emailStatus: badge.participant.email ? 'pending' : null,
+        // Re-email only a code that was already distributed; an undistributed
+        // badge waits for the admin dispatch like any other.
+        emailStatus: badge.participant.email && badge.emailStatus !== null ? 'pending' : null,
         emailLastSentAt: null,
       },
     });

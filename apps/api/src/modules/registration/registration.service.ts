@@ -223,7 +223,8 @@ async function registerOnce(
 
         const issuedBadges = await Promise.all(
           team.participants.map((participant) =>
-            issueBadgeInTx(tx, participant.id, participant.name),
+            // Badges are emailed by the admin dispatch, not at registration.
+            issueBadgeInTx(tx, participant.id, participant.name, { queueEmail: false }),
           ),
         );
 
