@@ -10,7 +10,7 @@ import {
   type TeamRegistrationResponse,
   type TeamResponse,
 } from 'api-contracts';
-import { issueBadgeInTx, scheduleBadgeEmails } from '../badges/badges.service';
+import { issueBadgeInTx } from '../badges/badges.service';
 import { hashPassword } from '../auth/password.service';
 import { getEventState } from '../event-state/event-state.service';
 
@@ -239,28 +239,6 @@ async function registerOnce(
       }
       throw error;
     });
-
-  const tokens = new Map(badges.map((badge) => [badge.participantId, badge.token]));
-
-  // Emails go out in the background: the response returns as soon as the
-  // registration is committed.
-  scheduleBadgeEmails(
-    created.participants.flatMap((participant) => {
-      const token = tokens.get(participant.id);
-      return participant.email && token
-        ? [
-            {
-              participantId: participant.id,
-              participantName: participant.name,
-              email: participant.email,
-              teamName: created.name,
-              color: participant.color,
-              token,
-            },
-          ]
-        : [];
-    }),
-  );
 
   const registered: TeamResponse = {
     id: created.id,

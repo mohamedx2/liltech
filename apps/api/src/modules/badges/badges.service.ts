@@ -6,6 +6,7 @@ import {
   type IssueBadgeResponse,
   type ReissueBadgeResponse,
   type ResendBadgeEmailResponse,
+  type SendBadgeEmailsResponse,
   type TeamBadgesResponse,
 } from 'api-contracts';
 import { env } from '../../config/env';
@@ -14,7 +15,7 @@ import { ApiError } from '../../utils/api-error';
 import { logger } from '../../utils/logger';
 import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import { decryptQrToken, encryptQrToken, generateQrToken } from '../checkin/qr-token';
-import { renderQrDataUrl, sendBadgeEmail } from './badge-mailer';
+import { renderQrDataUrl, sendBadgeEmail, sendBadgeEmailWithTemplate } from './badge-mailer';
 
 /**
  * QR badge lifecycle beyond check-in: issuance with a retrievable encrypted
@@ -455,4 +456,88 @@ export async function resendFailedBadgeEmails(
 
   scheduleBadgeEmails(deliveries);
   return { queued: deliveries.length };
+}
+
+/**
+ * Sends badge emails to ALL participants who have an active (non-revoked) QR
+ * token and an email address, using an optional custom subject and body.
+ * Runs synchronously (waits for every send) so the caller gets a real count.
+ * Admin only, audited.
+ */
+export async function sendBulkBadgeEmailsWithTemplate(
+  adminUserId: string,
+  options: { subject?: string; body?: string } = {},
+): Promise<SendBadgeEmailsResponse> {
+  const prisma = getPrismaClient();
+
+  const badges = await prisma.qrToken.findMany({
+    where: {
+      revokedAt: null,
+      participant: { email: { not: null } },
+    },
+    include: {
+      participant: {
+        select: { name: true, email: true, color: true, team: { select: { name: true } } },
+      },
+    },
+  });
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const badge of badges) {
+    const email = badge.participant.email;
+    if (!email) {
+      continue;
+    }
+
+    let token = badge.tokenCiphertext ? decryptQrToken(badge.tokenCiphertext, qrTokenKey()) : null;
+    if (!token) {
+      const issued = generateQrToken();
+      await prisma.qrToken.update({
+        where: { id: badge.id },
+        data: {
+          tokenHash: issued.tokenHash,
+          tokenCiphertext: encryptQrToken(issued.token, qrTokenKey()),
+          issuedAt: new Date(),
+        },
+      });
+      token = issued.token;
+    }
+
+    const result = await sendBadgeEmailWithTemplate(
+      {
+        to: email,
+        participantName: badge.participant.name,
+        teamName: badge.participant.team.name,
+        color: badge.participant.color,
+        token,
+      },
+      options,
+    );
+
+    if (result) {
+      sent++;
+      await prisma.qrToken.update({
+        where: { id: badge.id },
+        data: { emailStatus: 'sent', emailLastSentAt: new Date() },
+      });
+    } else {
+      failed++;
+      await prisma.qrToken.update({
+        where: { id: badge.id },
+        data: { emailStatus: 'failed', emailLastSentAt: new Date() },
+      });
+    }
+  }
+
+  await recordAuditLog({
+    action: AuditAction.BadgeEmailBulkResent,
+    actorId: adminUserId,
+    targetType: 'badge_batch',
+    targetId: String(sent + failed),
+    summary: `Manual dispatch: ${sent} sent, ${failed} failed${options.subject ? ` (custom subject: "${options.subject.slice(0, 50)}")` : ''}`,
+  });
+
+  return { total: sent + failed, sent, failed };
 }

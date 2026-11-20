@@ -176,3 +176,36 @@ export async function sendBadgeEmail(email: BadgeEmail): Promise<boolean> {
   await transport.sendMail(await buildBadgeEmail(email, from));
   return true;
 }
+
+/**
+ * Sends a badge email with optional subject/body overrides for admin manual
+ * dispatch. When overrides are provided the custom text replaces the default
+ * copy; the QR image attachment is always included.
+ */
+export async function sendBadgeEmailWithTemplate(
+  email: BadgeEmail,
+  overrides: { subject?: string; body?: string } = {},
+): Promise<boolean> {
+  const transport = resolveTransport();
+
+  if (!transport) {
+    return false;
+  }
+
+  const from = env.MAIL_FROM ?? env.SMTP_USER ?? 'LilTech 2026';
+  const base = await buildBadgeEmail(email, from);
+
+  const message: BadgeMailMessage = {
+    ...base,
+    ...(overrides.subject ? { subject: overrides.subject } : {}),
+    ...(overrides.body
+      ? {
+          text: overrides.body,
+          html: `<!doctype html>\n<html><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#202124">\n<table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden">\n<tr><td style="padding:24px;white-space:pre-wrap">${escapeHtml(overrides.body)}</td></tr>\n</table></body></html>`,
+        }
+      : {}),
+  };
+
+  await transport.sendMail(message);
+  return true;
+}

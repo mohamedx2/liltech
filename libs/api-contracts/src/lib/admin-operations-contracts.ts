@@ -194,6 +194,27 @@ export const bulkResendBadgeEmailsResponseSchema = z.strictObject({
 
 export type BulkResendBadgeEmailsResponse = z.infer<typeof bulkResendBadgeEmailsResponseSchema>;
 
+// ── Manual bulk badge email dispatch ─────────────────────────────────────────
+
+/**
+ * Request body for `POST /api/admin/badges/send-all`.
+ * Both fields are optional overrides; omit them to use the default template.
+ */
+export const sendBadgeEmailsRequestSchema = z.strictObject({
+  subject: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().min(1).max(5000).optional(),
+});
+
+export type SendBadgeEmailsRequest = z.infer<typeof sendBadgeEmailsRequestSchema>;
+
+export const sendBadgeEmailsResponseSchema = z.strictObject({
+  total: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+
+export type SendBadgeEmailsResponse = z.infer<typeof sendBadgeEmailsResponseSchema>;
+
 // ── Mini-CTF override ────────────────────────────────────────────────────────
 
 export const grantCtfSolveRequestSchema = z.strictObject({

@@ -65,6 +65,7 @@ export function getRoleNavItems(role: Role): readonly NavItem[] {
         { label: 'Teams', href: '/admin/teams' },
         { label: 'Challenges', href: '/admin/challenges' },
         { label: 'Jury', href: '/admin/jury' },
+        { label: 'Emails', href: '/admin/emails' },
         { label: 'Results', href: '/admin/results' },
       ];
     default:
