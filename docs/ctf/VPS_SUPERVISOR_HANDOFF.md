@@ -278,7 +278,7 @@ production data.
 ### API refuses to start
 
 Check the redacted API logs for environment validation. Confirm that the
-`CTF_ANSWER_PEPPER` GitHub secret exists, contains at least 16 characters, and
+`CTF_ANSWER_PEPPER` GitHub secret exists, contains at least 32 characters, and
 is included when the deployment creates the production environment. Do not
 print its value.
 
