@@ -97,6 +97,10 @@ export const adminParticipantSchema = z.strictObject({
   checkedInAt: isoTimestampSchema.nullable(),
   /** Staff member who recorded the check-in. */
   checkedInByName: z.string().nullable(),
+  /** When an organizer marked the participation fee paid; `null` while unpaid. */
+  paidAt: isoTimestampSchema.nullable(),
+  /** Organizer who marked the payment. */
+  paidByName: z.string().nullable(),
   /** `null` when the participant has no badge at all. */
   badge: adminParticipantBadgeSchema.nullable(),
 });
@@ -216,6 +220,18 @@ export const sendBadgeEmailsResponseSchema = z.strictObject({
 });
 
 export type SendBadgeEmailsResponse = z.infer<typeof sendBadgeEmailsResponseSchema>;
+
+// ── Participation fee ────────────────────────────────────────────────────────
+
+/**
+ * Body for `PUT /api/admin/participants/:participantId/payment` (admin only,
+ * audited). Idempotent: setting the current state again changes nothing.
+ */
+export const setParticipantPaymentRequestSchema = z.strictObject({
+  paid: z.boolean(),
+});
+
+export type SetParticipantPaymentRequest = z.infer<typeof setParticipantPaymentRequestSchema>;
 
 // ── Mini-CTF override ────────────────────────────────────────────────────────
 

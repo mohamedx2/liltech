@@ -5,6 +5,7 @@ import {
   grantCtfSolveRequestSchema,
   renameTeamRequestSchema,
   sendBadgeEmailsRequestSchema,
+  setParticipantPaymentRequestSchema,
   setTeamStatusRequestSchema,
   teamCtfSolveParamsSchema,
   teamIdParamsSchema,
@@ -43,6 +44,7 @@ import {
   renameTeam,
   resetTeamPassword,
   revokeCtfSolve,
+  setParticipantPayment,
   setTeamStatus,
   undoCheckIn,
   updateParticipant,
@@ -67,6 +69,7 @@ import {
  * - `GET /api/admin/jury`      — jury accounts, including their passwords.
  * - `POST /api/admin/jury`, `PATCH|DELETE /api/admin/jury/:id` — jury management (audited).
  * - `POST /api/admin/participants/:participantId/resend-badge-email` — no hourly limit (audited).
+ * - `PUT /api/admin/participants/:participantId/payment` — mark the fee paid/unpaid (audited).
  *
  * Every route here is admin-only.
  */
@@ -179,6 +182,12 @@ adminRouter.patch('/admin/participants/:participantId', ...adminOnly, async (req
 adminRouter.delete('/admin/participants/:participantId', ...adminOnly, async (req, res) => {
   const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
   res.status(200).json(await removeParticipant(participantId, authenticatedUserId(req)));
+});
+
+adminRouter.put('/admin/participants/:participantId/payment', ...adminOnly, async (req, res) => {
+  const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+  const { paid } = parseOrThrow(setParticipantPaymentRequestSchema, req.body);
+  res.status(200).json(await setParticipantPayment(participantId, paid, authenticatedUserId(req)));
 });
 
 adminRouter.post('/admin/participants/:participantId/check-in', ...adminOnly, async (req, res) => {

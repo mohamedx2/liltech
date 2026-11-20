@@ -32,6 +32,8 @@ export const AuditAction = {
   ParticipantAdded: 'participant.added',
   ParticipantUpdated: 'participant.updated',
   ParticipantRemoved: 'participant.removed',
+  ParticipantPaymentMarked: 'participant.payment_marked',
+  ParticipantPaymentCleared: 'participant.payment_cleared',
   CheckInManual: 'checkin.manual',
   CheckInUndone: 'checkin.undone',
   BadgeReissued: 'badge.reissued',

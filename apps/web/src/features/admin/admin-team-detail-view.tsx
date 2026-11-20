@@ -53,6 +53,7 @@ type PendingAction =
   | { kind: 'remove'; participant: AdminParticipant }
   | { kind: 'check-in'; participant: AdminParticipant }
   | { kind: 'undo-check-in'; participant: AdminParticipant }
+  | { kind: 'mark-unpaid'; participant: AdminParticipant }
   | { kind: 'reissue'; participant: AdminParticipant }
   | { kind: 'resend'; participant: AdminParticipant }
   | { kind: 'revoke'; participant: AdminParticipant }
@@ -87,6 +88,7 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
 
   // Form fields used by the dialogs.
@@ -139,6 +141,22 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
       setReasonField('');
     }
     setPending(action);
+  };
+
+  /** Marks one participant paid in a single click: the fast path at the payment desk. */
+  const markPaid = async (participant: AdminParticipant) => {
+    setFeedback(null);
+    setPayingId(participant.id);
+    try {
+      await applyTeamUpdate(
+        api.admin.setParticipantPayment(participant.id, true),
+        `${participant.name} marked as paid.`,
+      );
+    } catch (error) {
+      setFeedback({ tone: 'error', message: errorMessage(error, 'Could not mark the payment.') });
+    } finally {
+      setPayingId(null);
+    }
   };
 
   /** Runs a write that returns the refreshed team, then reports success. */
@@ -216,6 +234,11 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
           api.admin.checkInParticipant(pending.participant.id),
           `${pending.participant.name} checked in.`,
         );
+      case 'mark-unpaid':
+        return applyTeamUpdate(
+          api.admin.setParticipantPayment(pending.participant.id, false),
+          `${pending.participant.name} marked as unpaid.`,
+        );
       case 'undo-check-in':
         return applyTeamUpdate(
           api.admin.undoCheckIn(pending.participant.id),
@@ -291,6 +314,7 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
   const { checked, total } = checkInCount(team);
   const canDelete = phase !== null && PRE_EVENT_PHASES.includes(phase);
   const isFull = team.participants.length >= TEAM_MEMBERS_TOTAL_MAX;
+  const paidCount = team.participants.filter((participant) => participant.paidAt).length;
   const solvedIds = new Set(team.ctfSolves.map((solve) => solve.challengeId));
 
   return (
@@ -391,6 +415,9 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
         <div className={styles.panelHeader}>
           <h2 id="members-heading" className={styles.sectionTitle}>
             Members ({team.participants.length} / {TEAM_MEMBERS_TOTAL_MAX})
+            <Badge tone={paidCount === team.participants.length ? 'success' : 'warning'}>
+              Paid {paidCount} / {team.participants.length}
+            </Badge>
           </h2>
           <Button
             variant="primary"
@@ -402,7 +429,7 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
           </Button>
         </div>
         <DataTable
-          caption="Team members with check-in and badge state"
+          caption="Team members with check-in, payment and badge state"
           rows={team.participants}
           getRowKey={(participant) => participant.id}
           columns={[
@@ -446,6 +473,44 @@ export function AdminTeamDetailView({ teamId }: { teamId: string }) {
                   </div>
                 ) : (
                   <Badge tone="neutral">Not checked in</Badge>
+                ),
+            },
+            {
+              key: 'payment',
+              header: 'Payment',
+              render: (participant) =>
+                participant.paidAt ? (
+                  <div className={styles.cellStack}>
+                    <Badge tone="success" showDot>
+                      Paid
+                    </Badge>
+                    <span className={styles.small}>
+                      {formatTime(participant.paidAt)} · {participant.paidByName ?? '—'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => open({ kind: 'mark-unpaid', participant })}
+                      aria-label={`Mark ${participant.name} as unpaid`}
+                    >
+                      Mark unpaid
+                    </Button>
+                  </div>
+                ) : (
+                  <div className={styles.cellStack}>
+                    <Badge tone="warning">Unpaid</Badge>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => void markPaid(participant)}
+                      loading={payingId === participant.id}
+                      loadingLabel="Saving…"
+                      disabled={payingId !== null}
+                      aria-label={`Mark ${participant.name} as paid`}
+                    >
+                      Mark paid
+                    </Button>
+                  </div>
                 ),
             },
             {
@@ -906,6 +971,15 @@ function PendingActionDialog({
           <p style={{ margin: 0 }}>
             Mark <strong>{action.participant.name}</strong> as not checked in? Use this for a wrong
             scan or someone who left before the start.
+          </p>
+        </ConfirmActionDialog>
+      );
+    case 'mark-unpaid':
+      return (
+        <ConfirmActionDialog {...common} title="Mark as unpaid" confirmLabel="Mark unpaid">
+          <p style={{ margin: 0 }}>
+            Mark <strong>{action.participant.name}</strong> as not having paid? Use this to correct
+            a payment recorded on the wrong participant. The change is audited.
           </p>
         </ConfirmActionDialog>
       );

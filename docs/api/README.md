@@ -518,6 +518,7 @@ Roster (newest first) / one team: standing (`status`, `statusReason`, `statusCha
 | `POST /api/admin/participants/:participantId/reissue-badge` | — | New QR token (old one stops working, revocation lifted), emailed in the background → `{ participantId, issuedAt, emailQueued }`. Audit `badge.reissued`. |
 | `POST /api/admin/badges/resend-failed` | — | Requeues every failed (or stuck > 10 min pending) badge email of a non-revoked badge → `{ queued }`. Audit `badge.email_bulk_resent`. |
 | `POST /api/admin/badges/send-all` | `{ subject?, body? }` | Emails every non-revoked badge with an email (registration no longer emails badges). Optional subject/body replace the default copy; `[participant name]`, `[team name]` and `[color]` are replaced per recipient; the QR code is always included. Runs in the background, one email at a time → `{ queued }`; `409` while a dispatch is running. Audit `badge.email_bulk_resent`. |
+| `PUT /api/admin/participants/:participantId/payment` | `{ paid: boolean }` (strict) | Marks one participant's participation fee paid (`paidAt`, `paidByName` on `adminParticipantSchema`) or unpaid → `AdminTeam`. Idempotent: the current state again writes nothing. Audit `participant.payment_marked` / `participant.payment_cleared`. |
 
 Check-in no longer moves a team back to `checked_in` from a later progress state when a late member is scanned (scan and manual check-in both only advance from `registered`).
 
@@ -541,7 +542,7 @@ Any of `{ name, email, password }` (at least one). A new password ends every exi
 
 `204`. Deletes the account; its sessions go with it.
 
-At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and both are queued as `pending` and emailed in the same run (participants with an email), together with any email left `pending` by a restart. Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one. A reissued badge whose old code had been emailed is queued as `pending` and emailed in the same run, together with any email left `pending` by a restart; a new or never-emailed badge waits for the admin dispatch (`POST /api/admin/badges/send-all`). Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 

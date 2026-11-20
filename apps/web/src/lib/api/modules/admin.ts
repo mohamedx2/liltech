@@ -95,6 +95,7 @@ export interface AdminApi {
   removeParticipant: (participantId: string) => Promise<AdminTeam>;
   checkInParticipant: (participantId: string) => Promise<AdminTeam>;
   undoCheckIn: (participantId: string) => Promise<AdminTeam>;
+  setParticipantPayment: (participantId: string, paid: boolean) => Promise<AdminTeam>;
   reissueBadge: (participantId: string) => Promise<ReissueBadgeResponse>;
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
   revokeBadge: (participantId: string) => Promise<void>;
@@ -149,7 +150,7 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
   ) => parseWith(schema, await transport.request<unknown>(path, { signal: config?.signal }), label);
 
   const send = async <Schema extends z.ZodType>(
-    method: 'POST' | 'PATCH' | 'DELETE',
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     schema: Schema,
     label: string,
@@ -224,6 +225,8 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
       send('POST', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
     undoCheckIn: (participantId) =>
       send('DELETE', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
+    setParticipantPayment: (participantId, paid) =>
+      send('PUT', `${participantPath(participantId)}/payment`, adminTeamSchema, 'Team', { paid }),
     reissueBadge: (participantId) =>
       send(
         'POST',
