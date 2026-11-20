@@ -160,8 +160,11 @@ submission modules all call it, so the rules cannot drift apart.
 Drive link, Challenge 02 is a GitHub repository plus a report link and a
 presentation link. Each submission inserts a `Submission` row; the newest row
 counts, older rows stay as history. The GitHub HEAD is pinned best-effort and a
-failure never blocks a submission. Jury scores (`Team.c1JuryScore`,
-`Team.c2JuryScore`) exist as nullable columns for the next task; no scoring
-logic lives here yet.
+failure never blocks a submission. The first submission also sets `Team.progressState = 'submitted'`, which is a
+deliverable state only: a team that opened Challenge 01 through the 60-minute
+fallback reaches it without solving a single flag, so Mini-CTF completion is
+always read from `Team.ctfSolvedAt` (never from the progress ladder). Jury scores
+(`Team.c1JuryScore`, `Team.c2JuryScore`) exist as nullable columns for the next
+task; no scoring logic lives here yet.
 
 See `docs/ctf/README.md` for provisioning, stage content and playtesting.

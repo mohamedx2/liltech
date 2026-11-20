@@ -180,7 +180,7 @@ Team role only. The team is always the authenticated account's own team (`Team.l
 
 #### `GET /api/participants/team`
 
-The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). Schema: `teamPortalSummarySchema`.
+The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). `ctfSolved` is the authoritative Mini-CTF answer (`Team.ctfSolvedAt` is set): `progress: "submitted"` does **not** imply it, because a team reaches `submitted` by delivering Challenge 01 through the 60-minute fallback too. Schema: `teamPortalSummarySchema`.
 
 #### `GET /api/participants/badge`
 
@@ -466,7 +466,10 @@ Links are validated server-side: https only, no embedded credentials, Drive/Docs
 hosts for the Drive fields, and `https://github.com/<owner>/<repo>` for the
 repository. Anything else is `400 VALIDATION_ERROR`. Resubmission is allowed
 until the deadline; every submission inserts an append-only row and the newest
-one counts. For Challenge 02 the server also pins the GitHub default-branch HEAD
+one counts. The first accepted submission moves the team to `submitted`, a
+deliverable state only: it never means the Mini-CTF was solved (`Team.ctfSolvedAt`,
+exposed as `ctfSolved` on `GET /api/participants/team` and on the challenge views).
+For Challenge 02 the server also pins the GitHub default-branch HEAD
 (`commitSha`) on a best-effort basis: if the GitHub API fails, times out or rate
 limits, the submission is still accepted with `commitSha: null`.
 

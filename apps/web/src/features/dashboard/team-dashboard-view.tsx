@@ -125,7 +125,7 @@ export function TeamDashboardView() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Stepper currentProgress={team.progress} />
+          <Stepper currentProgress={team.progress} ctfSolved={team.ctfSolved} />
         </CardContent>
       </Card>
 
