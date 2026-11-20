@@ -1328,6 +1328,23 @@ export const swaggerSpec = {
         },
       },
     },
+    '/admin/ctf': {
+      get: {
+        tags: ['Admin Operations'],
+        summary: 'Mini-CTF board: clock, stages and team progress (Admin only)',
+        description:
+          'Read-only. Stages expose `answerConfigured` only; answers and digests are never sent.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json(
+            { type: 'object', description: 'adminCtfOverviewResponseSchema' },
+            'Mini-CTF board',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+    },
     '/admin/teams/{teamId}': {
       get: {
         tags: ['Admin Operations'],

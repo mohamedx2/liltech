@@ -176,3 +176,51 @@ export async function sendBadgeEmail(email: BadgeEmail): Promise<boolean> {
   await transport.sendMail(await buildBadgeEmail(email, from));
   return true;
 }
+
+/**
+ * Replaces the `[participant name]`, `[team name]` and `[color]` markers of an
+ * admin-written subject or body for one recipient. The result is plain text;
+ * callers HTML-escape it before putting it in the HTML part.
+ */
+export function personalizeTemplate(template: string, email: BadgeEmail): string {
+  const colorLabel = (email.color ? COLOR_STYLES[email.color] : null)?.label ?? 'Unassigned';
+  return template
+    .replaceAll('[participant name]', email.participantName)
+    .replaceAll('[team name]', email.teamName)
+    .replaceAll('[color]', colorLabel);
+}
+
+/**
+ * Sends a badge email with optional subject/body overrides for admin manual
+ * dispatch. When overrides are provided the custom text replaces the default
+ * copy. The QR code is always attached and shown inline below a custom body.
+ */
+export async function sendBadgeEmailWithTemplate(
+  email: BadgeEmail,
+  overrides: { subject?: string; body?: string } = {},
+): Promise<boolean> {
+  const transport = resolveTransport();
+
+  if (!transport) {
+    return false;
+  }
+
+  const from = env.MAIL_FROM ?? env.SMTP_USER ?? 'LilTech 2026';
+  const base = await buildBadgeEmail(email, from);
+  const subject = overrides.subject ? personalizeTemplate(overrides.subject, email) : undefined;
+  const body = overrides.body ? personalizeTemplate(overrides.body, email) : undefined;
+
+  const message: BadgeMailMessage = {
+    ...base,
+    ...(subject ? { subject } : {}),
+    ...(body
+      ? {
+          text: body,
+          html: `<!doctype html>\n<html><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#202124">\n<table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden">\n<tr><td style="padding:24px;white-space:pre-wrap">${escapeHtml(body)}</td></tr>\n<tr><td style="padding:0 24px 24px;text-align:center"><img src="cid:badge-qr" alt="Your QR badge" width="240" height="240" style="border-radius:8px"></td></tr>\n</table></body></html>`,
+        }
+      : {}),
+  };
+
+  await transport.sendMail(message);
+  return true;
+}
