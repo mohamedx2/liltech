@@ -12,6 +12,7 @@ import { participantsRouter } from '../modules/participants/participants.routes'
 import { ctfRouter } from '../modules/ctf/ctf.routes';
 import { challengesRouter } from '../modules/challenges/challenges.routes';
 import { submissionsRouter } from '../modules/submissions/submissions.routes';
+import { juryRouter } from '../modules/jury/jury.routes';
 
 /**
  * Mounts all feature routes under `/api`.
@@ -34,3 +35,4 @@ apiRouter.use(participantsRouter);
 apiRouter.use(ctfRouter);
 apiRouter.use(challengesRouter);
 apiRouter.use(submissionsRouter);
+apiRouter.use(juryRouter);

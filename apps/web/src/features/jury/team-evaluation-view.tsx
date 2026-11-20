@@ -131,7 +131,15 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
     );
   }
 
-  const { team, submission, members } = data;
+  const { team, submission, members, scoringOpen } = data;
+  const submissionLinks = submission
+    ? [
+        { label: 'GitHub repository', href: submission.githubUrl },
+        { label: 'Google Drive folder', href: submission.driveUrl },
+        { label: 'Technical report', href: submission.reportUrl },
+        { label: 'Presentation', href: submission.presentationUrl },
+      ].filter((link): link is { label: string; href: string } => Boolean(link.href))
+    : [];
 
   return (
     <div className={styles.container}>
@@ -187,35 +195,30 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
 
         {submission ? (
           <div className={styles.deliverableDetails}>
-            <span className={styles.deliverableTitle}>{submission.title}</span>
-            <p className={styles.deliverableDescription}>{submission.description}</p>
-
+            <span className={styles.deliverableTitle}>Latest submission (the one that counts)</span>
             <div className={styles.deliverablesActions}>
-              {submission.repoUrl ? (
+              {submissionLinks.map((link) => (
                 <a
-                  href={submission.repoUrl}
+                  key={link.label}
+                  href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.repoButton}
-                  aria-label={`Open GitHub repository for ${team.name} in a new tab`}
+                  aria-label={`Open ${link.label} of ${team.name} in a new tab`}
                 >
-                  <span aria-hidden="true">📦</span>
-                  <span>Open GitHub Repository ↗</span>
+                  <span>{link.label} ↗</span>
                 </a>
-              ) : null}
-
-              {submission.fileName ? (
+              ))}
+              {submission.commitSha ? (
                 <div className={styles.fileBadge}>
-                  <span aria-hidden="true">📎</span>
-                  <span>
-                    {submission.fileName} ({Math.round((submission.fileSizeBytes ?? 0) / 1024)} KB)
-                  </span>
+                  <span>Commit {submission.commitSha.slice(0, 7)}</span>
                 </div>
               ) : null}
-
               <span className={styles.metaItem}>
                 Version {submission.version} • Submitted on{' '}
-                {new Date(submission.submittedAt).toLocaleTimeString([], {
+                {new Date(submission.submittedAt).toLocaleString([], {
+                  day: 'numeric',
+                  month: 'short',
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
@@ -229,6 +232,13 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
           </Alert>
         )}
       </section>
+
+      {!scoringOpen ? (
+        <Alert tone="info" title="Scoring is not open">
+          Scores can be saved from the moment submissions close until the end of the pitches. You
+          can review the team now; the form unlocks automatically then.
+        </Alert>
+      ) : null}
 
       {/* Feedback Alerts */}
       {saveSuccessMessage ? (
@@ -367,6 +377,7 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
               size="lg"
               loading={isSubmitting}
               loadingLabel="Saving Evaluation..."
+              disabled={!scoringOpen}
               fullWidth
             >
               {team.evaluationStatus === 'graded' ? 'Update Evaluation' : 'Submit Evaluation'}

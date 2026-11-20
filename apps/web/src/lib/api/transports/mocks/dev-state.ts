@@ -5,6 +5,7 @@ import {
   TeamProgressState,
   type AuditLogEntry,
   type BadgeSummary,
+  type JuryCriteriaScores,
 } from 'api-contracts';
 import type {
   AnnouncementItem,
@@ -73,7 +74,7 @@ export interface DevMockState {
   juryEvaluations: Map<
     string,
     {
-      criteriaScores: Record<string, number>;
+      criteriaScores: JuryCriteriaScores;
       notes: string;
       totalScore: number;
       evaluatedAt: string;

@@ -3,7 +3,6 @@ import {
   EventPhase,
   Role,
   challengeTrackSchema,
-  eventPhaseSchema,
   eventStateResponseSchema as canonicalEventStateResponseSchema,
   isoTimestampSchema,
   participantPhoneSchema,
@@ -336,118 +335,21 @@ export const announcementsResponseSchema = z.object({
 export type AnnouncementsResponse = z.infer<typeof announcementsResponseSchema>;
 
 /**
- * Jury & Scoring portal contracts (provisional — pending `libs/api-contracts` additions).
- * Respects track scoping and jury evaluation rules from `AGENTS.md`.
+ * Jury & Scoring portal contracts now live in `libs/api-contracts`
+ * (`jury-contracts`); re-exported here so existing imports keep working.
  */
-
-export const JURY_EVALUATION_CRITERIA = [
-  {
-    key: 'technical_execution',
-    title: 'Technical Execution & Architecture',
-    maxPoints: 25,
-    description: 'Code quality, solution stability, architecture soundness, and working prototype.',
-  },
-  {
-    key: 'innovation_originality',
-    title: 'Innovation & Problem Solving',
-    maxPoints: 25,
-    description:
-      'Creativity, uniqueness of the approach, and cleverness in tackling the challenge.',
-  },
-  {
-    key: 'ui_ux_design',
-    title: 'UI/UX & Usability',
-    maxPoints: 25,
-    description: 'Interface polish, ease of use, responsiveness, and clear presentation.',
-  },
-  {
-    key: 'pitch_presentation',
-    title: 'Pitch, Defense & Q&A',
-    maxPoints: 25,
-    description: 'Clarity of the pitch, ability to answer technical questions, and team cohesion.',
-  },
-] as const;
-
-export type JuryCriterionKey = (typeof JURY_EVALUATION_CRITERIA)[number]['key'];
-
-export const juryTeamItemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  track: challengeTrackSchema,
-  progress: teamProgressStateSchema,
-  membersCount: z.number().int().positive(),
-  submitted: z.boolean(),
-  submittedAt: isoTimestampSchema.nullable().optional(),
-  submissionTitle: z.string().nullable().optional(),
-  submissionRepoUrl: z.string().nullable().optional(),
-  submissionFileName: z.string().nullable().optional(),
-  evaluationStatus: z.enum(['graded', 'pending']),
-  myScore: z.number().nullable().optional(),
-  evaluatedAt: isoTimestampSchema.nullable().optional(),
-});
-
-export type JuryTeamItem = z.infer<typeof juryTeamItemSchema>;
-
-export const juryOverviewResponseSchema = z.object({
-  track: challengeTrackSchema,
-  trackTitle: z.string(),
-  trackDescription: z.string(),
-  assignedJury: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string().email(),
-  }),
-  eventPhase: eventPhaseSchema,
-  totalTeams: z.number().int().nonnegative(),
-  evaluatedTeams: z.number().int().nonnegative(),
-  pendingTeams: z.number().int().nonnegative(),
-  averageScore: z.number().nullable(),
-  scoringOpen: z.boolean(),
-});
-
-export type JuryOverviewResponse = z.infer<typeof juryOverviewResponseSchema>;
-
-export const submitEvaluationRequestSchema = z.object({
-  criteriaScores: z.object({
-    technical_execution: z.number().min(0).max(25),
-    innovation_originality: z.number().min(0).max(25),
-    ui_ux_design: z.number().min(0).max(25),
-    pitch_presentation: z.number().min(0).max(25),
-  }),
-  notes: z.string().max(2000).optional(),
-});
-
-export type SubmitEvaluationRequest = z.infer<typeof submitEvaluationRequestSchema>;
-
-export const submitEvaluationResponseSchema = z.object({
-  success: z.boolean(),
-  teamId: z.string(),
-  totalScore: z.number(),
-  evaluatedAt: isoTimestampSchema,
-  message: z.string(),
-});
-
-export type SubmitEvaluationResponse = z.infer<typeof submitEvaluationResponseSchema>;
-
-export const juryTeamEvaluationResponseSchema = z.object({
-  team: juryTeamItemSchema,
-  members: z.array(
-    z.object({
-      id: z.string(),
-      fullName: z.string(),
-      roleInTeam: z.string(),
-    }),
-  ),
-  submission: submissionItemSchema.nullable().optional(),
-  evaluation: z
-    .object({
-      criteriaScores: z.record(z.string(), z.number()),
-      notes: z.string(),
-      totalScore: z.number(),
-      evaluatedAt: isoTimestampSchema.optional(),
-    })
-    .nullable()
-    .optional(),
-});
-
-export type JuryTeamEvaluationResponse = z.infer<typeof juryTeamEvaluationResponseSchema>;
+export {
+  JURY_EVALUATION_CRITERIA,
+  juryOverviewResponseSchema,
+  juryTeamEvaluationResponseSchema,
+  juryTeamItemSchema,
+  submitEvaluationRequestSchema,
+  submitEvaluationResponseSchema,
+  type JuryCriterionKey,
+  type JuryOverviewResponse,
+  type JurySubmission,
+  type JuryTeamEvaluationResponse,
+  type JuryTeamItem,
+  type SubmitEvaluationRequest,
+  type SubmitEvaluationResponse,
+} from 'api-contracts';

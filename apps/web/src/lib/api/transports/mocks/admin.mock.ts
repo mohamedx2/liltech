@@ -204,6 +204,8 @@ const DEV_MOCK_JURY: AdminJuryListResponse['items'] = [
     name: 'Mock Jury Evaluator',
     email: 'jury@liltech.mock',
     password: 'mock-jury-password',
+    challengeId: null,
+    challengeTitle: null,
     createdAt: '2026-11-13T18:00:00.000Z',
   },
 ];

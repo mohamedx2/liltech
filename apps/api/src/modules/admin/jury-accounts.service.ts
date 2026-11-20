@@ -24,20 +24,54 @@ function generateJuryPassword(): string {
   return randomBytes(12).toString('base64url');
 }
 
+/** Fields every jury query selects, including the assigned challenge. */
+const juryAccountSelect = {
+  id: true,
+  name: true,
+  email: true,
+  juryPlainPassword: true,
+  createdAt: true,
+  juryChallengeId: true,
+  juryChallenge: { select: { title: true } },
+} as const;
+
 function toDetail(user: {
   id: string;
   name: string;
   email: string;
   juryPlainPassword: string | null;
   createdAt: Date;
+  juryChallengeId: string | null;
+  juryChallenge: { title: string } | null;
 }): AdminJuryAccountDetail {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     password: user.juryPlainPassword,
+    challengeId: user.juryChallengeId,
+    challengeTitle: user.juryChallenge?.title ?? null,
     createdAt: user.createdAt.toISOString(),
   };
+}
+
+/** Refuses an assignment to a challenge that does not exist. */
+async function assertChallengeExists(
+  tx: Prisma.TransactionClient,
+  challengeId: string | null | undefined,
+) {
+  if (!challengeId) {
+    return;
+  }
+  const challenge = await tx.challenge.findUnique({
+    where: { id: challengeId },
+    select: { id: true },
+  });
+  if (!challenge) {
+    throw ApiError.badRequest('That challenge does not exist.', [
+      { path: 'challengeId', message: 'Choose an existing challenge.' },
+    ]);
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -55,7 +89,7 @@ export async function listJuryAccountDetails(): Promise<AdminJuryAccountDetail[]
   const users = await prisma.user.findMany({
     where: { role: JURY_ROLE },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, name: true, email: true, juryPlainPassword: true, createdAt: true },
+    select: juryAccountSelect,
   });
 
   return users.map(toDetail);
@@ -75,6 +109,7 @@ export async function createJuryAccount(
       if (await tx.user.findUnique({ where: { email }, select: { id: true } })) {
         throw emailTaken();
       }
+      await assertChallengeExists(tx, request.challengeId);
 
       const user = await tx.user.create({
         data: {
@@ -83,7 +118,9 @@ export async function createJuryAccount(
           email,
           passwordHash,
           juryPlainPassword: password,
+          juryChallengeId: request.challengeId ?? null,
         },
+        select: juryAccountSelect,
       });
 
       await recordAuditLog(
@@ -131,6 +168,7 @@ export async function updateJuryAccount(
           throw emailTaken();
         }
       }
+      await assertChallengeExists(tx, request.challengeId);
 
       const user = await tx.user.update({
         where: { id: juryUserId },
@@ -140,7 +178,9 @@ export async function updateJuryAccount(
           ...(request.password !== undefined
             ? { passwordHash, juryPlainPassword: request.password }
             : {}),
+          ...(request.challengeId !== undefined ? { juryChallengeId: request.challengeId } : {}),
         },
+        select: juryAccountSelect,
       });
 
       // A new password ends every existing jury session.
@@ -201,7 +241,7 @@ export async function deleteJuryAccount(juryUserId: string, adminUserId: string)
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
       throw ApiError.conflict(
-        'This jury account still has records attached and cannot be deleted.',
+        'This juror already scored teams: their scores would be lost. Unassign them instead of deleting the account.',
       );
     }
     throw error;

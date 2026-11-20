@@ -44,26 +44,32 @@ enum Role {
 /// Account for one of the API roles. Created by registration (team) or
 /// administratively (jury/admin — provisioning endpoint pending decision).
 model User {
-  id                String          @id @default(uuid()) @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
   role              Role
-  email             String          @unique @db.VarChar(254)
-  name              String          @db.VarChar(100)
+  email             String           @unique @db.VarChar(254)
+  name              String           @db.VarChar(100)
   /// bcrypt hash (slow, salted). Never logged, never returned.
   passwordHash      String
   /// Jury accounts only: the password kept readable for administrators, who
   /// hand it to the jury member (organizer decision, AGENTS.md §9). Returned
   /// exclusively by admin-only endpoints; never logged. Null for other roles.
-  juryPlainPassword String?         @db.VarChar(256)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  juryPlainPassword String?          @db.VarChar(256)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   sessions          Session[]
   team              Team?
   checkInRecords    CheckInRecord[]
-  paymentsMarked    Participant[]   @relation("ParticipantPaidBy")
+  paymentsMarked    Participant[]    @relation("ParticipantPaidBy")
   auditLogs         AuditLog[]
   announcements     Announcement[]
   submissions       Submission[]
+  /// Jury accounts only: the challenge this juror evaluates (one jury per
+  /// challenge). Null until an administrator assigns it.
+  juryChallenge     Challenge?       @relation("JuryChallenge", fields: [juryChallengeId], references: [id], onDelete: SetNull)
+  juryChallengeId   String?          @db.Uuid
+  juryEvaluations   JuryEvaluation[]
 
+  @@index([juryChallengeId])
   @@map("users")
 }
 
@@ -113,6 +119,7 @@ model Team {
   /// Per-challenge Mini-CTF solves (early access to a running challenge).
   ctfSolves       ChallengeCtfSolve[]
   submissions     Submission[]
+  juryEvaluations JuryEvaluation[]
 
   @@index([progressState])
   @@index([status])
@@ -311,6 +318,8 @@ model Challenge {
   updatedAt          DateTime            @updatedAt
   ctfSolves          ChallengeCtfSolve[]
   submissions        Submission[]
+  juryMembers        User[]              @relation("JuryChallenge")
+  juryEvaluations    JuryEvaluation[]
 
   @@index([status])
   @@map("challenges")
@@ -473,4 +482,31 @@ enum CtfOutcome {
   rate_limited
 
   @@map("ctf_outcome")
+}
+
+/// One juror's scores for one team on one challenge. Scores stay per juror:
+/// how several jurors combine into a final score is still an open question
+/// (docs/decisions/OPEN_QUESTIONS.md #5), so nothing is aggregated here.
+model JuryEvaluation {
+  id                    String    @id @default(uuid()) @db.Uuid
+  jury                  User      @relation(fields: [juryUserId], references: [id], onDelete: Restrict)
+  juryUserId            String    @db.Uuid
+  team                  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId                String    @db.Uuid
+  challenge             Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId           String    @db.Uuid
+  /// Four criteria, 0–25 each (integers).
+  technicalExecution    Int
+  innovationOriginality Int
+  uiUxDesign            Int
+  pitchPresentation     Int
+  totalScore            Int
+  /// Private deliberation notes: jury members and organizers only.
+  notes                 String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([juryUserId, teamId, challengeId])
+  @@index([challengeId, teamId])
+  @@map("jury_evaluations")
 }
