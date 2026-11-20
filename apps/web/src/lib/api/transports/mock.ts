@@ -13,6 +13,7 @@ import {
   handleGetAdminJury,
   handleGetAdminOverview,
   handleGetAdminTeam,
+  handleSetParticipantPayment,
   handleGetAdminTeams,
   handleGetAuditLog,
   handlePublishAdminAnnouncement,
@@ -152,12 +153,21 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
   const patternRoutes: ReadonlyArray<{
     method: string;
     pattern: RegExp;
-    handle: (match: RegExpMatchArray) => unknown;
+    handle: (match: RegExpMatchArray, config: ApiRequestConfig) => unknown;
   }> = [
     {
       method: 'GET',
       pattern: /^\/admin\/teams\/([^/]+)$/,
       handle: (match) => handleGetAdminTeam(decodeURIComponent(match[1])),
+    },
+    {
+      method: 'PUT',
+      pattern: /^\/admin\/participants\/([^/]+)\/payment$/,
+      handle: (match, config) =>
+        handleSetParticipantPayment(
+          decodeURIComponent(match[1]),
+          Boolean((config.body as { paid?: unknown } | undefined)?.paid),
+        ),
     },
   ];
 
@@ -201,7 +211,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
         for (const route of patternRoutes) {
           const match = route.method === method ? cleanPath.match(route.pattern) : null;
           if (match) {
-            return route.handle(match) as TResponse;
+            return route.handle(match, effectiveConfig) as TResponse;
           }
         }
         throw new ApiClientError({

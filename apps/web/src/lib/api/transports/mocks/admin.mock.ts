@@ -77,6 +77,23 @@ export function handleGetAdminTeam(teamId: string): AdminTeam {
   return team;
 }
 
+/** Mock-only payment state (the real API stores it on the participant). */
+const mockPayments = new Map<string, string>();
+
+/** `PUT /admin/participants/:id/payment` in mock mode. */
+export function handleSetParticipantPayment(participantId: string, paid: boolean): AdminTeam {
+  const team = buildMockAdminTeam();
+  if (!team.participants.some((participant) => participant.id === participantId)) {
+    throw new ApiClientError({ message: 'Participant not found.', status: 404, code: 'NOT_FOUND' });
+  }
+  if (paid && !mockPayments.has(participantId)) {
+    mockPayments.set(participantId, new Date().toISOString());
+  } else if (!paid) {
+    mockPayments.delete(participantId);
+  }
+  return buildMockAdminTeam();
+}
+
 function buildMockAdminTeam(): AdminTeam {
   const team = devMockState.team;
   const leader = team.members.find((member) => member.roleInTeam === 'leader') ?? team.members[0];
@@ -100,6 +117,8 @@ function buildMockAdminTeam(): AdminTeam {
       color: member.color,
       checkedInAt: member.isCheckedIn ? devMockState.phaseChangedAt : null,
       checkedInByName: member.isCheckedIn ? 'Mock Organizer Admin' : null,
+      paidAt: mockPayments.get(member.id) ?? null,
+      paidByName: mockPayments.has(member.id) ? 'Mock Organizer Admin' : null,
       badge: {
         issuedAt: devMockState.phaseChangedAt,
         revokedAt: null,

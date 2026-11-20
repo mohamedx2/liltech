@@ -1583,6 +1583,37 @@ export const swaggerSpec = {
         },
       },
     },
+    '/admin/participants/{participantId}/payment': {
+      put: {
+        tags: ['Admin Operations'],
+        summary: 'Mark one participant fee paid or unpaid (audited, idempotent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['paid'],
+                additionalProperties: false,
+                properties: { paid: { type: 'boolean' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          400: errorResponse('Invalid body'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
+        },
+      },
+    },
     '/admin/participants/{participantId}/check-in': {
       post: {
         tags: ['Admin Operations'],
