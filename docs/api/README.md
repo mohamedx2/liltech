@@ -395,6 +395,23 @@ report Challenge 01 as `access: "early"`. Teams that did not solve it get it at
 `ctfStartedAt + 60 min` (evaluated lazily on every request), or when an
 administrator force-opens it. See the challenge section above.
 
+#### `GET /api/admin/ctf` (admin)
+
+Read-only Mini-CTF board (`adminCtfOverviewResponseSchema` in
+`libs/api-contracts/src/lib/admin-ctf-contracts.ts`), shown at `/admin/ctf`:
+
+- `phase`, `timing` (same clock as `GET /api/ctf/chain`) and `windowMinutes`;
+- `stages[]` in chain order: `status`, `answerConfigured` (a boolean — the answer
+  and its digest are never sent), `hasDriveUrl`, `hintCount`, `solvedTeams`,
+  `attempts`;
+- `teams[]`, finished teams first: `checkedIn`, `currentStagePosition`,
+  `solvedStages`, `attempts`, `hintsUsed`, `lastActivityAt`, `chainSolvedAt`,
+  `points`;
+- `totals`, including `blockingStages`: required stages that are draft or have no
+  answer, which stop every team at that stage.
+
+`401` without a session, `403` for non-admin roles.
+
 ---
 
 ### Team submissions

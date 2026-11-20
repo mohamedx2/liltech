@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   adminChallengeListResponseSchema,
+  adminCtfOverviewResponseSchema,
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
   adminOverviewResponseSchema,
@@ -16,6 +17,7 @@ import {
   sendBadgeEmailsResponseSchema,
   type AddParticipantRequest,
   type AdminChallengeListResponse,
+  type AdminCtfOverviewResponse,
   type AdminJuryAccountDetail,
   type AdminJuryListResponse,
   type AdminOverviewResponse,
@@ -66,6 +68,7 @@ type Signal = Pick<ApiRequestConfig, 'signal'>;
  */
 export interface AdminApi {
   getOverview: (config?: Signal) => Promise<AdminOverviewResponse>;
+  getCtfOverview: (config?: Signal) => Promise<AdminCtfOverviewResponse>;
   getAuditLog: (
     params?: { limit?: number; offset?: number; action?: string },
     config?: Signal,
@@ -167,6 +170,9 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
   return {
     getOverview: (config) =>
       get(PLANNED_ENDPOINTS.ADMIN_OVERVIEW, adminOverviewResponseSchema, 'Overview', config),
+
+    getCtfOverview: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_CTF, adminCtfOverviewResponseSchema, 'Mini-CTF board', config),
 
     getAuditLog(params, config) {
       const query = new URLSearchParams({

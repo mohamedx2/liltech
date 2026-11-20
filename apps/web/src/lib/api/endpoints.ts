@@ -43,6 +43,7 @@ export const PLANNED_ENDPOINTS = {
   ADMIN_TEAMS: '/admin/teams',
   ADMIN_JURY: '/admin/jury',
   ADMIN_OVERVIEW: '/admin/overview',
+  ADMIN_CTF: '/admin/ctf',
   ADMIN_PARTICIPANTS: '/admin/participants',
   ADMIN_BADGES_RESEND_FAILED: '/admin/badges/resend-failed',
   ADMIN_BADGES_SEND_ALL: '/admin/badges/send-all',

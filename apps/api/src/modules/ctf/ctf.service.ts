@@ -248,7 +248,8 @@ function buildTrack(
   }));
 }
 
-function timingView(gate: ParticipantPhaseGate): CtfTiming {
+/** Mini-CTF clock as participants see it; also used by the admin board. */
+export function timingView(gate: ParticipantPhaseGate): CtfTiming {
   return {
     startedAt: gate.ctfStartedAt?.toISOString() ?? null,
     closesAt: gate.ctfClosesAt?.toISOString() ?? null,
