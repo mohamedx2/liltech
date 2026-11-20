@@ -4,6 +4,7 @@ import {
   auditLogListRequestSchema,
   grantCtfSolveRequestSchema,
   renameTeamRequestSchema,
+  sendBadgeEmailsRequestSchema,
   setTeamStatusRequestSchema,
   teamCtfSolveParamsSchema,
   teamIdParamsSchema,
@@ -23,7 +24,12 @@ import {
   type AdminJuryListResponse,
 } from 'api-contracts';
 import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
-import { reissueBadge, resendBadgeEmail, resendFailedBadgeEmails } from '../badges/badges.service';
+import {
+  reissueBadge,
+  resendBadgeEmail,
+  resendFailedBadgeEmails,
+  sendBulkBadgeEmailsWithTemplate,
+} from '../badges/badges.service';
 import { getAdminOverview } from './admin.service';
 import { getAdminCtfOverview } from './ctf-overview.service';
 import {
@@ -200,6 +206,11 @@ adminRouter.post(
 
 adminRouter.post('/admin/badges/resend-failed', ...adminOnly, async (req, res) => {
   res.status(200).json(await resendFailedBadgeEmails(authenticatedUserId(req)));
+});
+
+adminRouter.post('/admin/badges/send-all', ...adminOnly, async (req, res) => {
+  const input = parseOrThrow(sendBadgeEmailsRequestSchema, req.body);
+  res.status(200).json(await sendBulkBadgeEmailsWithTemplate(authenticatedUserId(req), input));
 });
 
 // ── Jury ─────────────────────────────────────────────────────────────────────

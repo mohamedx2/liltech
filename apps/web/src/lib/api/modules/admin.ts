@@ -14,6 +14,7 @@ import {
   reissueBadgeResponseSchema,
   resendBadgeEmailResponseSchema,
   resetTeamPasswordResponseSchema,
+  sendBadgeEmailsResponseSchema,
   type AddParticipantRequest,
   type AdminChallengeListResponse,
   type AdminCtfOverviewResponse,
@@ -32,6 +33,8 @@ import {
   type RenameTeamRequest,
   type ResendBadgeEmailResponse,
   type ResetTeamPasswordResponse,
+  type SendBadgeEmailsRequest,
+  type SendBadgeEmailsResponse,
   type SetTeamStatusRequest,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
@@ -96,6 +99,7 @@ export interface AdminApi {
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
   revokeBadge: (participantId: string) => Promise<void>;
   resendFailedBadgeEmails: () => Promise<BulkResendBadgeEmailsResponse>;
+  sendBadgeEmails: (opts: SendBadgeEmailsRequest) => Promise<SendBadgeEmailsResponse>;
 
   // Challenges
   getChallenges: (config?: Signal) => Promise<AdminChallengeListResponse>;
@@ -246,6 +250,14 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
         PLANNED_ENDPOINTS.ADMIN_BADGES_RESEND_FAILED,
         bulkResendBadgeEmailsResponseSchema,
         'Bulk resend',
+      ),
+    sendBadgeEmails: (opts) =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL,
+        sendBadgeEmailsResponseSchema,
+        'Send all badge emails',
+        opts,
       ),
 
     getChallenges: (config) =>

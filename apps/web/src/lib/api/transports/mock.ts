@@ -16,6 +16,7 @@ import {
   handleGetAdminTeams,
   handleGetAuditLog,
   handlePublishAdminAnnouncement,
+  handleSendAllBadgeEmails,
 } from './mocks/admin.mock';
 import {
   handleGetJuryEvaluation,
@@ -115,6 +116,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CTF}`]: () => handleGetAdminCtf(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
+    [`POST ${PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL}`]: () => handleSendAllBadgeEmails(),
   };
 
   /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */

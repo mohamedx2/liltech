@@ -194,6 +194,29 @@ export const bulkResendBadgeEmailsResponseSchema = z.strictObject({
 
 export type BulkResendBadgeEmailsResponse = z.infer<typeof bulkResendBadgeEmailsResponseSchema>;
 
+// ── Manual bulk badge email dispatch ─────────────────────────────────────────
+
+/**
+ * Request body for `POST /api/admin/badges/send-all`.
+ * Both fields are optional overrides; omit them to use the default template.
+ */
+export const sendBadgeEmailsRequestSchema = z.strictObject({
+  subject: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().min(1).max(5000).optional(),
+});
+
+export type SendBadgeEmailsRequest = z.infer<typeof sendBadgeEmailsRequestSchema>;
+
+/**
+ * The dispatch runs in the background, one email at a time: `queued` badges
+ * then move from `pending` to `sent` or `failed` (visible on Admin → Teams).
+ */
+export const sendBadgeEmailsResponseSchema = z.strictObject({
+  queued: z.number().int().nonnegative(),
+});
+
+export type SendBadgeEmailsResponse = z.infer<typeof sendBadgeEmailsResponseSchema>;
+
 // ── Mini-CTF override ────────────────────────────────────────────────────────
 
 export const grantCtfSolveRequestSchema = z.strictObject({
