@@ -63,6 +63,7 @@ export function getRoleNavItems(role: Role): readonly NavItem[] {
         { label: 'Control Panel', href: '/admin' },
         { label: 'QR Check-In', href: '/checkin' },
         { label: 'Teams', href: '/admin/teams' },
+        { label: 'Mini-CTF', href: '/admin/ctf' },
         { label: 'Challenges', href: '/admin/challenges' },
         { label: 'Jury', href: '/admin/jury' },
         { label: 'Results', href: '/admin/results' },
