@@ -1423,6 +1423,39 @@ export const swaggerSpec = {
         },
       },
     },
+    '/admin/results': {
+      get: {
+        tags: ['Admin Operations'],
+        summary: 'Ranked results: Mini-CTF, both challenges and final score (Admin only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object', description: 'adminResultsResponseSchema' }, 'Results'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+    },
+    '/admin/teams/{teamId}/scores': {
+      patch: {
+        tags: ['Admin Operations'],
+        summary: 'Set or clear a team score override (Admin only, audited)',
+        description:
+          'Body: `updateTeamScoresRequestSchema` — `ctfPoints` (0–10), `challenge1Score`, `challenge2Score` (0–100); `null` clears an override.',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('teamId')],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object' } } },
+        },
+        responses: {
+          200: json({ type: 'object', description: 'teamResultSchema' }, 'Updated team result'),
+          400: errorResponse('Invalid scores'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown team'),
+        },
+      },
+    },
     '/admin/teams/{teamId}': {
       get: {
         tags: ['Admin Operations'],

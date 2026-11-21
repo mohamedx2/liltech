@@ -562,7 +562,25 @@ Jury role only (`libs/api-contracts/src/lib/jury-contracts.ts`). An administrato
 | `GET /api/jury/evaluation?teamId=…` | One team: members, latest submission (links, version, commit), my scores, `scoringOpen`. A team outside the evaluation → `404`. |
 | `POST /api/jury/evaluation?teamId=…` | `{ criteriaScores: { technical_execution, innovation_originality, ui_ux_design, pitch_presentation }, notes? }` — integers 0–25 each (strict). Upsert of my evaluation → `{ success, teamId, totalScore, evaluatedAt, message }`. |
 
-Scores can be saved only in the `submissions_closed` and `pitching` phases (organizer decision); otherwise `403 SCORING_CLOSED`. Scores are stored per juror (`jury_evaluations`, unique per juror/team/challenge, range and total enforced by a CHECK constraint). How several jurors combine into a final score is still open (docs/decisions/OPEN_QUESTIONS.md #5), so `Team.c1JuryScore`/`c2JuryScore` stay empty. Each save is audited as `jury.evaluation_saved` (who, which team, when — not the scores).
+Scores can be saved only in the `submissions_closed` and `pitching` phases (organizer decision); otherwise `403 SCORING_CLOSED`. Scores are stored per juror (`jury_evaluations`, unique per juror/team/challenge, range and total enforced by a CHECK constraint). A team's challenge score is the average of its jurors' weighted totals (see *Results* below). Each save is audited as `jury.evaluation_saved` (who, which team, when — not the scores).
+
+### Results
+
+Admin role only (`libs/api-contracts/src/lib/results-contracts.ts`), shown at `/admin/results`.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/admin/results` | Every active team, ranked: Mini-CTF points, both challenge scores and the final total. |
+| `PATCH /api/admin/teams/:teamId/scores` | `{ ctfPoints?, challenge1Score?, challenge2Score? }` — set an override (two decimals at most; CTF 0–10, challenges 0–100) or `null` to clear it. Returns the team's result. Audited as `team.scores_updated`. |
+
+Final score out of 100 = Mini-CTF points (0–10) + 20% of the Challenge 1 score + 70% of the Challenge 2 score.
+
+- **Mini-CTF points:** the administrator override, else the automatic `ctfPoints` from the solve time, else 0. An override can score a team that did not finish the chain.
+- **Challenge score (0–100):** the administrator override, else the average of the jurors' weighted totals on that challenge, else 0.
+- **Juror weighted total (0–100):** each criterion is entered out of 25 and weighted Solution 35 (`ui_ux_design`) · Innovation 25 · Technique 25 · Pitching 15.
+- **Ranking:** by total; equal totals share a rank (1, 1, 3).
+
+Jurors keep scoring only their assigned challenge through the jury endpoints; only administrators can override scores. Overrides live on the team (`ctfPointsOverride`, `c1ScoreOverride`, `c2ScoreOverride`, range enforced by a CHECK constraint) and never change the jurors' own scores.
 
 ## Planned Endpoint Groups
 

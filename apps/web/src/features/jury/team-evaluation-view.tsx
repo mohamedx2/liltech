@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { juryWeightedTotal } from 'api-contracts';
 import { api, ApiClientError } from '@/lib/api';
 import {
   JURY_EVALUATION_CRITERIA,
@@ -21,11 +22,12 @@ interface TeamEvaluationViewProps {
 
 type CriteriaScoresState = Record<JuryCriterionKey, number>;
 
+/** A team starts at 0 until the juror scores it. */
 const DEFAULT_SCORES: CriteriaScoresState = {
-  technical_execution: 18,
-  innovation_originality: 18,
-  ui_ux_design: 18,
-  pitch_presentation: 18,
+  technical_execution: 0,
+  innovation_originality: 0,
+  ui_ux_design: 0,
+  pitch_presentation: 0,
 };
 
 export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
@@ -48,10 +50,10 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
 
       if (result.evaluation) {
         setScores({
-          technical_execution: result.evaluation.criteriaScores.technical_execution ?? 18,
-          innovation_originality: result.evaluation.criteriaScores.innovation_originality ?? 18,
-          ui_ux_design: result.evaluation.criteriaScores.ui_ux_design ?? 18,
-          pitch_presentation: result.evaluation.criteriaScores.pitch_presentation ?? 18,
+          technical_execution: result.evaluation.criteriaScores.technical_execution ?? 0,
+          innovation_originality: result.evaluation.criteriaScores.innovation_originality ?? 0,
+          ui_ux_design: result.evaluation.criteriaScores.ui_ux_design ?? 0,
+          pitch_presentation: result.evaluation.criteriaScores.pitch_presentation ?? 0,
         });
         setNotes(result.evaluation.notes ?? '');
       }
@@ -70,9 +72,8 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
     loadData();
   }, [loadData]);
 
-  const totalScore = useMemo(() => {
-    return Object.values(scores).reduce((sum, val) => sum + (Number(val) || 0), 0);
-  }, [scores]);
+  // Preview of the weighted total out of 100; the server computes the saved one.
+  const totalScore = useMemo(() => juryWeightedTotal(scores), [scores]);
 
   const ratingBand = useMemo((): { label: string; tone: BadgeTone } => {
     if (totalScore >= 90) return { label: 'Outstanding (90–100)', tone: 'success' };
@@ -275,7 +276,9 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
                     </h3>
                     <p className={styles.criterionDescription}>{criterion.description}</p>
                   </div>
-                  <Badge tone="neutral">Max {criterion.maxPoints} pts</Badge>
+                  <Badge tone="neutral">
+                    {criterion.weight}% · score out of {criterion.maxPoints}
+                  </Badge>
                 </div>
 
                 <div className={styles.scoreInputRow}>
@@ -362,7 +365,9 @@ export function TeamEvaluationView({ teamId }: TeamEvaluationViewProps) {
           <div className={styles.breakdownList}>
             {JURY_EVALUATION_CRITERIA.map((criterion) => (
               <div key={criterion.key} className={styles.breakdownRow}>
-                <span>{criterion.title.split('&')[0].trim()}</span>
+                <span>
+                  {criterion.title} ({criterion.weight}%)
+                </span>
                 <span className={styles.breakdownScore}>
                   {scores[criterion.key] ?? 0} / {criterion.maxPoints}
                 </span>
