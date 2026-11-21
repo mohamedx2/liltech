@@ -404,8 +404,8 @@ authenticated account, never from the request). Contract in
 `libs/api-contracts/src/lib/submissions-contracts.ts`.
 
 There is no file upload: Challenge 01 takes one Google Drive link (poster, logo,
-teaser video); Challenge 02 takes a GitHub repository plus a technical report
-link and a presentation link.
+teaser video); Challenge 02 takes a GitHub repository plus a presentation link,
+with an optional technical report link.
 
 #### `GET /api/submissions`
 
@@ -440,10 +440,13 @@ link and a presentation link.
 {
   "challengePosition": 2,
   "githubUrl": "https://github.com/owner/repo",
-  "reportUrl": "https://drive.google.com/…",
   "presentationUrl": "https://docs.google.com/presentation/…"
 }
 ```
+
+Challenge 01 is one Drive link holding the poster, logo and teaser video.
+Challenge 02 is the GitHub repository plus the presentation; an optional
+`reportUrl` (Drive/Docs) is still accepted for teams that write a report.
 
 Links are validated server-side: https only, no embedded credentials, Drive/Docs
 hosts for the Drive fields, and `https://github.com/<owner>/<repo>` for the

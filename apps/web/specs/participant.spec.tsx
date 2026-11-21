@@ -313,6 +313,76 @@ describe('Participant / Team Features', () => {
       });
       expect(getOverview).toHaveBeenCalled();
     });
+
+    it('submits only the GitHub repository and presentation for challenge 02', async () => {
+      const openChallengeTwo = {
+        ...challengeTwo,
+        status: 'live' as const,
+        startedAt: '2026-11-21T22:00:00.000Z',
+        publicAt: '2026-11-21T22:00:00.000Z',
+        submissionDeadline: '2026-11-22T08:00:00.000Z',
+      };
+
+      vi.spyOn(api.submissions, 'getOverview').mockResolvedValue({
+        phase: EventPhase.Live,
+        serverTime: '2026-11-21T22:10:00.000Z',
+        items: [
+          {
+            challenge: challengeOne,
+            access: 'public',
+            canSubmit: false,
+            blockedReason: 'SUBMISSIONS_CLOSED',
+            current: submission,
+            history: [submission],
+          },
+          {
+            challenge: openChallengeTwo,
+            access: 'public',
+            canSubmit: true,
+            blockedReason: null,
+            current: null,
+            history: [],
+          },
+        ],
+      });
+      const create = vi.spyOn(api.submissions, 'create').mockResolvedValue({
+        id: '00000000-0000-4000-8000-00000000bb01',
+        challengeId: openChallengeTwo.id,
+        challengePosition: 2,
+        driveUrl: null,
+        githubUrl: 'https://github.com/liltech/project',
+        reportUrl: null,
+        presentationUrl: 'https://docs.google.com/presentation/d/slides/edit',
+        commitSha: null,
+        submittedAt: '2026-11-21T22:15:00.000Z',
+        isCurrent: true,
+      });
+
+      render(<SubmissionsView />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Challenge submissions/i)).toBeTruthy();
+      });
+
+      expect(screen.queryByLabelText(/Technical report/i)).toBeNull();
+
+      fireEvent.change(screen.getByLabelText(/GitHub repository/i), {
+        target: { value: 'https://github.com/liltech/project' },
+      });
+      fireEvent.change(screen.getByLabelText(/Presentation/i), {
+        target: { value: 'https://docs.google.com/presentation/d/slides/edit' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /Submit deliverables/i }));
+
+      await waitFor(() => {
+        expect(create).toHaveBeenCalledWith({
+          challengePosition: 2,
+          githubUrl: 'https://github.com/liltech/project',
+          presentationUrl: 'https://docs.google.com/presentation/d/slides/edit',
+        });
+      });
+    });
   });
 
   describe('AnnouncementsView', () => {

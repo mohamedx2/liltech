@@ -15,7 +15,7 @@ import type { ApiRequestConfig, ApiTransport } from '../transport';
  * The server decides whether a team may submit (phase, Mini-CTF unlock,
  * deadline) and validates the links; the client only renders the overview and
  * posts links. Challenge 01 = one Google Drive link, Challenge 02 = a GitHub
- * repository plus a report and a presentation link.
+ * repository plus a presentation link.
  */
 export interface SubmissionsApi {
   getOverview: (config?: Pick<ApiRequestConfig, 'signal'>) => Promise<SubmissionsOverviewResponse>;

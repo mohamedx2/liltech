@@ -29,7 +29,7 @@ import { fetchGithubHeadCommit } from './github-commit';
  * - history is append-only and the newest row is the one that counts.
  *
  * There is no file upload: Challenge 01 is one Google Drive link, Challenge 02
- * is a GitHub repository plus a report link and a presentation link.
+ * is a GitHub repository plus a presentation link (a report link is optional).
  */
 
 /**
@@ -252,7 +252,7 @@ export async function createSubmission(
           submittedByUserId: userId,
           driveUrl: request.challengePosition === 1 ? request.driveUrl : null,
           githubUrl: request.challengePosition === 2 ? request.githubUrl : null,
-          reportUrl: request.challengePosition === 2 ? request.reportUrl : null,
+          reportUrl: request.challengePosition === 2 ? (request.reportUrl ?? null) : null,
           presentationUrl: request.challengePosition === 2 ? request.presentationUrl : null,
           commitSha,
         },

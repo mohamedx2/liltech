@@ -570,6 +570,29 @@ describeDb('participant challenges', () => {
       });
     });
 
+    it('accepts challenge 02 with only the repository and the presentation', async () => {
+      const { team, challenge: first } = await readyChallengeOne();
+      await asAdmin(request(app).post(`/api/admin/challenges/${first.id}/end`));
+      const second = await createChallenge(2);
+      await asAdmin(request(app).post(`/api/admin/challenges/${second.id}/start`));
+
+      setGithubCommitFetcher(async () => 'b'.repeat(40));
+
+      const response = await request(app).post('/api/submissions').set(auth(team.token)).send({
+        challengePosition: 2,
+        githubUrl: 'https://github.com/liltech/project',
+        presentationUrl: 'https://docs.google.com/presentation/d/slides/edit',
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        challengePosition: 2,
+        githubUrl: 'https://github.com/liltech/project',
+        reportUrl: null,
+        presentationUrl: 'https://docs.google.com/presentation/d/slides/edit',
+      });
+    });
+
     it('still accepts challenge 02 when the GitHub API fails', async () => {
       const { team, challenge: first } = await readyChallengeOne();
       await asAdmin(request(app).post(`/api/admin/challenges/${first.id}/end`));
