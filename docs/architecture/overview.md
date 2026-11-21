@@ -157,8 +157,8 @@ and submission availability (only `live`), and the Challenge 01 fallback
 submission modules all call it, so the rules cannot drift apart.
 
 `modules/submissions` stores **links**, not files: Challenge 01 is one Google
-Drive link, Challenge 02 is a GitHub repository plus a report link and a
-presentation link. Each submission inserts a `Submission` row; the newest row
+Drive link, Challenge 02 is a GitHub repository plus a presentation link (a
+report link stays optional). Each submission inserts a `Submission` row; the newest row
 counts, older rows stay as history. The GitHub HEAD is pinned best-effort and a
 failure never blocks a submission. The first submission also sets `Team.progressState = 'submitted'`, which is a
 deliverable state only: a team that opened Challenge 01 through the 60-minute

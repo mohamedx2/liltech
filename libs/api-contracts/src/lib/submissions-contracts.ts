@@ -7,9 +7,9 @@ import { eventPhaseSchema } from './event-state.js';
  * Contract for team submissions.
  *
  * Challenge 01 takes ONE Google Drive link (poster, logo, teaser video).
- * Challenge 02 takes a GitHub repository URL plus a technical report link and a
- * presentation link. Links only: there is no file-upload pipeline in this
- * platform, and deliverables are hosted outside it.
+ * Challenge 02 takes a GitHub repository URL plus a presentation link (an
+ * optional technical report link is still accepted). Links only: there is no
+ * file-upload pipeline in this platform, and deliverables are hosted outside it.
  *
  * Team endpoints:
  * - `GET  /api/submissions` — both challenges with access, deadlines and history
@@ -83,7 +83,8 @@ export const submissionChallenge01RequestSchema = z.strictObject({
 export const submissionChallenge02RequestSchema = z.strictObject({
   challengePosition: z.literal(2),
   githubUrl: githubRepoUrlSchema,
-  reportUrl: driveUrlSchema,
+  /** Optional: organizers ask for the repository and the presentation. */
+  reportUrl: driveUrlSchema.optional(),
   presentationUrl: driveUrlSchema,
 });
 

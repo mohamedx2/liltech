@@ -31,7 +31,7 @@ const BLOCKED_COPY: Record<SubmissionBlockedReason, string> = {
 };
 
 interface LinkField {
-  key: 'driveUrl' | 'githubUrl' | 'reportUrl' | 'presentationUrl';
+  key: 'driveUrl' | 'githubUrl' | 'presentationUrl';
   label: string;
   placeholder: string;
   hint: string;
@@ -55,12 +55,6 @@ function linkFields(position: number): LinkField[] {
       label: 'GitHub repository',
       placeholder: 'https://github.com/owner/repo',
       hint: 'The public repository the jury reviews.',
-    },
-    {
-      key: 'reportUrl',
-      label: 'Technical report',
-      placeholder: 'https://drive.google.com/…',
-      hint: 'A Drive or Docs link to the short technical report.',
     },
     {
       key: 'presentationUrl',
@@ -148,7 +142,6 @@ function SubmissionForm({
         : {
             challengePosition: 2 as const,
             githubUrl: values.githubUrl.trim(),
-            reportUrl: values.reportUrl.trim(),
             presentationUrl: values.presentationUrl.trim(),
           };
 
@@ -396,8 +389,8 @@ export function SubmissionsView() {
           <h1 className={styles.title}>Challenge submissions</h1>
           <p className={styles.description}>
             Challenge 01 takes one Google Drive link with your poster, logo and teaser video.
-            Challenge 02 takes your GitHub repository, technical report and presentation. You can
-            resubmit until the deadline: only the latest submission is judged.
+            Challenge 02 takes your GitHub repository and your presentation. You can resubmit until
+            the deadline: only the latest submission is judged.
           </p>
         </div>
       </header>
