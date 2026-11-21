@@ -1,4 +1,4 @@
-import { ChallengeTrack, Role } from 'api-contracts';
+import { ChallengeTrack, juryWeightedTotal, Role } from 'api-contracts';
 import type {
   JuryOverviewResponse,
   JuryTeamEvaluationResponse,
@@ -173,11 +173,7 @@ export function handleSubmitJuryEvaluation(
   }
 
   const scores = payload.criteriaScores;
-  const totalScore =
-    (scores.technical_execution ?? 0) +
-    (scores.innovation_originality ?? 0) +
-    (scores.ui_ux_design ?? 0) +
-    (scores.pitch_presentation ?? 0);
+  const totalScore = juryWeightedTotal(scores);
 
   const evaluatedAt = new Date().toISOString();
 

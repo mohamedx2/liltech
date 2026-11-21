@@ -224,13 +224,14 @@ describe('Jury Portal Features', () => {
       expect(screen.getByText(/Version 2/)).toBeTruthy();
 
       // Verify all 4 criteria are displayed
-      expect(screen.getByText('Technical Execution & Architecture')).toBeTruthy();
-      expect(screen.getByText('Innovation & Problem Solving')).toBeTruthy();
-      expect(screen.getByText('UI/UX & Usability')).toBeTruthy();
-      expect(screen.getByText('Pitch, Defense & Q&A')).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Solution' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Innovation' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Technique' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Pitching' })).toBeTruthy();
+      expect(screen.getByText('35% · score out of 25')).toBeTruthy();
 
-      // Default score total: 18 * 4 = 72
-      expect(screen.getByText('72')).toBeTruthy();
+      // A team starts at 0 until the juror scores it.
+      expect(screen.getByLabelText('Score points for Solution')).toHaveProperty('value', '0');
       expect(screen.getByText('/ 100')).toBeTruthy();
     });
 
@@ -259,13 +260,11 @@ describe('Jury Portal Features', () => {
         expect(screen.getByText('Sample Builders')).toBeTruthy();
       });
 
-      // Click preset 25 pts for Technical Execution
-      const presetButtons = screen.getAllByRole('button', { name: /set score to 25/i });
-      fireEvent.click(presetButtons[0]);
+      // 25/25 on Solution (35%) with the other criteria at 0 → 35
+      fireEvent.click(screen.getByRole('button', { name: 'Set score to 25 for Solution' }));
 
-      // Score should now be 25 + 18 + 18 + 18 = 79
       await waitFor(() => {
-        expect(screen.getByText('79')).toBeTruthy();
+        expect(screen.getByText('35')).toBeTruthy();
       });
     });
 

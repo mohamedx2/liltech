@@ -5,6 +5,7 @@ import { createEventsMockRoutes } from './mocks/events.mock';
 import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
 import { handleGetAdminCtf } from './mocks/admin-ctf.mock';
+import { handleGetAdminResults, handleUpdateTeamScores } from './mocks/results.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
@@ -39,6 +40,7 @@ import { PLANNED_ENDPOINTS } from '../endpoints';
 import type {
   CreateSubmissionRequest,
   CtfSubmitRequest as CtfSubmitAnswerRequest,
+  UpdateTeamScoresRequest,
 } from 'api-contracts';
 import type { MiniCtfSubmitRequest, SubmitEvaluationRequest } from '../contracts/pending';
 
@@ -116,6 +118,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CTF}`]: () => handleGetAdminCtf(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_RESULTS}`]: () => handleGetAdminResults(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
     [`POST ${PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL}`]: () => handleSendAllBadgeEmails(),
   };
@@ -159,6 +162,15 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
       method: 'GET',
       pattern: /^\/admin\/teams\/([^/]+)$/,
       handle: (match) => handleGetAdminTeam(decodeURIComponent(match[1])),
+    },
+    {
+      method: 'PATCH',
+      pattern: /^\/admin\/teams\/([^/]+)\/scores$/,
+      handle: (match, config) =>
+        handleUpdateTeamScores(
+          decodeURIComponent(match[1]),
+          (config.body ?? {}) as UpdateTeamScoresRequest,
+        ),
     },
     {
       method: 'PUT',

@@ -5,6 +5,7 @@ import {
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
   adminOverviewResponseSchema,
+  adminResultsResponseSchema,
   adminTeamListResponseSchema,
   adminTeamSchema,
   announcementSchema,
@@ -12,6 +13,7 @@ import {
   bulkResendBadgeEmailsResponseSchema,
   challengeAdminDetailSchema,
   reissueBadgeResponseSchema,
+  teamResultSchema,
   resendBadgeEmailResponseSchema,
   resetTeamPasswordResponseSchema,
   sendBadgeEmailsResponseSchema,
@@ -21,6 +23,7 @@ import {
   type AdminJuryAccountDetail,
   type AdminJuryListResponse,
   type AdminOverviewResponse,
+  type AdminResultsResponse,
   type AdminTeam,
   type AdminTeamListResponse,
   type Announcement,
@@ -36,8 +39,10 @@ import {
   type SendBadgeEmailsRequest,
   type SendBadgeEmailsResponse,
   type SetTeamStatusRequest,
+  type TeamResult,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
+  type UpdateTeamScoresRequest,
   type UpdateParticipantRequest,
 } from 'api-contracts';
 import { PLANNED_ENDPOINTS } from '../endpoints';
@@ -88,6 +93,10 @@ export interface AdminApi {
   deleteTeam: (teamId: string) => Promise<void>;
   grantCtfSolve: (teamId: string, challengeId: string) => Promise<AdminTeam>;
   revokeCtfSolve: (teamId: string, challengeId: string) => Promise<AdminTeam>;
+
+  // Results
+  getResults: (config?: Signal) => Promise<AdminResultsResponse>;
+  updateTeamScores: (teamId: string, body: UpdateTeamScoresRequest) => Promise<TeamResult>;
 
   // Participants
   addParticipant: (teamId: string, body: AddParticipantRequest) => Promise<AdminTeam>;
@@ -214,6 +223,11 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
       send('POST', `${teamPath(teamId)}/ctf-solves`, adminTeamSchema, 'Team', { challengeId }),
     revokeCtfSolve: (teamId, challengeId) =>
       send('DELETE', `${teamPath(teamId)}/ctf-solves/${enc(challengeId)}`, adminTeamSchema, 'Team'),
+
+    getResults: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_RESULTS, adminResultsResponseSchema, 'Results', config),
+    updateTeamScores: (teamId, body) =>
+      send('PATCH', `${teamPath(teamId)}/scores`, teamResultSchema, 'Team scores', body),
 
     addParticipant: (teamId, body) =>
       send('POST', `${teamPath(teamId)}/participants`, adminTeamSchema, 'Team', body),

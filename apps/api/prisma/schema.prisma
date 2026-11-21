@@ -91,35 +91,37 @@ model Session {
 
 /// Team registered by its leader. 4–7 members (leader included).
 model Team {
-  id              String              @id @default(uuid()) @db.Uuid
-  name            String              @unique @db.VarChar(60)
-  leader          User                @relation(fields: [leaderId], references: [id])
-  leaderId        String              @unique @db.Uuid
-  progressState   TeamProgress        @default(registered)
+  id                String              @id @default(uuid()) @db.Uuid
+  name              String              @unique @db.VarChar(60)
+  leader            User                @relation(fields: [leaderId], references: [id])
+  leaderId          String              @unique @db.Uuid
+  progressState     TeamProgress        @default(registered)
   /// Administrative standing; a team that is not `active` cannot be checked
   /// in and cannot read challenges.
-  status          TeamStatus          @default(active)
+  status            TeamStatus          @default(active)
   /// Why the team was withdrawn or disqualified (shown to administrators).
-  statusReason    String?             @db.VarChar(300)
-  statusChangedAt DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  statusReason      String?             @db.VarChar(300)
+  statusChangedAt   DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   /// When the team cleared the Mini-CTF chain (server time). Null until then.
-  ctfSolvedAt     DateTime?
+  ctfSolvedAt       DateTime?
   /// Automatic Mini-CTF score (10/7/4.5/2.5/0 by solve window). Null until solved.
-  ctfPoints       Float?
-  /// Challenge 01 jury score. Filled by the jury module (later task); no logic here.
-  c1JuryScore     Float?
-  /// Challenge 02 jury score. Filled by the jury module (later task); no logic here.
-  c2JuryScore     Float?
-  participants    Participant[]
+  ctfPoints         Float?
+  /// Administrator override of the Mini-CTF points (0–10). Null: use `ctfPoints`.
+  ctfPointsOverride Float?
+  /// Administrator override of the Challenge 01 score (0–100). Null: jury average.
+  c1ScoreOverride   Float?
+  /// Administrator override of the Challenge 02 score (0–100). Null: jury average.
+  c2ScoreOverride   Float?
+  participants      Participant[]
   /// LOUAGE 404 chain: per-stage state and the timestamped attempt log.
-  ctfProgress     CtfProgress[]
-  ctfAttempts     CtfAttempt[]
+  ctfProgress       CtfProgress[]
+  ctfAttempts       CtfAttempt[]
   /// Per-challenge Mini-CTF solves (early access to a running challenge).
-  ctfSolves       ChallengeCtfSolve[]
-  submissions     Submission[]
-  juryEvaluations JuryEvaluation[]
+  ctfSolves         ChallengeCtfSolve[]
+  submissions       Submission[]
+  juryEvaluations   JuryEvaluation[]
 
   @@index([progressState])
   @@index([status])

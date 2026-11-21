@@ -241,21 +241,22 @@ describeDb('jury evaluation', () => {
     await setPhase('submissions_closed');
     const saved = await score(jury.token, teamId);
     expect(saved.status).toBe(200);
-    expect(saved.body).toMatchObject({ success: true, totalScore: 80 });
+    // Weighted: 15/25×35 + 25/25×25 + 20/25×25 + 20/25×15 = 21 + 25 + 20 + 12.
+    expect(saved.body).toMatchObject({ success: true, totalScore: 78 });
 
     await setPhase('pitching');
     const updated = await score(jury.token, teamId, {
       criteriaScores: { ...SCORES, pitch_presentation: 25 },
       notes: '  Strong demo.  ',
     });
-    expect(updated.body.totalScore).toBe(85);
+    expect(updated.body.totalScore).toBe(81);
     expect(await prisma.juryEvaluation.count()).toBe(1);
 
     const detail = juryTeamEvaluationResponseSchema.parse(
       (await request(app).get(`/api/jury/evaluation?teamId=${teamId}`).set(auth(jury.token))).body,
     );
-    expect(detail.evaluation).toMatchObject({ totalScore: 85, notes: 'Strong demo.' });
-    expect(detail.team).toMatchObject({ evaluationStatus: 'graded', myScore: 85 });
+    expect(detail.evaluation).toMatchObject({ totalScore: 81, notes: 'Strong demo.' });
+    expect(detail.team).toMatchObject({ evaluationStatus: 'graded', myScore: 81 });
 
     await setPhase('results');
     const late = await score(jury.token, teamId);

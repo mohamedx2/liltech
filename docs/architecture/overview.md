@@ -163,8 +163,11 @@ counts, older rows stay as history. The GitHub HEAD is pinned best-effort and a
 failure never blocks a submission. The first submission also sets `Team.progressState = 'submitted'`, which is a
 deliverable state only: a team that opened Challenge 01 through the 60-minute
 fallback reaches it without solving a single flag, so Mini-CTF completion is
-always read from `Team.ctfSolvedAt` (never from the progress ladder). Jury scores
-(`Team.c1JuryScore`, `Team.c2JuryScore`) exist as nullable columns for the next
-task; no scoring logic lives here yet.
+always read from `Team.ctfSolvedAt` (never from the progress ladder). Jurors'
+scores live in `jury_evaluations`; administrator overrides of the final scores
+live on the team (`Team.ctfPointsOverride`, `Team.c1ScoreOverride`,
+`Team.c2ScoreOverride`, NULL = computed). The results service
+(`apps/api/src/modules/results`) combines them: Mini-CTF 10 pts + Challenge 1 20%
++ Challenge 2 70% (see `docs/api/README.md` → Results).
 
 See `docs/ctf/README.md` for provisioning, stage content and playtesting.

@@ -19,3 +19,4 @@ export * from './lib/admin-operations-contracts.js';
 export * from './lib/admin-ctf-contracts.js';
 export * from './lib/ctf-contracts.js';
 export * from './lib/submissions-contracts.js';
+export * from './lib/results-contracts.js';

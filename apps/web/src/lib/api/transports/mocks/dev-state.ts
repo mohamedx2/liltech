@@ -372,7 +372,7 @@ function createPortalState() {
           },
           notes:
             'Very impressive neural network approach to traffic rerouting. Presentation was clear and defended architectural trade-offs well.',
-          totalScore: 88,
+          totalScore: 87.6,
           evaluatedAt: '2026-11-22T09:30:00.000Z',
         },
       ],

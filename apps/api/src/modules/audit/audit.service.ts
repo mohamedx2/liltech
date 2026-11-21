@@ -44,6 +44,7 @@ export const AuditAction = {
   CtfLaunched: 'ctf.launched',
   ChallengeForceOpened: 'challenge.force_opened',
   SubmissionCreated: 'submission.created',
+  TeamScoresUpdated: 'team.scores_updated',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

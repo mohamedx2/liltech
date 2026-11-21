@@ -10,7 +10,9 @@ import {
   teamCtfSolveParamsSchema,
   teamIdParamsSchema,
   updateParticipantRequestSchema,
+  updateTeamScoresRequestSchema,
   type AdminCtfOverviewResponse,
+  type AdminResultsResponse,
   type AdminTeamListResponse,
   type AuditLogEntry,
 } from 'api-contracts';
@@ -33,6 +35,7 @@ import {
 } from '../badges/badges.service';
 import { getAdminOverview } from './admin.service';
 import { getAdminCtfOverview } from './ctf-overview.service';
+import { getAdminResults, updateTeamScores } from '../results/results.service';
 import {
   addParticipant,
   deleteTeam,
@@ -70,6 +73,8 @@ import {
  * - `POST /api/admin/jury`, `PATCH|DELETE /api/admin/jury/:id` — jury management (audited).
  * - `POST /api/admin/participants/:participantId/resend-badge-email` — no hourly limit (audited).
  * - `PUT /api/admin/participants/:participantId/payment` — mark the fee paid/unpaid (audited).
+ * - `GET /api/admin/results` — every active team's Mini-CTF, challenge and final scores.
+ * - `PATCH /api/admin/teams/:teamId/scores` — set or clear score overrides (audited).
  *
  * Every route here is admin-only.
  */
@@ -115,6 +120,11 @@ adminRouter.get('/admin/ctf', ...adminOnly, async (_req, res) => {
   res.status(200).json(body);
 });
 
+adminRouter.get('/admin/results', ...adminOnly, async (_req, res) => {
+  const body: AdminResultsResponse = await getAdminResults();
+  res.status(200).json(body);
+});
+
 // ── Teams ────────────────────────────────────────────────────────────────────
 
 adminRouter.get('/admin/teams', ...adminOnly, async (_req, res) => {
@@ -154,6 +164,12 @@ adminRouter.post('/admin/teams/:teamId/participants', ...adminOnly, async (req, 
   const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
   const input = parseOrThrow(addParticipantRequestSchema, req.body);
   res.status(201).json(await addParticipant(teamId, input, authenticatedUserId(req)));
+});
+
+adminRouter.patch('/admin/teams/:teamId/scores', ...adminOnly, async (req, res) => {
+  const { teamId } = parseOrThrow(teamIdParamsSchema, req.params);
+  const input = parseOrThrow(updateTeamScoresRequestSchema, req.body);
+  res.status(200).json(await updateTeamScores(teamId, input, authenticatedUserId(req)));
 });
 
 adminRouter.post('/admin/teams/:teamId/ctf-solves', ...adminOnly, async (req, res) => {

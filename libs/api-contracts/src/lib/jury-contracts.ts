@@ -11,39 +11,56 @@ import { challengeTrackSchema, eventPhaseSchema, teamProgressStateSchema } from 
  * - `GET  /api/jury/evaluation?teamId=…`   — one team, its submission and my scores
  * - `POST /api/jury/evaluation?teamId=…`   — save my scores (scoring window only)
  *
- * Scores are stored per juror. How several jurors combine into a final score
- * is still open (docs/decisions/OPEN_QUESTIONS.md #5), so no aggregate is sent.
+ * Scores are stored per juror. Each criterion is entered out of 25 and
+ * weighted (Solution 35 · Innovation 25 · Technique 25 · Pitching 15), so every
+ * total sent here is a weighted score out of 100. A team's challenge score is
+ * the average of its jurors' totals (see `results-contracts`).
  */
 
 export const JURY_CRITERION_MAX_POINTS = 25;
 
 export const JURY_EVALUATION_CRITERIA = [
   {
-    key: 'technical_execution',
-    title: 'Technical Execution & Architecture',
+    key: 'ui_ux_design',
+    title: 'Solution',
+    weight: 35,
     maxPoints: JURY_CRITERION_MAX_POINTS,
-    description: 'Code quality, solution stability, architecture soundness, and working prototype.',
+    description: 'Does the result answer the challenge brief, completely and well?',
   },
   {
     key: 'innovation_originality',
-    title: 'Innovation & Problem Solving',
+    title: 'Innovation',
+    weight: 25,
     maxPoints: JURY_CRITERION_MAX_POINTS,
-    description:
-      'Creativity, uniqueness of the approach, and cleverness in tackling the challenge.',
+    description: 'Is the idea original, and the approach clever and relevant?',
   },
   {
-    key: 'ui_ux_design',
-    title: 'UI/UX & Usability',
+    key: 'technical_execution',
+    title: 'Technique',
+    weight: 25,
     maxPoints: JURY_CRITERION_MAX_POINTS,
-    description: 'Interface polish, ease of use, responsiveness, and clear presentation.',
+    description: 'Is it well made? Execution quality, stability, a working result.',
   },
   {
     key: 'pitch_presentation',
-    title: 'Pitch, Defense & Q&A',
+    title: 'Pitching',
+    weight: 15,
     maxPoints: JURY_CRITERION_MAX_POINTS,
-    description: 'Clarity of the pitch, ability to answer technical questions, and team cohesion.',
+    description: 'Clear pitch, good answers to the questions, team cohesion.',
   },
 ] as const;
+
+/**
+ * Weighted total out of 100: each criterion counts `score / maxPoints × weight`.
+ * Rounded to two decimals.
+ */
+export function juryWeightedTotal(scores: Readonly<Record<JuryCriterionKey, number>>): number {
+  const total = JURY_EVALUATION_CRITERIA.reduce(
+    (sum, criterion) => sum + (scores[criterion.key] * criterion.weight) / criterion.maxPoints,
+    0,
+  );
+  return Math.round(total * 100) / 100;
+}
 
 export type JuryCriterionKey = (typeof JURY_EVALUATION_CRITERIA)[number]['key'];
 
@@ -91,8 +108,8 @@ export const juryTeamItemSchema = z.strictObject({
   submissionRepoUrl: z.string().nullable(),
   submissionFileName: z.string().nullable(),
   evaluationStatus: z.enum(['graded', 'pending']),
-  /** My total for this team; `null` until I score it. */
-  myScore: z.number().int().nullable(),
+  /** My weighted total for this team (0–100); `null` until I score it. */
+  myScore: z.number().nullable(),
   evaluatedAt: isoTimestampSchema.nullable(),
 });
 
@@ -136,7 +153,8 @@ export type JurySubmission = z.infer<typeof jurySubmissionSchema>;
 export const juryEvaluationSchema = z.strictObject({
   criteriaScores: juryCriteriaScoresSchema,
   notes: z.string(),
-  totalScore: z.number().int(),
+  /** Weighted total out of 100. */
+  totalScore: z.number(),
   evaluatedAt: isoTimestampSchema,
 });
 
@@ -161,7 +179,8 @@ export type JuryTeamEvaluationResponse = z.infer<typeof juryTeamEvaluationRespon
 export const submitEvaluationResponseSchema = z.strictObject({
   success: z.literal(true),
   teamId: idSchema,
-  totalScore: z.number().int(),
+  /** Weighted total out of 100. */
+  totalScore: z.number(),
   evaluatedAt: isoTimestampSchema,
   message: z.string(),
 });

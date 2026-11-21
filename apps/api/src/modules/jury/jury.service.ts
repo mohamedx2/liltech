@@ -14,6 +14,7 @@ import { getPrismaClient } from '../../config/database';
 import { ApiError } from '../../utils/api-error';
 import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import { getEventState } from '../event-state/event-state.service';
+import { jurorWeightedTotal } from '../results/scoring';
 
 /**
  * Jury evaluation (jury role only). Rules enforced here, never in the UI:
@@ -100,7 +101,6 @@ async function loadTeams(assigned: AssignedJury, teamId?: string) {
           innovationOriginality: true,
           uiUxDesign: true,
           pitchPresentation: true,
-          totalScore: true,
           notes: true,
           updatedAt: true,
         },
@@ -127,7 +127,7 @@ function toTeamItem(team: TeamRow, assigned: AssignedJury): JuryTeamItem {
     submissionRepoUrl: latest ? (latest.githubUrl ?? latest.driveUrl) : null,
     submissionFileName: null,
     evaluationStatus: evaluation ? 'graded' : 'pending',
-    myScore: evaluation?.totalScore ?? null,
+    myScore: evaluation ? jurorWeightedTotal(evaluation) : null,
     evaluatedAt: evaluation?.updatedAt.toISOString() ?? null,
   };
 }
@@ -161,7 +161,7 @@ function toEvaluation(team: TeamRow): JuryEvaluationView | null {
       pitch_presentation: evaluation.pitchPresentation,
     },
     notes: evaluation.notes,
-    totalScore: evaluation.totalScore,
+    totalScore: jurorWeightedTotal(evaluation),
     evaluatedAt: evaluation.updatedAt.toISOString(),
   };
 }
@@ -169,7 +169,7 @@ function toEvaluation(team: TeamRow): JuryEvaluationView | null {
 export async function getJuryOverview(userId: string): Promise<JuryOverviewResponse> {
   const assigned = await loadAssignedJury(userId);
   const [{ phase }, teams] = await Promise.all([getEventState(), loadTeams(assigned)]);
-  const myTotals = teams.flatMap((team) => team.juryEvaluations.map((item) => item.totalScore));
+  const myTotals = teams.flatMap((team) => team.juryEvaluations.map(jurorWeightedTotal));
 
   return {
     track: trackFor(assigned.challenge.position),
@@ -251,7 +251,9 @@ export async function submitJuryEvaluation(
     uiUxDesign: request.criteriaScores.ui_ux_design,
     pitchPresentation: request.criteriaScores.pitch_presentation,
   };
+  // Stored as the raw sum (database CHECK); reported as the weighted total.
   const totalScore = Object.values(scores).reduce((sum, value) => sum + value, 0);
+  const weightedTotal = jurorWeightedTotal(scores);
   const notes = request.notes?.trim() ?? '';
 
   const saved = await prisma.$transaction(async (tx) => {
@@ -293,8 +295,8 @@ export async function submitJuryEvaluation(
   return {
     success: true,
     teamId,
-    totalScore,
+    totalScore: weightedTotal,
     evaluatedAt: saved.updatedAt.toISOString(),
-    message: `Evaluation saved: ${totalScore} / 100.`,
+    message: `Evaluation saved: ${weightedTotal} / 100.`,
   };
 }
