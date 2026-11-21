@@ -180,7 +180,7 @@ Team role only. The team is always the authenticated account's own team (`Team.l
 
 #### `GET /api/participants/team`
 
-The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). Schema: `teamPortalSummarySchema`.
+The team, its progress, and its members (`fullName`, `email`, `roleInTeam`, badge `color`, `isCheckedIn`). `ctfSolved` is the authoritative Mini-CTF answer (`Team.ctfSolvedAt` is set): `progress: "submitted"` does **not** imply it, because a team reaches `submitted` by delivering Challenge 01 through the 60-minute fallback too. Schema: `teamPortalSummarySchema`.
 
 #### `GET /api/participants/badge`
 
@@ -395,6 +395,23 @@ report Challenge 01 as `access: "early"`. Teams that did not solve it get it at
 `ctfStartedAt + 60 min` (evaluated lazily on every request), or when an
 administrator force-opens it. See the challenge section above.
 
+#### `GET /api/admin/ctf` (admin)
+
+Read-only Mini-CTF board (`adminCtfOverviewResponseSchema` in
+`libs/api-contracts/src/lib/admin-ctf-contracts.ts`), shown at `/admin/ctf`:
+
+- `phase`, `timing` (same clock as `GET /api/ctf/chain`) and `windowMinutes`;
+- `stages[]` in chain order: `status`, `answerConfigured` (a boolean — the answer
+  and its digest are never sent), `hasDriveUrl`, `hintCount`, `solvedTeams`,
+  `attempts`;
+- `teams[]`, finished teams first: `checkedIn`, `currentStagePosition`,
+  `solvedStages`, `attempts`, `hintsUsed`, `lastActivityAt`, `chainSolvedAt`,
+  `points`;
+- `totals`, including `blockingStages`: required stages that are draft or have no
+  answer, which stop every team at that stage.
+
+`401` without a session, `403` for non-admin roles.
+
 ---
 
 ### Team submissions
@@ -452,7 +469,10 @@ Links are validated server-side: https only, no embedded credentials, Drive/Docs
 hosts for the Drive fields, and `https://github.com/<owner>/<repo>` for the
 repository. Anything else is `400 VALIDATION_ERROR`. Resubmission is allowed
 until the deadline; every submission inserts an append-only row and the newest
-one counts. For Challenge 02 the server also pins the GitHub default-branch HEAD
+one counts. The first accepted submission moves the team to `submitted`, a
+deliverable state only: it never means the Mini-CTF was solved (`Team.ctfSolvedAt`,
+exposed as `ctfSolved` on `GET /api/participants/team` and on the challenge views).
+For Challenge 02 the server also pins the GitHub default-branch HEAD
 (`commitSha`) on a best-effort basis: if the GitHub API fails, times out or rate
 limits, the submission is still accepted with `commitSha: null`.
 
@@ -500,6 +520,8 @@ Roster (newest first) / one team: standing (`status`, `statusReason`, `statusCha
 | `DELETE /api/admin/participants/:participantId/check-in` | — | Undo; a team with no check-in left goes back from `checked_in` to `registered`. Audit `checkin.undone`. |
 | `POST /api/admin/participants/:participantId/reissue-badge` | — | New QR token (old one stops working, revocation lifted), emailed in the background → `{ participantId, issuedAt, emailQueued }`. Audit `badge.reissued`. |
 | `POST /api/admin/badges/resend-failed` | — | Requeues every failed (or stuck > 10 min pending) badge email of a non-revoked badge → `{ queued }`. Audit `badge.email_bulk_resent`. |
+| `POST /api/admin/badges/send-all` | `{ subject?, body? }` | Emails every non-revoked badge with an email (registration no longer emails badges). Optional subject/body replace the default template (`DEFAULT_BADGE_EMAIL_SUBJECT` / `DEFAULT_BADGE_EMAIL_BODY` in `libs/api-contracts`, prefilled in Admin → Emails); `[participant name]`, `[team name]` and `[color]` are replaced per recipient, lines starting with `•`, `*` or `-` become a bullet list, `[label](https://…)` becomes a named link (spelled out as `label: url` in the plain-text part). The branded HTML layout and the inline QR card are always included. Runs in the background, one email at a time → `{ queued }`; `409` while a dispatch is running. Audit `badge.email_bulk_resent`. |
+| `PUT /api/admin/participants/:participantId/payment` | `{ paid: boolean }` (strict) | Marks one participant's participation fee paid (`paidAt`, `paidByName` on `adminParticipantSchema`) or unpaid → `AdminTeam`. Idempotent: the current state again writes nothing. Audit `participant.payment_marked` / `participant.payment_cleared`. |
 
 Check-in no longer moves a team back to `checked_in` from a later progress state when a late member is scanned (scan and manual check-in both only advance from `registered`).
 
@@ -517,17 +539,30 @@ Admin only; every route is pinned to `role: 'jury'`, so a team or admin account 
 
 #### `PATCH /api/admin/jury/:id`
 
-Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`.
+Any of `{ name, email, password }` (at least one). A new password ends every existing session of that juror. Schema: `updateJuryAccountRequestSchema`. `challengeId` (UUID, or `null` to unassign) sets the challenge the juror scores; an unknown challenge → `400`. The same field is accepted by `POST /api/admin/jury`, and every account returns `challengeId` and `challengeTitle`. Deleting a juror who already scored teams is refused (`409`) so scores are never lost silently.
 
 #### `DELETE /api/admin/jury/:id`
 
 `204`. Deletes the account; its sessions go with it.
 
-At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one, and both are queued as `pending` and emailed in the same run (participants with an email), together with any email left `pending` by a restart. Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
+At every API start, badges issued before encrypted storage existed are reissued (the old code stops working; the new one shows on the team portal), participants without a badge get one. A reissued badge whose old code had been emailed is queued as `pending` and emailed in the same run, together with any email left `pending` by a restart; a new or never-emailed badge waits for the admin dispatch (`POST /api/admin/badges/send-all`). Badge emails can also be sent one by one, or retried in bulk, from the admin Teams pages (`GET /api/admin/teams` returns each participant's `email` and `badge.emailStatus`). Team password resets are documented under "Admin operations toolkit".
 
 #### `POST /api/admin/participants/:participantId/resend-badge-email`
 
 Resends a participant's badge email without the hourly limit (audited as `badge.email_resent`).
+
+### Jury evaluation
+
+Jury role only (`libs/api-contracts/src/lib/jury-contracts.ts`). An administrator assigns each jury account one challenge (challenge 01 = `track_a`, challenge 02 = `track_b`); without an assignment every route answers `403 JURY_NOT_ASSIGNED`. A juror scores every **active team with at least one checked-in member** on their challenge, and only ever reads or writes their **own** scores.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/jury/overview` | Assigned challenge, phase, team counts, my average, `scoringOpen`. |
+| `GET /api/jury/teams` | Teams to score: latest submission link for my challenge, my status and total. |
+| `GET /api/jury/evaluation?teamId=…` | One team: members, latest submission (links, version, commit), my scores, `scoringOpen`. A team outside the evaluation → `404`. |
+| `POST /api/jury/evaluation?teamId=…` | `{ criteriaScores: { technical_execution, innovation_originality, ui_ux_design, pitch_presentation }, notes? }` — integers 0–25 each (strict). Upsert of my evaluation → `{ success, teamId, totalScore, evaluatedAt, message }`. |
+
+Scores can be saved only in the `submissions_closed` and `pitching` phases (organizer decision); otherwise `403 SCORING_CLOSED`. Scores are stored per juror (`jury_evaluations`, unique per juror/team/challenge, range and total enforced by a CHECK constraint). How several jurors combine into a final score is still open (docs/decisions/OPEN_QUESTIONS.md #5), so `Team.c1JuryScore`/`c2JuryScore` stay empty. Each save is audited as `jury.evaluation_saved` (who, which team, when — not the scores).
 
 ## Planned Endpoint Groups
 

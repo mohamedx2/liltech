@@ -4,6 +4,7 @@ import { createAuthMockRoutes } from './mocks/auth.mock';
 import { createEventsMockRoutes } from './mocks/events.mock';
 import { createHealthMockRoutes } from './mocks/health.mock';
 import { createRegistrationsMockRoutes } from './mocks/registrations.mock';
+import { handleGetAdminCtf } from './mocks/admin-ctf.mock';
 import { handleGetAnnouncements } from './mocks/announcements.mock';
 import { handleGetCurrentChallenge } from './mocks/challenges.mock';
 import { handleGetBadges, handleRevokeBadge, handleScanCheckIn } from './mocks/checkin.mock';
@@ -12,9 +13,11 @@ import {
   handleGetAdminJury,
   handleGetAdminOverview,
   handleGetAdminTeam,
+  handleSetParticipantPayment,
   handleGetAdminTeams,
   handleGetAuditLog,
   handlePublishAdminAnnouncement,
+  handleSendAllBadgeEmails,
 } from './mocks/admin.mock';
 import {
   handleGetJuryEvaluation,
@@ -112,7 +115,9 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
     [`GET ${PLANNED_ENDPOINTS.ADMIN_TEAMS}`]: () => handleGetAdminTeams(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_JURY}`]: () => handleGetAdminJury(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_OVERVIEW}`]: () => handleGetAdminOverview(),
+    [`GET ${PLANNED_ENDPOINTS.ADMIN_CTF}`]: () => handleGetAdminCtf(),
     [`GET ${PLANNED_ENDPOINTS.ADMIN_CHALLENGES}`]: () => handleGetAdminChallenges(),
+    [`POST ${PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL}`]: () => handleSendAllBadgeEmails(),
   };
 
   /** `/ctf/stages/<slug>` and its `hints` / `submit` sub-paths. */
@@ -148,12 +153,21 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
   const patternRoutes: ReadonlyArray<{
     method: string;
     pattern: RegExp;
-    handle: (match: RegExpMatchArray) => unknown;
+    handle: (match: RegExpMatchArray, config: ApiRequestConfig) => unknown;
   }> = [
     {
       method: 'GET',
       pattern: /^\/admin\/teams\/([^/]+)$/,
       handle: (match) => handleGetAdminTeam(decodeURIComponent(match[1])),
+    },
+    {
+      method: 'PUT',
+      pattern: /^\/admin\/participants\/([^/]+)\/payment$/,
+      handle: (match, config) =>
+        handleSetParticipantPayment(
+          decodeURIComponent(match[1]),
+          Boolean((config.body as { paid?: unknown } | undefined)?.paid),
+        ),
     },
   ];
 
@@ -197,7 +211,7 @@ export function createMockTransport(options: MockTransportOptions = {}): ApiTran
         for (const route of patternRoutes) {
           const match = route.method === method ? cleanPath.match(route.pattern) : null;
           if (match) {
-            return route.handle(match) as TResponse;
+            return route.handle(match, effectiveConfig) as TResponse;
           }
         }
         throw new ApiClientError({

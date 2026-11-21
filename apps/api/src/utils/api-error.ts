@@ -24,6 +24,8 @@ export const ApiErrorCode = {
   CTF_CLOSED: 'CTF_CLOSED',
   CHALLENGE_LOCKED: 'CHALLENGE_LOCKED',
   SUBMISSIONS_CLOSED: 'SUBMISSIONS_CLOSED',
+  SCORING_CLOSED: 'SCORING_CLOSED',
+  JURY_NOT_ASSIGNED: 'JURY_NOT_ASSIGNED',
 } as const;
 
 export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
@@ -94,6 +96,18 @@ export class ApiError extends Error {
 
   static submissionsClosed(message = 'Submissions are closed.'): ApiError {
     return new ApiError(ApiErrorCode.SUBMISSIONS_CLOSED, message, 403);
+  }
+
+  static scoringClosed(
+    message = 'Scoring opens when submissions close and stays open through the pitches.',
+  ): ApiError {
+    return new ApiError(ApiErrorCode.SCORING_CLOSED, message, 403);
+  }
+
+  static juryNotAssigned(
+    message = 'No challenge is assigned to your jury account yet. Ask the organizers.',
+  ): ApiError {
+    return new ApiError(ApiErrorCode.JURY_NOT_ASSIGNED, message, 403);
   }
 
   static challengeLocked(message = 'This challenge is not open for your team yet.'): ApiError {

@@ -6,6 +6,7 @@ import {
   type IssueBadgeResponse,
   type ReissueBadgeResponse,
   type ResendBadgeEmailResponse,
+  type SendBadgeEmailsResponse,
   type TeamBadgesResponse,
 } from 'api-contracts';
 import { env } from '../../config/env';
@@ -14,7 +15,12 @@ import { ApiError } from '../../utils/api-error';
 import { logger } from '../../utils/logger';
 import { AuditAction, recordAuditLog } from '../audit/audit.service';
 import { decryptQrToken, encryptQrToken, generateQrToken } from '../checkin/qr-token';
-import { renderQrDataUrl, sendBadgeEmail } from './badge-mailer';
+import {
+  renderQrDataUrl,
+  sendBadgeEmail,
+  sendBadgeEmailWithTemplate,
+  type BadgeEmailTemplate,
+} from './badge-mailer';
 
 /**
  * QR badge lifecycle beyond check-in: issuance with a retrievable encrypted
@@ -30,11 +36,17 @@ function qrTokenKey(): Buffer {
   return Buffer.from(env.QR_TOKEN_KEY, 'base64');
 }
 
-/** Issue a QR badge within an already-open transaction (atomic with registration). */
+/**
+ * Issue a QR badge within an already-open transaction (atomic with registration).
+ * `queueEmail` marks it `pending` for a delivery the caller schedules right
+ * away; otherwise it stays unsent (`null`) until the admin dispatch, and the
+ * startup retry of `pending` badges never picks it up.
+ */
 export async function issueBadgeInTx(
   tx: Prisma.TransactionClient,
   participantId: string,
   participantName: string,
+  { queueEmail }: { queueEmail: boolean },
 ): Promise<IssueBadgeResponse> {
   const { token, tokenHash } = generateQrToken();
 
@@ -43,7 +55,7 @@ export async function issueBadgeInTx(
       participantId,
       tokenHash,
       tokenCiphertext: encryptQrToken(token, qrTokenKey()),
-      emailStatus: 'pending',
+      emailStatus: queueEmail ? 'pending' : null,
     },
     select: { issuedAt: true },
   });
@@ -70,18 +82,24 @@ export interface BadgeDelivery {
  * failure must not undo a registration, and the team can still read its
  * badges on the platform.
  */
-async function deliverOne(delivery: BadgeDelivery): Promise<'sent' | 'failed'> {
+async function deliverOne(
+  delivery: BadgeDelivery,
+  template?: BadgeEmailTemplate,
+): Promise<'sent' | 'failed'> {
   const prisma = getPrismaClient();
   let status: 'sent' | 'failed' = 'failed';
 
   try {
-    const sent = await sendBadgeEmail({
+    const email = {
       to: delivery.email,
       participantName: delivery.participantName,
       teamName: delivery.teamName,
       color: delivery.color,
       token: delivery.token,
-    });
+    };
+    const sent = template
+      ? await sendBadgeEmailWithTemplate(email, template)
+      : await sendBadgeEmail(email);
     status = sent ? 'sent' : 'failed';
 
     if (!sent) {
@@ -455,4 +473,106 @@ export async function resendFailedBadgeEmails(
 
   scheduleBadgeEmails(deliveries);
   return { queued: deliveries.length };
+}
+
+let bulkDispatchRunning = false;
+
+/**
+ * Emails every active badge (participants with an email), optionally with an
+ * admin-written subject and body. Admin only, audited.
+ *
+ * Returns as soon as the badges are queued: emails go out one at a time in the
+ * background (Gmail refuses many parallel SMTP connections), and each badge
+ * moves from `pending` to `sent` or `failed`. Only one dispatch runs at a
+ * time. A restart during a dispatch re-sends the `pending` badges with the
+ * default copy.
+ */
+export async function sendBulkBadgeEmailsWithTemplate(
+  adminUserId: string,
+  template: BadgeEmailTemplate = {},
+): Promise<SendBadgeEmailsResponse> {
+  if (bulkDispatchRunning) {
+    throw ApiError.conflict('A badge email dispatch is already running. Wait for it to finish.');
+  }
+  bulkDispatchRunning = true;
+
+  try {
+    const prisma = getPrismaClient();
+    const now = new Date();
+    const badges = await prisma.qrToken.findMany({
+      where: { revokedAt: null, participant: { email: { not: null } } },
+      include: {
+        participant: {
+          select: { name: true, email: true, color: true, team: { select: { name: true } } },
+        },
+      },
+    });
+
+    const deliveries: BadgeDelivery[] = [];
+    for (const badge of badges) {
+      const email = badge.participant.email;
+      if (!email) {
+        continue;
+      }
+
+      let token = badge.tokenCiphertext
+        ? decryptQrToken(badge.tokenCiphertext, qrTokenKey())
+        : null;
+      if (!token) {
+        // A badge issued before encrypted storage cannot be shown again: reissue
+        // it, like the failed-email resend does. Its old code stops working.
+        const issued = generateQrToken();
+        await prisma.qrToken.update({
+          where: { id: badge.id },
+          data: {
+            tokenHash: issued.tokenHash,
+            tokenCiphertext: encryptQrToken(issued.token, qrTokenKey()),
+            issuedAt: now,
+          },
+        });
+        token = issued.token;
+      }
+
+      deliveries.push({
+        participantId: badge.participantId,
+        participantName: badge.participant.name,
+        email,
+        teamName: badge.participant.team.name,
+        color: badge.participant.color,
+        token,
+      });
+    }
+
+    if (deliveries.length > 0) {
+      await prisma.qrToken.updateMany({
+        where: { participantId: { in: deliveries.map((delivery) => delivery.participantId) } },
+        data: { emailStatus: 'pending', emailLastSentAt: now },
+      });
+    }
+
+    await recordAuditLog({
+      action: AuditAction.BadgeEmailBulkResent,
+      actorId: adminUserId,
+      targetType: 'badge_batch',
+      targetId: String(deliveries.length),
+      summary: `Manual dispatch of ${deliveries.length} badge email(s)${
+        template.subject ? ` with custom subject "${template.subject.slice(0, 50)}"` : ''
+      }${template.body ? ' and custom body' : ''}`,
+    });
+
+    const batch = (async () => {
+      for (const delivery of deliveries) {
+        await deliverOne(delivery, template);
+      }
+    })().finally(() => {
+      bulkDispatchRunning = false;
+    });
+    inFlightDeliveries.add(batch);
+    void batch.finally(() => inFlightDeliveries.delete(batch));
+
+    return { queued: deliveries.length };
+  } catch (error) {
+    bulkDispatchRunning = false;
+    throw error;
+  }
 }

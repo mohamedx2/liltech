@@ -39,6 +39,7 @@ const teamInclude = {
     include: {
       badge: true,
       checkIn: { select: { checkedInAt: true, checkedByUser: { select: { name: true } } } },
+      paidBy: { select: { name: true } },
     },
   },
   ctfSolves: {
@@ -71,6 +72,8 @@ function toAdminTeam(team: TeamWithDetails): AdminTeam {
       color: participant.color,
       checkedInAt: participant.checkIn?.checkedInAt.toISOString() ?? null,
       checkedInByName: participant.checkIn?.checkedByUser.name ?? null,
+      paidAt: participant.paidAt?.toISOString() ?? null,
+      paidByName: participant.paidBy?.name ?? null,
       badge: participant.badge
         ? {
             issuedAt: participant.badge.issuedAt.toISOString(),
@@ -342,7 +345,7 @@ export async function addParticipant(
             color,
           },
         });
-        const issued = await issueBadgeInTx(tx, created.id, created.name);
+        const issued = await issueBadgeInTx(tx, created.id, created.name, { queueEmail: true });
         await recordAuditLog(
           {
             action: AuditAction.ParticipantAdded,
@@ -546,6 +549,48 @@ export async function undoCheckIn(participantId: string, adminUserId: string): P
       },
       tx,
     );
+    return toAdminTeam(await loadTeam(tx, participant.teamId));
+  });
+}
+
+// ── Participation fee ────────────────────────────────────────────────────────
+
+/**
+ * Marks one participant's participation fee as paid or unpaid. Idempotent:
+ * setting the current state again writes nothing and records no audit entry.
+ * Works for every team standing, so a withdrawn team's payment stays traceable.
+ */
+export async function setParticipantPayment(
+  participantId: string,
+  paid: boolean,
+  adminUserId: string,
+): Promise<AdminTeam> {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (tx) => {
+    const participant = await loadParticipant(tx, participantId);
+    const isPaid = participant.paidAt !== null;
+
+    if (paid !== isPaid) {
+      await tx.participant.update({
+        where: { id: participantId },
+        data: paid
+          ? { paidAt: new Date(), paidById: adminUserId }
+          : { paidAt: null, paidById: null },
+      });
+      await recordAuditLog(
+        {
+          action: paid
+            ? AuditAction.ParticipantPaymentMarked
+            : AuditAction.ParticipantPaymentCleared,
+          actorId: adminUserId,
+          targetType: 'participant',
+          targetId: participantId,
+        },
+        tx,
+      );
+    }
+
     return toAdminTeam(await loadTeam(tx, participant.teamId));
   });
 }

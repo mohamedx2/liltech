@@ -7,6 +7,7 @@ import {
   type AdminTeam,
   type AdminTeamListResponse,
   type AuditLogEntry,
+  type SendBadgeEmailsResponse,
 } from 'api-contracts';
 import { ApiClientError } from '../../errors';
 import { devMockState } from './dev-state';
@@ -76,6 +77,23 @@ export function handleGetAdminTeam(teamId: string): AdminTeam {
   return team;
 }
 
+/** Mock-only payment state (the real API stores it on the participant). */
+const mockPayments = new Map<string, string>();
+
+/** `PUT /admin/participants/:id/payment` in mock mode. */
+export function handleSetParticipantPayment(participantId: string, paid: boolean): AdminTeam {
+  const team = buildMockAdminTeam();
+  if (!team.participants.some((participant) => participant.id === participantId)) {
+    throw new ApiClientError({ message: 'Participant not found.', status: 404, code: 'NOT_FOUND' });
+  }
+  if (paid && !mockPayments.has(participantId)) {
+    mockPayments.set(participantId, new Date().toISOString());
+  } else if (!paid) {
+    mockPayments.delete(participantId);
+  }
+  return buildMockAdminTeam();
+}
+
 function buildMockAdminTeam(): AdminTeam {
   const team = devMockState.team;
   const leader = team.members.find((member) => member.roleInTeam === 'leader') ?? team.members[0];
@@ -99,6 +117,8 @@ function buildMockAdminTeam(): AdminTeam {
       color: member.color,
       checkedInAt: member.isCheckedIn ? devMockState.phaseChangedAt : null,
       checkedInByName: member.isCheckedIn ? 'Mock Organizer Admin' : null,
+      paidAt: mockPayments.get(member.id) ?? null,
+      paidByName: mockPayments.has(member.id) ? 'Mock Organizer Admin' : null,
       badge: {
         issuedAt: devMockState.phaseChangedAt,
         revokedAt: null,
@@ -165,6 +185,12 @@ export function handleGetAdminChallenges(): AdminChallengeListResponse {
   return { items: [], total: 0 };
 }
 
+/** Mock bulk send: simulates success with the team member count. */
+export function handleSendAllBadgeEmails(): SendBadgeEmailsResponse {
+  const team = devMockState.team;
+  return { queued: team.members.filter((m) => m.email).length };
+}
+
 /** Mock jury accounts derived from the dev mock users. */
 export function handleGetAdminJury(): AdminJuryListResponse {
   const items = DEV_MOCK_JURY.map((jury) => ({ ...jury }));
@@ -178,6 +204,8 @@ const DEV_MOCK_JURY: AdminJuryListResponse['items'] = [
     name: 'Mock Jury Evaluator',
     email: 'jury@liltech.mock',
     password: 'mock-jury-password',
+    challengeId: null,
+    challengeTitle: null,
     createdAt: '2026-11-13T18:00:00.000Z',
   },
 ];

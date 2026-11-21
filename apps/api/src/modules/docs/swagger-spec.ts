@@ -987,6 +987,84 @@ export const swaggerSpec = {
         },
       },
     },
+    '/jury/overview': {
+      get: {
+        tags: ['Jury'],
+        summary: 'Assigned challenge, progress and scoring window (Jury only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'object', description: 'juryOverviewResponseSchema' }, 'Overview'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+        },
+      },
+    },
+    '/jury/teams': {
+      get: {
+        tags: ['Jury'],
+        summary: 'Teams to score on my challenge (Jury only)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json({ type: 'array', description: 'juryTeamItemSchema[]' }, 'Teams'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+        },
+      },
+    },
+    '/jury/evaluation': {
+      get: {
+        tags: ['Jury'],
+        summary: 'One team, its latest submission and my scores (Jury only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'teamId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          200: json(
+            { type: 'object', description: 'juryTeamEvaluationResponseSchema' },
+            'Evaluation',
+          ),
+          400: errorResponse('Invalid team id'),
+          403: errorResponse('Requires jury role, or JURY_NOT_ASSIGNED'),
+          404: errorResponse('Team not part of the evaluation'),
+        },
+      },
+      post: {
+        tags: ['Jury'],
+        summary: 'Save my scores for a team (Jury only, scoring window, audited)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'teamId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                description: 'submitEvaluationRequestSchema (integers 0–25)',
+              },
+            },
+          },
+        },
+        responses: {
+          200: json({ type: 'object', description: 'submitEvaluationResponseSchema' }, 'Saved'),
+          400: errorResponse('Invalid scores'),
+          403: errorResponse('SCORING_CLOSED, JURY_NOT_ASSIGNED or wrong role'),
+          404: errorResponse('Team not part of the evaluation'),
+        },
+      },
+    },
     '/admin/jury/{id}': {
       patch: {
         tags: ['Admin'],
@@ -1328,6 +1406,23 @@ export const swaggerSpec = {
         },
       },
     },
+    '/admin/ctf': {
+      get: {
+        tags: ['Admin Operations'],
+        summary: 'Mini-CTF board: clock, stages and team progress (Admin only)',
+        description:
+          'Read-only. Stages expose `answerConfigured` only; answers and digests are never sent.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: json(
+            { type: 'object', description: 'adminCtfOverviewResponseSchema' },
+            'Mini-CTF board',
+          ),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+        },
+      },
+    },
     '/admin/teams/{teamId}': {
       get: {
         tags: ['Admin Operations'],
@@ -1563,6 +1658,37 @@ export const swaggerSpec = {
           403: errorResponse('Requires admin role'),
           404: errorResponse('Unknown participant'),
           409: errorResponse('Leader cannot be removed'),
+        },
+      },
+    },
+    '/admin/participants/{participantId}/payment': {
+      put: {
+        tags: ['Admin Operations'],
+        summary: 'Mark one participant fee paid or unpaid (audited, idempotent)',
+        security: [{ bearerAuth: [] }],
+        parameters: [uuidPathParam('participantId')],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['paid'],
+                additionalProperties: false,
+                properties: { paid: { type: 'boolean' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: json(
+            { type: 'object', description: 'AdminTeam (adminTeamSchema)' },
+            'Refreshed team',
+          ),
+          400: errorResponse('Invalid body'),
+          401: errorResponse('Unauthenticated'),
+          403: errorResponse('Requires admin role'),
+          404: errorResponse('Unknown participant'),
         },
       },
     },

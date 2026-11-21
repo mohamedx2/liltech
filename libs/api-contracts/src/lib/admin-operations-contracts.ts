@@ -97,6 +97,10 @@ export const adminParticipantSchema = z.strictObject({
   checkedInAt: isoTimestampSchema.nullable(),
   /** Staff member who recorded the check-in. */
   checkedInByName: z.string().nullable(),
+  /** When an organizer marked the participation fee paid; `null` while unpaid. */
+  paidAt: isoTimestampSchema.nullable(),
+  /** Organizer who marked the payment. */
+  paidByName: z.string().nullable(),
   /** `null` when the participant has no badge at all. */
   badge: adminParticipantBadgeSchema.nullable(),
 });
@@ -193,6 +197,76 @@ export const bulkResendBadgeEmailsResponseSchema = z.strictObject({
 });
 
 export type BulkResendBadgeEmailsResponse = z.infer<typeof bulkResendBadgeEmailsResponseSchema>;
+
+// ── Manual bulk badge email dispatch ─────────────────────────────────────────
+
+/**
+ * Default badge email, written by the organizers. Markers are replaced for
+ * each recipient: [participant name], [team name] and [color]. Lines starting
+ * with "•" become a bullet list, `[label](https://…)` becomes a named link and
+ * bare links stay clickable; the personal QR code is always shown below.
+ */
+export const BADGE_EMAIL_MARKERS = ['[participant name]', '[team name]', '[color]'] as const;
+
+export const DEFAULT_BADGE_EMAIL_SUBJECT =
+  'Welcome to LilTech 2026 – Important Information for Participants';
+
+export const DEFAULT_BADGE_EMAIL_BODY = `Dear [participant name],
+
+We are delighted to welcome you to LilTech 2026! We are excited to have you and your team "[team name]" join us for this experience.
+
+Here are the important details:
+
+• Date: Saturday, November 21st, 2026
+• Arrival time: 14:00 sharp
+• Location: EPI Digital School — [Open in Google Maps](https://maps.app.goo.gl/5D6wEEb5RzvnhCUy5)
+
+Important reminders:
+
+• Please make sure to arrive at 14:00 sharp.
+• Bring your National Identity Card (CIN): free SIM cards with internet connectivity are among the prizes during the event.
+• Your personal QR code is below (color group: [color]). Present it on arrival to complete your check-in.
+• Select your preferred workshop in this form — completing it is mandatory: [Fill out the workshop form](https://docs.google.com/forms/d/e/1FAIpQLSewHnWMuEocYdUrXVG7EDIZZ9enpO7FKqxA_3EBv8RiSnHDsQ/viewform)
+
+We encourage everyone to arrive on time and come prepared to make the most of this exciting experience. If you have any questions, feel free to contact the organizing team.
+
+We look forward to seeing you all!
+
+Best regards,
+The LilTech 2026 organizing team`;
+
+/**
+ * Request body for `POST /api/admin/badges/send-all`.
+ * Both fields are optional overrides; omit them to use the default template.
+ */
+export const sendBadgeEmailsRequestSchema = z.strictObject({
+  subject: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().min(1).max(5000).optional(),
+});
+
+export type SendBadgeEmailsRequest = z.infer<typeof sendBadgeEmailsRequestSchema>;
+
+/**
+ * The dispatch runs in the background, one email at a time: `queued` badges
+ * then move from `pending` to `sent` or `failed` (visible on Admin → Teams).
+ */
+export const sendBadgeEmailsResponseSchema = z.strictObject({
+  queued: z.number().int().nonnegative(),
+});
+
+export type SendBadgeEmailsResponse = z.infer<typeof sendBadgeEmailsResponseSchema>;
+
+// ── Participation fee ────────────────────────────────────────────────────────
+
+/**
+ * Body for `PUT /api/admin/participants/:participantId/payment` (admin only,
+ * audited). Idempotent: setting the current state again changes nothing.
+ */
+export const setParticipantPaymentRequestSchema = z.strictObject({
+  paid: z.boolean(),
+});
+
+export type SetParticipantPaymentRequest = z.infer<typeof setParticipantPaymentRequestSchema>;
 
 // ── Mini-CTF override ────────────────────────────────────────────────────────
 

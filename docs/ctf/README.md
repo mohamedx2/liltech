@@ -136,6 +136,15 @@ note instead of a broken link. Add or change it by re-provisioning that slug.
   windows keep guessing hostile without punishing a team that solves several
   stages in a row.
 
+## Admin board
+
+**Admin → Mini-CTF** (`/admin/ctf`, `GET /api/admin/ctf`) is the read-only
+event-night view: the server clock and countdown, every stage with its status and
+whether an answer is configured, and each team's current stage, attempts, hints,
+solve time and points. It flags required stages that are draft or have no answer,
+because they stop every team at that stage. It never shows answers or digests;
+answers change only through provisioning. Early access stays on each team's page.
+
 ## Main challenge
 
 `GET /api/challenges/current` returns `403 CTF_NOT_SOLVED` until every stage

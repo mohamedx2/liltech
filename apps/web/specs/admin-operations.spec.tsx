@@ -32,6 +32,8 @@ function participant(overrides: Partial<AdminParticipant> & { id: string; name: 
     color: 'blue',
     checkedInAt: null,
     checkedInByName: null,
+    paidAt: null,
+    paidByName: null,
     badge: {
       issuedAt: '2026-11-20T10:00:00.000Z',
       revokedAt: null,
@@ -110,6 +112,15 @@ describe('admin operations', () => {
       });
       expect(matchesFilter(failed, 'email-problem')).toBe(true);
       expect(matchesFilter(makeTeam({ status: 'withdrawn' }), 'inactive')).toBe(true);
+      expect(matchesFilter(team, 'unpaid')).toBe(true);
+      const allPaid = makeTeam({
+        participants: team.participants.map((p) => ({
+          ...p,
+          paidAt: '2026-11-21T17:00:00.000Z',
+          paidByName: 'Ops',
+        })),
+      });
+      expect(matchesFilter(allPaid, 'unpaid')).toBe(false);
       expect(
         matchesFilter(makeTeam({ participants: team.participants.slice(0, 3) }), 'needs-members'),
       ).toBe(true);
@@ -183,6 +194,40 @@ describe('admin operations', () => {
       await waitFor(() => {
         expect(checkIn).toHaveBeenCalledWith(team.participants[1].id);
         expect(screen.getByText('Karim Member checked in.')).toBeTruthy();
+      });
+    });
+
+    it('marks one member paid in one click and needs confirmation to undo it', async () => {
+      const team = makeTeam();
+      const paidTeam = makeTeam({
+        participants: team.participants.map((p, index) =>
+          index === 1 ? { ...p, paidAt: '2026-11-21T17:00:00.000Z', paidByName: 'Ops' } : p,
+        ),
+      });
+      vi.spyOn(api.admin, 'getTeam').mockResolvedValue(team);
+      const setPayment = vi
+        .spyOn(api.admin, 'setParticipantPayment')
+        .mockResolvedValueOnce(paidTeam)
+        .mockResolvedValueOnce(team);
+
+      render(<AdminTeamDetailView teamId={TEAM_ID} />);
+
+      await waitFor(() => expect(screen.getByText('Quantum Coders')).toBeTruthy());
+      expect(screen.getByText(`Paid 0 / ${team.participants.length}`)).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Karim Member as paid' }));
+      await waitFor(() => {
+        expect(setPayment).toHaveBeenCalledWith(team.participants[1].id, true);
+        expect(screen.getByText('Karim Member marked as paid.')).toBeTruthy();
+        expect(screen.getByText(`Paid 1 / ${team.participants.length}`)).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Karim Member as unpaid' }));
+      expect(setPayment).toHaveBeenCalledTimes(1);
+      fireEvent.click(await screen.findByRole('button', { name: 'Mark unpaid' }));
+      await waitFor(() => {
+        expect(setPayment).toHaveBeenLastCalledWith(team.participants[1].id, false);
+        expect(screen.getByText('Karim Member marked as unpaid.')).toBeTruthy();
       });
     });
 

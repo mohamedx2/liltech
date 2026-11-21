@@ -167,6 +167,66 @@ describeDb('admin operations', () => {
     expect(afterUndo.participants.every((p) => p.checkedInAt === null)).toBe(true);
   });
 
+  it('marks participants paid or unpaid one by one, audited and idempotent', async () => {
+    const team = await registerTeam('fees');
+    const [first, second] = team.participants;
+    const pay = (participantId: string, paid: boolean) =>
+      asAdmin(request(app).put(`/api/admin/participants/${participantId}/payment`)).send({ paid });
+
+    const initial = parseTeam(
+      (await asAdmin(request(app).get(`/api/admin/teams/${team.id}`))).body,
+    );
+    expect(initial.participants.every((p) => p.paidAt === null && p.paidByName === null)).toBe(
+      true,
+    );
+
+    const marked = await pay(first.id, true);
+    expect(marked.status).toBe(200);
+    const afterMark = parseTeam(marked.body);
+    expect(afterMark.participants.find((p) => p.id === first.id)).toMatchObject({
+      paidByName: 'Ops Admin',
+    });
+    expect(afterMark.participants.find((p) => p.id === first.id)?.paidAt).not.toBeNull();
+    // One by one: the teammate is untouched.
+    expect(afterMark.participants.find((p) => p.id === second.id)?.paidAt).toBeNull();
+
+    // Setting the same state again is a no-op, with no second audit entry.
+    expect((await pay(first.id, true)).status).toBe(200);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'participant.payment_marked', targetId: first.id },
+      }),
+    ).toBe(1);
+
+    const cleared = await pay(first.id, false);
+    expect(cleared.status).toBe(200);
+    expect(parseTeam(cleared.body).participants.find((p) => p.id === first.id)).toMatchObject({
+      paidAt: null,
+      paidByName: null,
+    });
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'participant.payment_cleared', targetId: first.id },
+      }),
+    ).toBe(1);
+  });
+
+  it('guards the payment endpoint: admin only, strict body, known participant', async () => {
+    const team = await registerTeam('fee-guard');
+    const participantId = team.participants[0].id;
+    const url = `/api/admin/participants/${participantId}/payment`;
+
+    expect((await request(app).put(url).send({ paid: true })).status).toBe(401);
+    expect((await asAdmin(request(app).put(url)).send({ paid: 'yes' })).status).toBe(400);
+    expect((await asAdmin(request(app).put(url)).send({ paid: true, amount: 10 })).status).toBe(
+      400,
+    );
+    const unknown = await asAdmin(
+      request(app).put('/api/admin/participants/00000000-0000-4000-8000-000000000000/payment'),
+    ).send({ paid: true });
+    expect(unknown.status).toBe(404);
+  });
+
   it('keeps a later progress state when a late member is scanned in', async () => {
     const team = await registerTeam('late');
     await prisma.team.update({ where: { id: team.id }, data: { progressState: 'ctf_solved' } });

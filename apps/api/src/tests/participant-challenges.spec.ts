@@ -782,6 +782,10 @@ describeDb('participant challenges', () => {
       const overview = await request(app).get('/api/submissions').set(auth(team.token));
       expect(overview.body.items[0]).toMatchObject({ access: 'public', canSubmit: true });
 
+      // The team portal reports the same split: submitted, Mini-CTF unsolved.
+      const portal = await request(app).get('/api/participants/team').set(auth(team.token));
+      expect(portal.body).toMatchObject({ progress: 'submitted', ctfSolved: false });
+
       // The Mini-CTF itself is still untouched for this team.
       const ctf = await request(app).get('/api/ctf/chain').set(auth(team.token));
       expect(ctf.status).toBe(200);

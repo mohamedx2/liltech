@@ -44,25 +44,32 @@ enum Role {
 /// Account for one of the API roles. Created by registration (team) or
 /// administratively (jury/admin — provisioning endpoint pending decision).
 model User {
-  id                String          @id @default(uuid()) @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
   role              Role
-  email             String          @unique @db.VarChar(254)
-  name              String          @db.VarChar(100)
+  email             String           @unique @db.VarChar(254)
+  name              String           @db.VarChar(100)
   /// bcrypt hash (slow, salted). Never logged, never returned.
   passwordHash      String
   /// Jury accounts only: the password kept readable for administrators, who
   /// hand it to the jury member (organizer decision, AGENTS.md §9). Returned
   /// exclusively by admin-only endpoints; never logged. Null for other roles.
-  juryPlainPassword String?         @db.VarChar(256)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  juryPlainPassword String?          @db.VarChar(256)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   sessions          Session[]
   team              Team?
   checkInRecords    CheckInRecord[]
+  paymentsMarked    Participant[]    @relation("ParticipantPaidBy")
   auditLogs         AuditLog[]
   announcements     Announcement[]
   submissions       Submission[]
+  /// Jury accounts only: the challenge this juror evaluates (one jury per
+  /// challenge). Null until an administrator assigns it.
+  juryChallenge     Challenge?       @relation("JuryChallenge", fields: [juryChallengeId], references: [id], onDelete: SetNull)
+  juryChallengeId   String?          @db.Uuid
+  juryEvaluations   JuryEvaluation[]
 
+  @@index([juryChallengeId])
   @@map("users")
 }
 
@@ -95,23 +102,24 @@ model Team {
   /// Why the team was withdrawn or disqualified (shown to administrators).
   statusReason    String?             @db.VarChar(300)
   statusChangedAt DateTime?
-    createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   /// When the team cleared the Mini-CTF chain (server time). Null until then.
-  ctfSolvedAt       DateTime?
+  ctfSolvedAt     DateTime?
   /// Automatic Mini-CTF score (10/7/4.5/2.5/0 by solve window). Null until solved.
-  ctfPoints         Float?
+  ctfPoints       Float?
   /// Challenge 01 jury score. Filled by the jury module (later task); no logic here.
-  c1JuryScore       Float?
+  c1JuryScore     Float?
   /// Challenge 02 jury score. Filled by the jury module (later task); no logic here.
-  c2JuryScore       Float?
-  participants      Participant[]
+  c2JuryScore     Float?
+  participants    Participant[]
   /// LOUAGE 404 chain: per-stage state and the timestamped attempt log.
-  ctfProgress       CtfProgress[]
-  ctfAttempts       CtfAttempt[]
+  ctfProgress     CtfProgress[]
+  ctfAttempts     CtfAttempt[]
   /// Per-challenge Mini-CTF solves (early access to a running challenge).
-  ctfSolves         ChallengeCtfSolve[]
-  submissions       Submission[]
+  ctfSolves       ChallengeCtfSolve[]
+  submissions     Submission[]
+  juryEvaluations JuryEvaluation[]
 
   @@index([progressState])
   @@index([status])
@@ -158,6 +166,12 @@ model Participant {
   phone      String?        @db.VarChar(20)
   /// Badge color, balanced across all participants at registration time.
   color      BadgeColor?
+  /// When an organizer marked this participant's participation fee as paid;
+  /// null while unpaid. Set one participant at a time, audited.
+  paidAt     DateTime?
+  /// Organizer who marked the payment.
+  paidBy     User?          @relation("ParticipantPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  paidById   String?        @db.Uuid
   createdAt  DateTime       @default(now())
   badge      QrToken?
   checkIn    CheckInRecord?
@@ -304,6 +318,8 @@ model Challenge {
   updatedAt          DateTime            @updatedAt
   ctfSolves          ChallengeCtfSolve[]
   submissions        Submission[]
+  juryMembers        User[]              @relation("JuryChallenge")
+  juryEvaluations    JuryEvaluation[]
 
   @@index([status])
   @@map("challenges")
@@ -466,4 +482,31 @@ enum CtfOutcome {
   rate_limited
 
   @@map("ctf_outcome")
+}
+
+/// One juror's scores for one team on one challenge. Scores stay per juror:
+/// how several jurors combine into a final score is still an open question
+/// (docs/decisions/OPEN_QUESTIONS.md #5), so nothing is aggregated here.
+model JuryEvaluation {
+  id                    String    @id @default(uuid()) @db.Uuid
+  jury                  User      @relation(fields: [juryUserId], references: [id], onDelete: Restrict)
+  juryUserId            String    @db.Uuid
+  team                  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId                String    @db.Uuid
+  challenge             Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId           String    @db.Uuid
+  /// Four criteria, 0–25 each (integers).
+  technicalExecution    Int
+  innovationOriginality Int
+  uiUxDesign            Int
+  pitchPresentation     Int
+  totalScore            Int
+  /// Private deliberation notes: jury members and organizers only.
+  notes                 String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([juryUserId, teamId, challengeId])
+  @@index([challengeId, teamId])
+  @@map("jury_evaluations")
 }

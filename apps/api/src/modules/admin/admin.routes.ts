@@ -4,10 +4,13 @@ import {
   auditLogListRequestSchema,
   grantCtfSolveRequestSchema,
   renameTeamRequestSchema,
+  sendBadgeEmailsRequestSchema,
+  setParticipantPaymentRequestSchema,
   setTeamStatusRequestSchema,
   teamCtfSolveParamsSchema,
   teamIdParamsSchema,
   updateParticipantRequestSchema,
+  type AdminCtfOverviewResponse,
   type AdminTeamListResponse,
   type AuditLogEntry,
 } from 'api-contracts';
@@ -22,8 +25,14 @@ import {
   type AdminJuryListResponse,
 } from 'api-contracts';
 import { authenticatedUserId, parseOrThrow } from '../../utils/validation';
-import { reissueBadge, resendBadgeEmail, resendFailedBadgeEmails } from '../badges/badges.service';
+import {
+  reissueBadge,
+  resendBadgeEmail,
+  resendFailedBadgeEmails,
+  sendBulkBadgeEmailsWithTemplate,
+} from '../badges/badges.service';
 import { getAdminOverview } from './admin.service';
+import { getAdminCtfOverview } from './ctf-overview.service';
 import {
   addParticipant,
   deleteTeam,
@@ -35,6 +44,7 @@ import {
   renameTeam,
   resetTeamPassword,
   revokeCtfSolve,
+  setParticipantPayment,
   setTeamStatus,
   undoCheckIn,
   updateParticipant,
@@ -49,6 +59,8 @@ import {
 /**
  * Admin operational endpoints.
  * - `GET /api/admin/overview`  — live situation board (aggregates).
+ * - `GET /api/admin/ctf`       — Mini-CTF board: clock, stage configuration and
+ *   per-team progress (never answers or digests).
  * - `GET /api/admin/audit-log` — audited administrative actions, newest first,
  *   optionally filtered by action prefix.
  * - `GET /api/admin/teams[/:teamId]` — roster with contact, badge, check-in and
@@ -57,6 +69,7 @@ import {
  * - `GET /api/admin/jury`      — jury accounts, including their passwords.
  * - `POST /api/admin/jury`, `PATCH|DELETE /api/admin/jury/:id` — jury management (audited).
  * - `POST /api/admin/participants/:participantId/resend-badge-email` — no hourly limit (audited).
+ * - `PUT /api/admin/participants/:participantId/payment` — mark the fee paid/unpaid (audited).
  *
  * Every route here is admin-only.
  */
@@ -95,6 +108,11 @@ const adminOnly = [requireAuth, requireRole('admin')] as const;
 
 adminRouter.get('/admin/overview', ...adminOnly, async (_req, res) => {
   res.status(200).json(await getAdminOverview());
+});
+
+adminRouter.get('/admin/ctf', ...adminOnly, async (_req, res) => {
+  const body: AdminCtfOverviewResponse = await getAdminCtfOverview();
+  res.status(200).json(body);
 });
 
 // ── Teams ────────────────────────────────────────────────────────────────────
@@ -166,6 +184,12 @@ adminRouter.delete('/admin/participants/:participantId', ...adminOnly, async (re
   res.status(200).json(await removeParticipant(participantId, authenticatedUserId(req)));
 });
 
+adminRouter.put('/admin/participants/:participantId/payment', ...adminOnly, async (req, res) => {
+  const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
+  const { paid } = parseOrThrow(setParticipantPaymentRequestSchema, req.body);
+  res.status(200).json(await setParticipantPayment(participantId, paid, authenticatedUserId(req)));
+});
+
 adminRouter.post('/admin/participants/:participantId/check-in', ...adminOnly, async (req, res) => {
   const { participantId } = parseOrThrow(participantIdParamsSchema, req.params);
   res.status(200).json(await manualCheckIn(participantId, authenticatedUserId(req)));
@@ -191,6 +215,11 @@ adminRouter.post(
 
 adminRouter.post('/admin/badges/resend-failed', ...adminOnly, async (req, res) => {
   res.status(200).json(await resendFailedBadgeEmails(authenticatedUserId(req)));
+});
+
+adminRouter.post('/admin/badges/send-all', ...adminOnly, async (req, res) => {
+  const input = parseOrThrow(sendBadgeEmailsRequestSchema, req.body);
+  res.status(200).json(await sendBulkBadgeEmailsWithTemplate(authenticatedUserId(req), input));
 });
 
 // ── Jury ─────────────────────────────────────────────────────────────────────

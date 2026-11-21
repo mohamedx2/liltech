@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import type { AdminJuryAccount } from 'api-contracts';
+import type { AdminJuryAccount, ChallengeAdminDetail } from 'api-contracts';
 import { api } from '@/lib/api';
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/state-panel';
 import { Button } from '@/components/ui/button';
-import { FormField, TextInput } from '@/components/ui/input';
+import { FormField, Select, TextInput } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/table';
 import {
   ConfirmActionDialog,
@@ -19,7 +20,8 @@ import styles from './admin-tools.module.css';
 /**
  * Jury account management: create accounts (the server can generate the
  * password), read a password back to a jury member who forgot it, change
- * it (their sessions end), and delete accounts. Jury passwords are readable
+ * it (their sessions end), assign the challenge each juror scores, and delete
+ * accounts. Jury passwords are readable
  * to administrators by organizer decision (AGENTS.md §9).
  */
 
@@ -41,12 +43,21 @@ export function AdminJuryView() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [challenges, setChallenges] = useState<ChallengeAdminDetail[]>([]);
+  /** '' means "not assigned yet". */
+  const [challengeField, setChallengeField] = useState('');
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      setAccounts((await api.admin.getJuryAccounts()).items);
+      const [jury, challengeList] = await Promise.all([
+        api.admin.getJuryAccounts(),
+        // The roster stays usable even if the challenge list cannot load.
+        api.admin.getChallenges().catch(() => ({ items: [], total: 0 })),
+      ]);
+      setAccounts(jury.items);
+      setChallenges([...challengeList.items].sort((a, b) => a.position - b.position));
     } catch (error) {
       setLoadError(errorMessage(error, 'Failed to load jury accounts.'));
     } finally {
@@ -63,6 +74,7 @@ export function AdminJuryView() {
     setName(action.kind === 'edit' ? action.account.name : '');
     setEmail(action.kind === 'edit' ? action.account.email : '');
     setPassword('');
+    setChallengeField(action.kind === 'edit' ? (action.account.challengeId ?? '') : '');
     setPending(action);
   };
 
@@ -81,6 +93,7 @@ export function AdminJuryView() {
         name: name.trim(),
         email: email.trim(),
         ...(password ? { password } : {}),
+        challengeId: challengeField || null,
       });
       setAccounts((current) => [created, ...(current ?? [])]);
       setRevealed((current) => new Set(current).add(created.id));
@@ -93,6 +106,9 @@ export function AdminJuryView() {
         ...(name.trim() !== pending.account.name ? { name: name.trim() } : {}),
         ...(email.trim() !== pending.account.email ? { email: email.trim() } : {}),
         ...(password ? { password } : {}),
+        ...((challengeField || null) !== pending.account.challengeId
+          ? { challengeId: challengeField || null }
+          : {}),
       };
       const updated = await api.admin.updateJuryAccount(pending.account.id, changes);
       setAccounts((current) =>
@@ -127,6 +143,7 @@ export function AdminJuryView() {
     pending?.kind === 'edit' &&
     name.trim() === pending.account.name &&
     email.trim() === pending.account.email &&
+    (challengeField || null) === pending.account.challengeId &&
     !password;
 
   return (
@@ -142,8 +159,9 @@ export function AdminJuryView() {
           Jury
         </h1>
         <p className={styles.description}>
-          Jury accounts with evaluation access. Passwords are readable here so you can hand them to
-          jury members; they are never shown anywhere else.
+          Jury accounts with evaluation access. Assign each juror the challenge they score: they see
+          only that challenge. Passwords are readable here so you can hand them to jury members;
+          they are never shown anywhere else.
         </p>
       </section>
 
@@ -189,6 +207,16 @@ export function AdminJuryView() {
                         {revealed.has(account.id) ? 'Hide' : 'Show'}
                       </Button>
                     </div>
+                  ),
+              },
+              {
+                key: 'challenge',
+                header: 'Scores',
+                render: (account) =>
+                  account.challengeTitle ? (
+                    <span className={styles.strong}>{account.challengeTitle}</span>
+                  ) : (
+                    <Badge tone="warning">Not assigned</Badge>
                   ),
               },
               {
@@ -261,6 +289,26 @@ export function AdminJuryView() {
             )}
           </FormField>
           <FormField
+            label="Challenge (jury track)"
+            hint="The juror scores every team on this challenge only. You can assign it later."
+          >
+            {({ id, describedBy }) => (
+              <Select
+                id={id}
+                aria-describedby={describedBy}
+                value={challengeField}
+                onChange={(event) => setChallengeField(event.target.value)}
+              >
+                <option value="">Not assigned yet</option>
+                {challenges.map((challenge) => (
+                  <option key={challenge.id} value={challenge.id}>
+                    {`Challenge ${challenge.position} — ${challenge.title}`}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          <FormField
             label={pending.kind === 'create' ? 'Password (optional)' : 'New password (optional)'}
             hint={
               pending.kind === 'create'
@@ -294,7 +342,8 @@ export function AdminJuryView() {
         >
           <p style={{ margin: 0 }}>
             Delete the account of <strong>{pending.account.name}</strong> ({pending.account.email})?
-            They are signed out immediately. This cannot be undone.
+            They are signed out immediately. This cannot be undone. A juror who already scored teams
+            cannot be deleted: unassign them instead.
           </p>
         </ConfirmActionDialog>
       ) : null}

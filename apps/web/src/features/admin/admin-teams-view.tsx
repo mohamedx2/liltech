@@ -36,6 +36,7 @@ export const ROSTER_FILTERS = {
   'email-problem': 'Badge email problem',
   'revoked-badge': 'Has a revoked badge',
   'needs-members': 'Below minimum size (4)',
+  unpaid: 'Has an unpaid member',
   inactive: 'Withdrawn or disqualified',
 } as const;
 
@@ -69,6 +70,8 @@ export function matchesFilter(team: AdminTeam, filter: RosterFilter): boolean {
       return active && total < TEAM_MEMBERS_MIN;
     case 'inactive':
       return !active;
+    case 'unpaid':
+      return team.participants.some((participant) => participant.paidAt === null);
   }
 }
 
@@ -106,6 +109,7 @@ export function rosterToCsv(teams: readonly AdminTeam[]): string {
     'Mobile number',
     'Badge color',
     'Checked in at',
+    'Paid at',
     'Badge email',
     'Badge revoked',
   ];
@@ -121,6 +125,7 @@ export function rosterToCsv(teams: readonly AdminTeam[]): string {
       participant.phone ?? '',
       participant.color ?? '',
       participant.checkedInAt ?? '',
+      participant.paidAt ?? '',
       participant.badge?.emailStatus ?? '',
       participant.badge?.revokedAt ? 'yes' : 'no',
     ]),
@@ -338,6 +343,19 @@ export function AdminTeamsView() {
                 },
               },
               {
+                key: 'paid',
+                header: 'Paid',
+                render: (team) => {
+                  const paid = team.participants.filter((participant) => participant.paidAt).length;
+                  const total = team.participants.length;
+                  return (
+                    <Badge tone={paid === total ? 'success' : paid > 0 ? 'warning' : 'neutral'}>
+                      {paid} / {total}
+                    </Badge>
+                  );
+                },
+              },
+              {
                 key: 'members',
                 header: 'Members',
                 render: (team) => (
@@ -348,6 +366,7 @@ export function AdminTeamsView() {
                         {participant.name}
                         {participant.isLeader ? ' (leader)' : ''}
                         {participant.checkedInAt ? ' ✓' : ''}
+                        {participant.paidAt ? '' : ' · unpaid'}
                         {participant.badge?.emailStatus === 'failed' ? ' · email failed' : ''}
                         {!participant.email ? ' · no email' : ''}
                         {participant.badge?.revokedAt ? ' · badge revoked' : ''}

@@ -5,6 +5,7 @@ import {
   TeamProgressState,
   type AuditLogEntry,
   type BadgeSummary,
+  type JuryCriteriaScores,
 } from 'api-contracts';
 import type {
   AnnouncementItem,
@@ -73,7 +74,7 @@ export interface DevMockState {
   juryEvaluations: Map<
     string,
     {
-      criteriaScores: Record<string, number>;
+      criteriaScores: JuryCriteriaScores;
       notes: string;
       totalScore: number;
       evaluatedAt: string;
@@ -94,6 +95,7 @@ function createPortalState() {
       id: '7d1c2f3e-0000-4000-8000-000000000001',
       name: 'Sample Builders (Dev Mock)',
       progress: TeamProgressState.CheckedIn,
+      ctfSolved: false,
       isCheckedIn: true,
       members: [
         {

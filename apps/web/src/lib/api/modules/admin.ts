@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   adminChallengeListResponseSchema,
+  adminCtfOverviewResponseSchema,
   adminJuryAccountDetailSchema,
   adminJuryListResponseSchema,
   adminOverviewResponseSchema,
@@ -13,8 +14,10 @@ import {
   reissueBadgeResponseSchema,
   resendBadgeEmailResponseSchema,
   resetTeamPasswordResponseSchema,
+  sendBadgeEmailsResponseSchema,
   type AddParticipantRequest,
   type AdminChallengeListResponse,
+  type AdminCtfOverviewResponse,
   type AdminJuryAccountDetail,
   type AdminJuryListResponse,
   type AdminOverviewResponse,
@@ -30,6 +33,8 @@ import {
   type RenameTeamRequest,
   type ResendBadgeEmailResponse,
   type ResetTeamPasswordResponse,
+  type SendBadgeEmailsRequest,
+  type SendBadgeEmailsResponse,
   type SetTeamStatusRequest,
   type UpdateChallengeRequest,
   type UpdateJuryAccountRequest,
@@ -63,6 +68,7 @@ type Signal = Pick<ApiRequestConfig, 'signal'>;
  */
 export interface AdminApi {
   getOverview: (config?: Signal) => Promise<AdminOverviewResponse>;
+  getCtfOverview: (config?: Signal) => Promise<AdminCtfOverviewResponse>;
   getAuditLog: (
     params?: { limit?: number; offset?: number; action?: string },
     config?: Signal,
@@ -89,10 +95,12 @@ export interface AdminApi {
   removeParticipant: (participantId: string) => Promise<AdminTeam>;
   checkInParticipant: (participantId: string) => Promise<AdminTeam>;
   undoCheckIn: (participantId: string) => Promise<AdminTeam>;
+  setParticipantPayment: (participantId: string, paid: boolean) => Promise<AdminTeam>;
   reissueBadge: (participantId: string) => Promise<ReissueBadgeResponse>;
   resendBadgeEmail: (participantId: string) => Promise<ResendBadgeEmailResponse>;
   revokeBadge: (participantId: string) => Promise<void>;
   resendFailedBadgeEmails: () => Promise<BulkResendBadgeEmailsResponse>;
+  sendBadgeEmails: (opts: SendBadgeEmailsRequest) => Promise<SendBadgeEmailsResponse>;
 
   // Challenges
   getChallenges: (config?: Signal) => Promise<AdminChallengeListResponse>;
@@ -142,7 +150,7 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
   ) => parseWith(schema, await transport.request<unknown>(path, { signal: config?.signal }), label);
 
   const send = async <Schema extends z.ZodType>(
-    method: 'POST' | 'PATCH' | 'DELETE',
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     schema: Schema,
     label: string,
@@ -163,6 +171,9 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
   return {
     getOverview: (config) =>
       get(PLANNED_ENDPOINTS.ADMIN_OVERVIEW, adminOverviewResponseSchema, 'Overview', config),
+
+    getCtfOverview: (config) =>
+      get(PLANNED_ENDPOINTS.ADMIN_CTF, adminCtfOverviewResponseSchema, 'Mini-CTF board', config),
 
     getAuditLog(params, config) {
       const query = new URLSearchParams({
@@ -214,6 +225,8 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
       send('POST', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
     undoCheckIn: (participantId) =>
       send('DELETE', `${participantPath(participantId)}/check-in`, adminTeamSchema, 'Team'),
+    setParticipantPayment: (participantId, paid) =>
+      send('PUT', `${participantPath(participantId)}/payment`, adminTeamSchema, 'Team', { paid }),
     reissueBadge: (participantId) =>
       send(
         'POST',
@@ -240,6 +253,14 @@ export function createAdminApi(transport: ApiTransport): AdminApi {
         PLANNED_ENDPOINTS.ADMIN_BADGES_RESEND_FAILED,
         bulkResendBadgeEmailsResponseSchema,
         'Bulk resend',
+      ),
+    sendBadgeEmails: (opts) =>
+      send(
+        'POST',
+        PLANNED_ENDPOINTS.ADMIN_BADGES_SEND_ALL,
+        sendBadgeEmailsResponseSchema,
+        'Send all badge emails',
+        opts,
       ),
 
     getChallenges: (config) =>
